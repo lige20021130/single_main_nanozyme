@@ -1,0 +1,15 @@
+- [x] kinetics bucket fallback: EvidenceBucketBuilder.build中kinetics/application/mechanism bucket严格过滤后为空时，使用宽松过滤重新填充
+- [x] kinetics bucket fallback: diagnostics中记录"kinetics_bucket_fallback_applied"警告
+- [x] kinetics bucket fallback: application和mechanism bucket同样有fallback
+- [x] OCR修复: _OCR_FIXES覆盖Ce/Ag/Ti/V/Cr/Mo/W/Ru/Rh/Ir/La等金属双字母错误
+- [x] OCR修复: _OCR_COMPOUND_FIXES不误伤合法化学式（如Fe3C不被修复为F-3-C）
+- [x] OCR修复: 增加数字OCR修复规则（O/0混淆）
+- [x] 合并策略: _merge_llm中>10倍差异时判断规则值是否为LLM值的截断前缀
+- [x] 合并策略: _merge_llm中>10倍差异时判断规则值是否在合理量级范围外
+- [x] 合并策略: 不可靠规则值时使用LLM值替换
+- [x] 单位归一化: _extract_kinetics_from_text写入单位前调用normalize_unit
+- [x] 单位归一化: _extract_kinetics_from_table写入单位前调用normalize_unit
+- [x] 单位归一化: _extract_kcat_from_text写入单位前调用normalize_unit
+- [x] 全链路验证: 10篇文献关键字段填充率对比改革前有提升
+- [x] 全链路验证: 无单位异常（Ms、×10⁻²等）
+- [x] 全链路验证: 迭代记录已更新

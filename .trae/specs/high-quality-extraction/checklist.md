@@ -1,0 +1,20 @@
+- [ ] kcat 量级下限从 1e-3 放宽至 1e-6，超出原范围的值标记 needs_review=True
+- [ ] kcat_Km 量级下限从 1e0 放宽至 1e-3，超出原范围的值标记 needs_review=True
+- [ ] Km 量级下限从 1e-9 放宽至 1e-12，超出原范围的值标记 needs_review=True
+- [ ] Vmax 量级下限从 1e-12 放宽至 1e-15，超出原范围的值标记 needs_review=True
+- [ ] Lineweaver-Burk 数据不再硬性拒绝，改为 needs_review=True 标记
+- [ ] figure_candidate 来源不再硬性拒绝，改为 needs_review=True 标记
+- [ ] CONCENTRATION_UNITS 包含 M/L、mM/L、μM/L 等变体
+- [ ] RATE_UNITS 包含 M/h、mM/h、μM/h、mol/L/s 等变体
+- [ ] normalize_unit 正确处理 M/L、mol/L/s、uM/min 等变体
+- [ ] 复合材料名（如 MoS2@CoFe2O4）被拆分为子组件，优先选择含金属元素的子组件
+- [ ] 候选材料与酶活类型关联性评分加分生效
+- [ ] _REAGENT_NAMES 包含 RPMI-1640、DMEM、FBS 等培养基名称
+- [ ] 规则 Km/Vmax/kcat/kcat_Km 为 None 时直接采用 LLM 值
+- [ ] LLM 提供了规则未提取的字段时自动补充
+- [ ] 合并后的字段有来源标记（source: "llm_supplement" 或 "rule"）
+- [ ] 单位输出格式统一（mM·s⁻¹ → mM/s 等）
+- [ ] 酶类型命名统一（peroxidase (POD)-like → peroxidase-like）
+- [ ] 材料名称去除冗余后缀（nanoparticles、NPs、nanozyme 等）
+- [ ] 10篇文献关键字段填充率对比改革前有提升
+- [ ] 无系统性拒绝有效值的情况

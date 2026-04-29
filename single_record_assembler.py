@@ -15,6 +15,16 @@ _CITE_THIS_RE = re.compile(r'(?i)cite\s+this|please\s+cite|citation|doi:\s*10\.'
 _JOURNAL_PAGE_RE = re.compile(r'\b\d{4,5}\s*-\s*\d{4,5}\b')
 _AUTHOR_SEPARATOR_RE = re.compile(r'[;,]|\band\b')
 
+_REDUNDANT_SUFFIXES = (
+    "nanoparticles", "nps", "nanozyme", "nanosheets", "nanorods",
+    "nanofibers", "nanoclusters", "nanocubes", "nanowires", "nanotubes",
+    "nanostructures", "nanocomposites", "nanoplates", "nanoflowers", "nanospheres",
+)
+_REDUNDANT_SUFFIX_RE = re.compile(
+    r'\s+(' + '|'.join(re.escape(s) for s in _REDUNDANT_SUFFIXES) + r')\s*$',
+    re.IGNORECASE,
+)
+
 
 def _clean_author_field(author: Optional[str]) -> Optional[str]:
     if not author:
@@ -326,8 +336,13 @@ class SingleRecordAssembler:
         nanozyme_systems: List[Dict[str, Any]],
         selected_name: Optional[str],
     ) -> Dict[str, Any]:
+        cleaned_name = selected_name
+        if cleaned_name:
+            cleaned_name = _REDUNDANT_SUFFIX_RE.sub('', cleaned_name).strip()
+
         result: Dict[str, Any] = {
-            "material_name": selected_name,
+            "material_name": cleaned_name,
+            "raw_name": selected_name if selected_name and selected_name != cleaned_name else None,
             "synthesis_method": None,
             "synthesis_conditions": {
                 "temperature": None, "time": None, "precursors": [],

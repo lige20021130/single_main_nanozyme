@@ -169,7 +169,10 @@ _REAGENT_NAMES = frozenset({
     "NADH", "NAD+", "NADPH", "NADP+",
     "HUVEC", "HeLa", "HEK293", "MCF-7", "4T1", "RAW264.7", "RAW 264.7",
     "HepG2", "A549", "MRC-5", "NIH3T3", "L929", "COS-7",
-    "RPMI", "DMEM", "FBS", "HAcNaAc", "NaAc-HAc",
+    "RPMI", "RPMI-1640", "RPMI 1640", "DMEM", "FBS",
+    "BSA", "HSA", "PVP", "PVA", "PEG", "PEO",
+    "Triton", "Tween-20", "Tween-80", "Triton X-100",
+    "CH3CN", "Acetonitrile", "Ethanol", "Methanol", "Isopropanol",
     "E coli", "E. coli", "S aureus", "S. aureus",
 })
 
@@ -236,6 +239,10 @@ _COMPOSITE_PATTERN_RE = re.compile(
     r"|(?:\b[A-Z][a-z]?\d*(?:O\d*)?\s*(?:@|/)\s*[A-Z][a-z]?\d*(?:O\d*)?\b)",
 )
 
+_METAL_ELEMENTS_RE = re.compile(
+    r'\b(?:Fe|Co|Ni|Mn|Cu|Zn|Ce|Au|Ag|Pt|Pd|Ti|V|Cr|Mo|W|Ru|Rh|Ir|La|Pr|Nd|Sm|Eu|Gd|Tb|Dy|Ho|Er|Tm|Yb|Lu)\d*'
+)
+
 _SECTION_SCORE_MAP = {
     "title": 8, "abstract": 6, "synthesis": 8,
     "characterization": 5, "characterization_caption": 5,
@@ -278,7 +285,7 @@ _KM_PATTERNS = [
     re.compile(r'\bKm\s+of\s+(\w[\w\d\-]*)\s+(?:was|is|=|:|≈|~)\s*([\d.]+)\s*(?:±\s*[\d.]+\s*)?(mM|μM|uM|M|mmol|umol|nmol)', re.I),
     re.compile(r'\bKm\s*[\(（]\s*(\w[\w\d\-]*)\s*[\)）]\s*=\s*([\d.]+)\s*[×x]\s*10[\^⁻\-–]?\s*[-]?(\d+)\s*(mM|μM|uM|M)', re.I),
     re.compile(r'\bMichaelis\s+constant\s*(?:for\s+)?(\w[\w\d\-]*)?\s*(?:was|=|:|≈|~)\s*([\d.]+)\s*(mM|μM|uM|M)', re.I),
-    re.compile(r'\bKm\s+(?:values?\s+)?(?:to|toward|for)\s+(\w[\w\d\-]*)\s+(?:and|&)\s+\w[\w\d\-]*\s+(?:are|were|is|was)\s*([\d.]+)\s*(?:±\s*[\d.]+\s*)?(mM|μM|uM|M)', re.I),
+    re.compile(r'\bKm\s+(?:values?\s+)?(?:to|toward|for)\s+(\S+)\s+(?:and|&)\s+\S+\s+(?:are|were|is|was)\s*([\d.]+)\s+(?:and|&)\s*[\d.]+\s*(mM|μM|uM|M)', re.I),
     re.compile(r'\bKm\s+(?:was|is|were|are)\s*(?:calculated\s+(?:to\s+be|as)\s+)?(?:approximately\s+)?([\d.]+)\s*(?:±\s*[\d.]+\s*)?(mM|μM|uM|M)', re.I),
     re.compile(r'\bKm\b[^.]{0,40}?\(([\d.]+)\s*(mM|μM|uM|M)\)', re.I),
     re.compile(r'\bKm\s*(?:of|for)\s+\S+\s+(?:toward|to)\s+\w[\w\d\-]*\s+(?:was|is|=|:)\s*([\d.]+)\s*(mM|μM|uM|M)', re.I),
@@ -294,19 +301,19 @@ _KM_VMAX_JOINT_PATTERNS = [
 ]
 
 _KCAT_PATTERNS = [
-    re.compile(r'\bkcat\s*[\(（]\s*(\w[\w\d\-]*)\s*[\)）]\s*(?:was|=|:|≈|~)\s*([\d.]+(?:\s*[×x\u00d7]\s*10[\u207b⁻\-–\u2212\u2013]?\s*[-]?\d+)?)\s*(s[\u207b⁻\-–\u2212\u2013]?1|s\-1|min[\u207b⁻\-–\u2212\u2013]?1|min\-1)', re.I),
-    re.compile(r'\bkcat\s+(?:for\s+)?(\w[\w\d\-]*)?\s*(?:was|=|:|≈|~)\s*([\d.]+(?:\s*[×x\u00d7]\s*10[\u207b⁻\-–\u2212\u2013]?\s*[-]?\d+)?)\s*(s[\u207b⁻\-–\u2212\u2013]?1|s\-1|min[\u207b⁻\-–\u2212\u2013]?1|min\-1)', re.I),
-    re.compile(r'\bkcat\s*(?:was|=|:|≈|~)\s*([\d.]+(?:\s*[×x\u00d7]\s*10[\u207b⁻\-–\u2212\u2013]?\s*[-]?\d+)?)\s*(s[\u207b⁻\-–\u2212\u2013]?1|s\-1|min[\u207b⁻\-–\u2212\u2013]?1|min\-1)', re.I),
-    re.compile(r'\bturnover\s+(?:number|frequency)\s*(?:was|=|:|≈|~)\s*([\d.]+(?:\s*[×x\u00d7]\s*10[\u207b⁻\-–\u2212\u2013]?\s*[-]?\d+)?)\s*(s[\u207b⁻\-–\u2212\u2013]?1|s\-1|min[\u207b⁻\-–\u2212\u2013]?1|min\-1)', re.I),
-    re.compile(r'\bkcat\s*(?:was|=|:|≈|~|\u2248)\s*([\d.]+)\s*[eE]\s*([\-−\u2212]?\d+)\s*(s[\u207b⁻\-–\u2212\u2013]?1|s\-1|min[\u207b⁻\-–\u2212\u2013]?1|min\-1)', re.I),
-    re.compile(r'\bkcat\b[^.=]{0,20}?(?:was|=|:|≈|~|\u2248)\s*([\d.]+)\s*[×x\u00d7]?\s*10[\u207b⁻\-–\u2212\u2013]\s*(\d+)\s*(s[\u207b⁻\-–\u2212\u2013]?1|s\-1|min[\u207b⁻\-–\u2212\u2013]?1|min\-1)', re.I),
-    re.compile(r'\bcatalytic\s+(?:rate\s+)?constant\s*(?:was|=|:|≈|~|\u2248)\s*([\d.]+(?:\s*[×x\u00d7]\s*10[\u207b⁻\-–\u2212\u2013]?\s*[-]?\d+)?)\s*(s[\u207b⁻\-–\u2212\u2013]?1|s\-1|min[\u207b⁻\-–\u2212\u2013]?1|min\-1)', re.I),
-    re.compile(r'\bkcat\s*=\s*([\d.]+)\s*(s[\u207b⁻\-–\u2212\u2013]?1|s\-1|min[\u207b⁻\-–\u2212\u2013]?1|min\-1)', re.I),
-    re.compile(r'\bkcat\b[^.=]{0,30}?(?:was|=|:|≈|~|\u2248)\s*([\d.]+(?:\s*[×x\u00d7]\s*10[\u207b⁻\-–\u2212\u2013]?\s*[-]?\d+)?)\s*(s[\u207b⁻\-–\u2212\u2013]?1|s[\-1]|s\u207b\u00b9|min[\u207b⁻\-–\u2212\u2013]?1|min\-1|min\u207b\u00b9)', re.I),
-    re.compile(r'\bkcat\b[^.=]{0,15}?([\d.]+)\s*[×x\u00d7]\s*10[\u207b⁻\-–\u2212\u2013]\s*(\d+)\s*(s[\u207b⁻\-–\u2212\u2013]?1|s\-1|min[\u207b⁻\-–\u2212\u2013]?1|min\-1)', re.I),
-    re.compile(r'\bkcat\b[^.=]{0,15}?([\d.]+)\s*[eE][\-−\u2212]?(\d+)\s*(s[\u207b⁻\-–\u2212\u2013]?1|s\-1|min[\u207b⁻\-–\u2212\u2013]?1|min\-1)', re.I),
-    re.compile(r'\bKcat\b[^.=]{0,20}?(?:was|=|:|≈|~|\u2248)\s*([\d.]+(?:\s*[×x\u00d7]\s*10[\u207b⁻\-–\u2212\u2013]?\s*[-]?\d+)?)\s*(s[\u207b⁻\-–\u2212\u2013]?1|s\-1|min[\u207b⁻\-–\u2212\u2013]?1|min\-1)', re.I),
-    re.compile(r'\bkcat\s*[\(（]\s*(\w[\w\d\-]*)\s*[\)）]\s*=\s*([\d.]+)\s*(s[\u207b⁻\-–\u2212\u2013]?1|s\-1|min[\u207b⁻\-–\u2212\u2013]?1|min\-1)', re.I),
+    re.compile(r'\bkcat\s*[\(（]\s*(\w[\w\d\-]*)\s*[\)）]\s*(?:was|=|:|≈|~)\s*([\d.]+(?:\s*[×x\u00d7]\s*10(?:\u207b|\u2212|\u2013|-)?\s*[-]?\d+)?)\s*(s(?:\u207b|\u2212|\u2013|-)?1|s-1|min(?:\u207b|\u2212|\u2013|-)?1|min-1)', re.I),
+    re.compile(r'\bkcat(?!\s*/\s*Km)\s+(?:for\s+)?(\w[\w\d\-]*)?\s*(?:was|=|:|≈|~)\s*([\d.]+(?:\s*[×x\u00d7]\s*10(?:\u207b|\u2212|\u2013|-)?\s*[-]?\d+)?)\s*(s(?:\u207b|\u2212|\u2013|-)?1|s-1|min(?:\u207b|\u2212|\u2013|-)?1|min-1)', re.I),
+    re.compile(r'\bkcat(?!\s*/\s*Km)\s*(?:was|=|:|≈|~)\s*([\d.]+(?:\s*[×x\u00d7]\s*10(?:\u207b|\u2212|\u2013|-)?\s*[-]?\d+)?)\s*(s(?:\u207b|\u2212|\u2013|-)?1|s-1|min(?:\u207b|\u2212|\u2013|-)?1|min-1)', re.I),
+    re.compile(r'\bturnover\s+(?:number|frequency)\s*(?:was|=|:|≈|~)\s*([\d.]+(?:\s*[×x\u00d7]\s*10(?:\u207b|\u2212|\u2013|-)?\s*[-]?\d+)?)\s*(s(?:\u207b|\u2212|\u2013|-)?1|s-1|min(?:\u207b|\u2212|\u2013|-)?1|min-1)', re.I),
+    re.compile(r'\bkcat(?!\s*/\s*Km)\s*(?:was|=|:|≈|~|\u2248)\s*([\d.]+)\s*[eE]\s*([\-−\u2212]?\d+)\s*(s(?:\u207b|\u2212|\u2013|-)?1|s-1|min(?:\u207b|\u2212|\u2013|-)?1|min-1)', re.I),
+    re.compile(r'\bkcat(?!\s*/\s*Km)\b[^.=]{0,20}?(?:was|=|:|≈|~|\u2248)\s*([\d.]+)\s*[×x\u00d7]?\s*10(?:\u207b|\u2212|\u2013|-)\s*(\d+)\s*(s(?:\u207b|\u2212|\u2013|-)?1|s-1|min(?:\u207b|\u2212|\u2013|-)?1|min-1)', re.I),
+    re.compile(r'\bcatalytic\s+(?:rate\s+)?constant\s*(?:was|=|:|≈|~|\u2248)\s*([\d.]+(?:\s*[×x\u00d7]\s*10(?:\u207b|\u2212|\u2013|-)?\s*[-]?\d+)?)\s*(s(?:\u207b|\u2212|\u2013|-)?1|s-1|min(?:\u207b|\u2212|\u2013|-)?1|min-1)', re.I),
+    re.compile(r'\bkcat\s*=\s*([\d.]+)\s*(s(?:\u207b|\u2212|\u2013|-)?1|s-1|min(?:\u207b|\u2212|\u2013|-)?1|min-1)', re.I),
+    re.compile(r'\bkcat(?!\s*/\s*Km)\b[^.=]{0,30}?(?:was|=|:|≈|~|\u2248)\s*([\d.]+(?:\s*[×x\u00d7]\s*10(?:\u207b|\u2212|\u2013|-)?\s*[-]?\d+)?)\s*(s(?:\u207b|\u2212|\u2013|-)?1|s-1|min(?:\u207b|\u2212|\u2013|-)?1|min-1)', re.I),
+    re.compile(r'\bkcat(?!\s*/\s*Km)\b[^.=]{0,15}?([\d.]+)\s*[×x\u00d7]\s*10(?:\u207b|\u2212|\u2013|-)\s*(\d+)\s*(s(?:\u207b|\u2212|\u2013|-)?1|s-1|min(?:\u207b|\u2212|\u2013|-)?1|min-1)', re.I),
+    re.compile(r'\bkcat(?!\s*/\s*Km)\b[^.=]{0,15}?([\d.]+)\s*[eE][\-−\u2212]?(\d+)\s*(s(?:\u207b|\u2212|\u2013|-)?1|s-1|min(?:\u207b|\u2212|\u2013|-)?1|min-1)', re.I),
+    re.compile(r'\bKcat(?!\s*/\s*Km)\b[^.=]{0,20}?(?:was|=|:|≈|~|\u2248)\s*([\d.]+(?:\s*[×x\u00d7]\s*10(?:\u207b|\u2212|\u2013|-)?\s*[-]?\d+)?)\s*(s(?:\u207b|\u2212|\u2013|-)?1|s-1|min(?:\u207b|\u2212|\u2013|-)?1|min-1)', re.I),
+    re.compile(r'\bkcat\s*[\(（]\s*(\w[\w\d\-]*)\s*[\)）]\s*=\s*([\d.]+)\s*(s(?:\u207b|\u2212|\u2013|-)?1|s-1|min(?:\u207b|\u2212|\u2013|-)?1|min-1)', re.I),
 ]
 
 _KCAT_KM_PATTERNS = [
@@ -319,10 +326,10 @@ _KCAT_KM_PATTERNS = [
     re.compile(r'\bkcat/Km\b[^.=]{0,20}?(?:was|=|:|≈|~|\u2248)\s*([\d.]+)\s*[eE]\s*([\-−\u2212]?\d+)\s*(M[\u207b⁻\-–\u2212\u2013]?1\s*[·\u00b7]?\s*s[\u207b⁻\-–\u2212\u2013]?1|M\s*/?\s*s[\u207b⁻\-–\u2212\u2013]?1)', re.I),
     re.compile(r'\bkcat/Km\b[^.=]{0,20}?(?:was|=|:|≈|~|\u2248)\s*([\d.]+)\s*[×x\u00d7]\s*10[\u207b⁻\-–\u2212\u2013]\s*(\d+)\s*(M[\u207b⁻\-–\u2212\u2013]?1\s*[·\u00b7]?\s*s[\u207b⁻\-–\u2212\u2013]?1|M\s*/?\s*s[\u207b⁻\-–\u2212\u2013]?1)', re.I),
     re.compile(r'\bcatalytic\s+efficiency\s*(?:of\s+)?(\w[\w\d\-]*)?\s*(?:was|=|:|≈|~|\u2248)\s*([\d.]+(?:\s*[×x\u00d7]\s*10[\u207b⁻\-–\u2212\u2013]?\s*[-]?\d+)?)\s*(M[\u207b⁻\-–\u2212\u2013]?1\s*[·\u00b7]?\s*s[\u207b⁻\-–\u2212\u2013]?1|M\s*/?\s*s[\u207b⁻\-–\u2212\u2013]?1|M[\^⁻\-–]?1\s*s[\^⁻\-–]?1|M\u207b\u00b9\s*s\u207b\u00b9)', re.I),
-    re.compile(r'\bspecificity\s+constant\s*(?:of\s+)?(\w[\w\d\-]*)?\s*(?:was|=|:|≈|~|\u2248)\s*([\d.]+(?:\s*[×x\u00d7]\s*10[\u207b⁻\-–\u2212\u2013]?\s*[-]?\d+)?)\s*(M[\u207b⁻\-–\u2212\u2013]?1\s*[·\u00b7]?\s*s[\u207b⁻\-–\u2212\u2013]?1|M\s*/?\s*s[\u207b⁻\-–\u2212\u2013]?1|M[\^⁻\-–]?1\s*s[\^⁻\-–]?1|M\u207b\u00b9\s*s\u207b\u00b9)', re.I),
-    re.compile(r'\bkcat\s*/\s*Km\b[^.=]{0,15}?(?:was|=|:|≈|~|\u2248)\s*([\d.]+(?:\s*[×x\u00d7]\s*10[\u207b⁻\-–\u2212\u2013]?\s*[-]?\d+)?)\s*(M[\u207b⁻\-–\u2212\u2013]?1\s*[·\u00b7]?\s*s[\u207b⁻\-–\u2212\u2013]?1|M\s*/?\s*s[\u207b⁻\-–\u2212\u2013]?1)', re.I),
-    re.compile(r'\bkcat/Km\b[^.=]{0,20}?(?:was|=|:|≈|~|\u2248)\s*([\d.]+(?:\s*[×x\u00d7]\s*10[\u207b⁻\-–\u2212\u2013]?\s*[-]?\d+)?)\s*(s[\u207b⁻\-–\u2212\u2013]?1\s*[·\u00b7]?\s*(?:u|M|m|μ|n)[M\u207b⁻\-–\u2212\u2013]?1|s\-1\s*(?:u|M|m|μ|M)\-1)', re.I),
-    re.compile(r'\bkcat/Km\s*(?:of|for)\s+\S+\s+(?:was|=|:|≈|~|\u2248)\s*([\d.]+(?:\s*[×x\u00d7]\s*10[\u207b⁻\-–\u2212\u2013]?\s*[-]?\d+)?)\s*(s[\u207b⁻\-–\u2212\u2013]?1\s*[·\u00b7]?\s*(?:u|M|m|μ|n)[M\u207b⁻\-–\u2212\u2013]?1|M[\u207b⁻\-–\u2212\u2013]?1\s*[·\u00b7]?\s*s[\u207b⁻\-–\u2212\u2013]?1)', re.I),
+    re.compile(r'\bspecificity\s+constant\s*(?:of\s+)?(\w[\w\d\-]*)?\s*(?:was|=|:|≈|~|\u2248)\s*([\d.]+(?:\s*[×x\u00d7]\s*10(?:\u207b|\u2212|\u2013|-)?\s*[-]?\d+)?)\s*(M(?:\u207b|\u2212|\u2013|-)?1\s*[·\u00b7]?\s*s(?:\u207b|\u2212|\u2013|-)?1|M\s*/?\s*s(?:\u207b|\u2212|\u2013|-)?1|M[\^\u207b\u2212\u2013\\-]?1\s*s[\^\u207b\u2212\u2013\\-]?1|M\u207b\u00b9\s*s\u207b\u00b9)', re.I),
+    re.compile(r'\bkcat\s*/\s*Km\b[^.=]{0,15}?(?:was|=|:|≈|~|\u2248)\s*([\d.]+(?:\s*[×x\u00d7]\s*10(?:\u207b|\u2212|\u2013|-)?\s*[-]?\d+)?)\s*(M(?:\u207b|\u2212|\u2013|-)?1\s*[·\u00b7]?\s*s(?:\u207b|\u2212|\u2013|-)?1|M\s*/?\s*s(?:\u207b|\u2212|\u2013|-)?1)', re.I),
+    re.compile(r'\bkcat/Km\b[^.=]{0,40}?(?:was|=|:|≈|~|\u2248)\s*([\d.]+(?:\s*[×x\u00d7]\s*10(?:\u207b|\u2212|\u2013|-)?\s*[-]?\d+)?)\s*(s(?:\u207b|\u2212|\u2013|-)?(?:\^?-)?1\s*[·\u00b7\s]?\s*(?:u|M|m|μ|n)M(?:\u207b|\u2212|\u2013|-)?(?:\^?-)?1|s-1\s*(?:u|M|m|μ|M)-1)', re.I),
+    re.compile(r'\bkcat/Km\s*(?:of|for)\s+\S+\s+(?:was|=|:|≈|~|\u2248)\s*([\d.]+(?:\s*[×x\u00d7]\s*10(?:\u207b|\u2212|\u2013|-)?\s*[-]?\d+)?)\s*(s(?:\u207b|\u2212|\u2013|-)?(?:\^?-)?1\s*[·\u00b7\s]?\s*(?:u|M|m|μ|n)M(?:\u207b|\u2212|\u2013|-)?(?:\^?-)?1|M(?:\u207b|\u2212|\u2013|-)?1\s*[·\u00b7\s]?\s*s(?:\u207b|\u2212|\u2013|-)?1)', re.I),
 ]
 
 def _normalize_ocr_scientific(text: str) -> str:
@@ -341,7 +348,8 @@ def _normalize_ocr_scientific(text: str) -> str:
     t = re.sub(r'\b(m)\s+(M)\s*[\u207b\u2212\u2013\-]?\s*1\b', 'mM\u207b\u00b9', t)
     t = re.sub(r'\b(m)\s+(M)\b', 'mM', t)
     t = re.sub(r'([\d.]+)\s+10\s*[\u207b\u2212\u2013\-]\s*(\d+)', lambda m: m.group(1) + ' \u00d7 10\u207b' + m.group(2), t)
-    t = re.sub(r'([\d.]+)\s*[x\u00d7]\s*10\s*[\u2212\u2013\-]\s*(\d+)', lambda m: m.group(1) + ' \u00d7 10\u207b' + m.group(2), t)
+    t = re.sub(r'([\d.]+)\s*[x\u00d7]\s*10\s*[\^]?\s*[\u2212\u2013\-]\s*(\d+)', lambda m: m.group(1) + ' \u00d7 10\u207b' + m.group(2), t)
+    t = re.sub(r'([\d.]+)\s*[x\u00d7]\s*10\s*[\^]?\s*(\d+)', lambda m: m.group(1) + ' \u00d7 10' + m.group(2), t)
     t = re.sub(r'([\d.]+)\s*[x\u00d7]\s*10\s*(\d+)', lambda m: m.group(1) + ' \u00d7 10' + m.group(2), t)
     t = t.replace('\u25a1', '')
     return t
@@ -1011,6 +1019,16 @@ def validate_schema(record: Dict[str, Any]) -> Dict[str, Any]:
                 if normed != raw_u:
                     sel_nano[ukey] = normed
 
+        for app in record.get("applications", []):
+            if not isinstance(app, dict):
+                continue
+            for ukey in ("detection_limit_unit", "linear_range_unit"):
+                raw_u = app.get(ukey)
+                if raw_u and isinstance(raw_u, str):
+                    normed = normalize_unit(raw_u)
+                    if normed != raw_u:
+                        app[ukey] = normed
+
         for ukey in ("Km_unit", "Vmax_unit", "kcat_unit", "kcat_Km_unit"):
             raw_u = kinetics.get(ukey)
             if raw_u and isinstance(raw_u, str):
@@ -1275,6 +1293,24 @@ class CandidateRecaller:
             if caption:
                 self._extract_material_names(caption, "characterization_caption", candidates)
 
+        compound_subcandidates: Dict[str, Dict[str, Any]] = {}
+        for name, info in list(candidates.items()):
+            subparts = self._split_compound_name(name)
+            for sub in subparts:
+                if sub == name:
+                    continue
+                if not self._is_valid_candidate(sub):
+                    continue
+                compound_subcandidates.setdefault(sub, {"name": sub, "sources": set(), "evidence": []})
+                compound_subcandidates[sub]["sources"] |= info["sources"]
+                compound_subcandidates[sub]["evidence"].extend(info.get("evidence", []))
+        for sub_name, sub_info in compound_subcandidates.items():
+            if sub_name in candidates:
+                candidates[sub_name]["sources"] |= sub_info["sources"]
+                candidates[sub_name]["evidence"].extend(sub_info["evidence"])
+            else:
+                candidates[sub_name] = sub_info
+
         deduped = self._deduplicate(candidates)
         return deduped[:self.top_k] if self.top_k > 0 else deduped
 
@@ -1449,6 +1485,22 @@ class CandidateRecaller:
                 return False
         return True
 
+    def _split_compound_name(self, name: str) -> List[str]:
+        parts = []
+        if '@' in name:
+            parts = [p.strip() for p in name.split('@') if p.strip()]
+        elif '/' in name:
+            parts = [p.strip() for p in name.split('/') if p.strip()]
+        elif '-' in name:
+            segments = name.split('-')
+            if len(segments) == 2:
+                chem_re = re.compile(r'[A-Z][a-z]?\d*')
+                if chem_re.search(segments[0]) and chem_re.search(segments[1]):
+                    parts = [s.strip() for s in segments if s.strip()]
+        if len(parts) <= 1:
+            return []
+        return parts
+
     def _deduplicate(self, candidates: Dict[str, Dict[str, Any]]) -> List[Dict[str, Any]]:
         result = []
         seen = {}
@@ -1540,6 +1592,8 @@ class NanozymeScorer:
                     score += 5
                 if any(mw in title_lower and mw in name_lower for mw in _MORPHOLOGY_WORDS):
                     score += 3
+                if _METAL_ELEMENTS_RE.search(cand["name"]):
+                    score += 5
 
             score += self._score_data_richness(cand, doc)
             score += self._score_narrative_importance(cand, title, abstract_text)
@@ -1624,6 +1678,9 @@ class NanozymeScorer:
         if has_synthesis:
             bonus += 3
         if has_application:
+            bonus += 3
+
+        if "kinetics" in cand.get("sources", set()):
             bonus += 3
 
         evidence_count = len(cand.get("evidence", []))
@@ -1840,28 +1897,36 @@ class TableProcessor:
             "recovery_tables": [], "characterization_tables": [], "general_tables": [],
         }
         for tbl in tables:
-            headers = " ".join(str(h) for h in tbl.get("headers", []))
-            rows_text = " ".join(str(cell) for row in tbl.get("rows", []) for cell in row)
-            full_text = headers + " " + rows_text
+            headers = " ".join(str(h) for h in tbl.get("headers", tbl.get("columns", [])))
+            rows = tbl.get("rows", [])
+            rows_text = " ".join(str(cell) for row in rows for cell in row) if rows else ""
+            content_text = tbl.get("content_text", "")
+            markdown = tbl.get("markdown", "")
+            caption = tbl.get("caption", "")
+            full_text = f"{headers} {rows_text} {content_text} {markdown} {caption}"
 
             classified = False
             for tbl_type, pattern in _TABLE_TYPE_PATTERNS.items():
                 if pattern.search(full_text):
-                    entry = {"table_type": tbl_type, "headers": tbl.get("headers", []),
-                             "row_count": len(tbl.get("rows", [])), "text": full_text[:500]}
+                    entry = {"table_type": tbl_type, "headers": tbl.get("headers", tbl.get("columns", [])),
+                             "row_count": len(rows), "text": full_text[:500],
+                             "rows": rows, "content_text": content_text, "markdown": markdown, "caption": caption}
 
                     if tbl_type == "comparison_table":
                         this_work_rows = self._filter_this_work(tbl, selected_name)
                         entry["this_work_rows"] = this_work_rows
-                        entry["other_rows_count"] = len(tbl.get("rows", [])) - len(this_work_rows)
+                        entry["other_rows_count"] = len(rows) - len(this_work_rows)
+                    elif tbl_type == "kinetics_table":
+                        entry["this_work_rows"] = self._filter_this_work(tbl, selected_name)
 
                     result[f"{tbl_type}s"].append(entry)
                     classified = True
                     break
             if not classified:
                 result["general_tables"].append({
-                    "table_type": "general_table", "headers": tbl.get("headers", []),
-                    "row_count": len(tbl.get("rows", [])), "text": full_text[:500],
+                    "table_type": "general_table", "headers": tbl.get("headers", tbl.get("columns", [])),
+                    "row_count": len(rows), "text": full_text[:500],
+                    "rows": rows, "content_text": content_text, "markdown": markdown, "caption": caption,
                 })
 
         return result
@@ -1877,44 +1942,85 @@ class TableProcessor:
 
     def get_kinetics_values(self, classified: Dict[str, Any], selected_name: str) -> List[Dict]:
         values = []
+        name_lower = selected_name.lower() if selected_name else ""
         for tbl in classified.get("kinetics_tables", []):
+            this_work_rows = tbl.get("this_work_rows", [])
+            rows = tbl.get("rows", [])
+            content_text = tbl.get("content_text", "")
+            markdown = tbl.get("markdown", "")
+
+            if this_work_rows:
+                for row_dict in this_work_rows:
+                    cells = row_dict.get("cells", [])
+                    row_text = " ".join(str(c) for c in cells)
+                    self._extract_kinetics_from_row(row_text, values)
+            elif rows:
+                for row in rows:
+                    row_text = " ".join(str(c) for c in row)
+                    row_lower = row_text.lower()
+                    if _THIS_WORK_RE.search(row_lower) or name_lower in row_lower:
+                        self._extract_kinetics_from_row(row_text, values)
+
+            if not this_work_rows and not rows:
+                fallback_texts = []
+                if content_text:
+                    fallback_texts.append(content_text)
+                if markdown:
+                    for line in markdown.split("\n"):
+                        line = line.strip()
+                        if line and not line.startswith("|---") and not line.startswith("| ---"):
+                            fallback_texts.append(line)
+                for text in fallback_texts:
+                    text_lower = text.lower()
+                    if name_lower and name_lower in text_lower:
+                        self._extract_kinetics_from_row(text, values)
+                    elif _THIS_WORK_RE.search(text_lower):
+                        self._extract_kinetics_from_row(text, values)
+                    elif any(kw in text_lower for kw in ("km", "vmax", "kcat")):
+                        self._extract_kinetics_from_row(text, values)
+
+        for tbl in classified.get("comparison_tables", []):
             for row_dict in tbl.get("this_work_rows", []):
                 cells = row_dict.get("cells", [])
                 row_text = " ".join(str(c) for c in cells)
-                for pat in _KM_PATTERNS:
-                    km_m = pat.search(row_text)
-                    if km_m:
-                        groups = km_m.groups()
-                        if len(groups) == 3:
-                            values.append({"parameter": "Km", "value": groups[1], "unit": groups[2],
-                                           "substrate": groups[0], "source": "table"})
-                        elif len(groups) == 2:
-                            values.append({"parameter": "Km", "value": groups[0], "unit": groups[1],
-                                           "substrate": None, "source": "table"})
-                        break
-                for pat in _VMAX_PATTERNS:
-                    vmax_m = pat.search(row_text)
-                    if vmax_m:
-                        groups = vmax_m.groups()
-                        if len(groups) == 3:
-                            values.append({"parameter": "Vmax", "value": groups[1], "unit": groups[2],
-                                           "substrate": groups[0], "source": "table"})
-                        elif len(groups) == 2:
-                            g0, g1 = groups
-                            _RATE_UNITS = ("M s⁻¹", "M s-1", "M s–1", "M s^-1", "M/s", "mM/s", "μM/s", "M S⁻¹", "M S-1")
-                            g0_is_unit = g0 in _RATE_UNITS or bool(re.match(r'10[−\-–]?\d*\s*M\s*[sS]', g0))
-                            g1_is_unit = g1 in _RATE_UNITS or bool(re.match(r'10[−\-–]?\d*\s*M\s*[sS]', g1))
-                            if g1_is_unit and not g0_is_unit:
-                                values.append({"parameter": "Vmax", "value": g0, "unit": g1,
-                                               "substrate": None, "source": "table"})
-                            elif g0_is_unit:
-                                values.append({"parameter": "Vmax", "value": g1, "unit": g0,
-                                               "substrate": None, "source": "table"})
-                            else:
-                                values.append({"parameter": "Vmax", "value": g1, "unit": None,
-                                               "substrate": g0, "source": "table"})
-                        break
+                self._extract_kinetics_from_row(row_text, values)
+
         return values
+
+    def _extract_kinetics_from_row(self, row_text: str, values: List[Dict]) -> None:
+        for pat in _KM_PATTERNS:
+            km_m = pat.search(row_text)
+            if km_m:
+                groups = km_m.groups()
+                if len(groups) == 3:
+                    values.append({"parameter": "Km", "value": groups[1], "unit": groups[2],
+                                   "substrate": groups[0], "source": "table"})
+                elif len(groups) == 2:
+                    values.append({"parameter": "Km", "value": groups[0], "unit": groups[1],
+                                   "substrate": None, "source": "table"})
+                break
+        for pat in _VMAX_PATTERNS:
+            vmax_m = pat.search(row_text)
+            if vmax_m:
+                groups = vmax_m.groups()
+                if len(groups) == 3:
+                    values.append({"parameter": "Vmax", "value": groups[1], "unit": groups[2],
+                                   "substrate": groups[0], "source": "table"})
+                elif len(groups) == 2:
+                    g0, g1 = groups
+                    _RATE_UNITS = ("M s⁻¹", "M s-1", "M s–1", "M s^-1", "M/s", "mM/s", "μM/s", "M S⁻¹", "M S-1")
+                    g0_is_unit = g0 in _RATE_UNITS or bool(re.match(r'10[−\-–]?\d*\s*M\s*[sS]', g0))
+                    g1_is_unit = g1 in _RATE_UNITS or bool(re.match(r'10[−\-–]?\d*\s*M\s*[sS]', g1))
+                    if g1_is_unit and not g0_is_unit:
+                        values.append({"parameter": "Vmax", "value": g0, "unit": g1,
+                                       "substrate": None, "source": "table"})
+                    elif g0_is_unit:
+                        values.append({"parameter": "Vmax", "value": g1, "unit": g0,
+                                       "substrate": None, "source": "table"})
+                    else:
+                        values.append({"parameter": "Vmax", "value": g1, "unit": None,
+                                       "substrate": g0, "source": "table"})
+                break
 
     def get_sensing_values(self, classified: Dict[str, Any]) -> List[Dict]:
         values = []
@@ -1922,12 +2028,16 @@ class TableProcessor:
             for row_dict in tbl.get("this_work_rows", []):
                 cells = row_dict.get("cells", [])
                 row_text = " ".join(str(c) for c in cells)
-                lod_m = _LOD_PATTERN.search(row_text)
-                lr_m = _LINEAR_RANGE_PATTERN.search(row_text)
-                if lod_m:
-                    values.append({"parameter": "LOD", "value": lod_m.group(1), "unit": lod_m.group(2), "source": "table"})
-                if lr_m:
-                    values.append({"parameter": "linear_range", "value": lr_m.group(1), "unit": lr_m.group(2), "source": "table"})
+                for pat in _LOD_PATTERNS:
+                    lod_m = pat.search(row_text)
+                    if lod_m:
+                        values.append({"parameter": "LOD", "value": lod_m.group(1), "unit": lod_m.group(2), "source": "table"})
+                        break
+                for pat in _LINEAR_RANGE_PATTERNS:
+                    lr_m = pat.search(row_text)
+                    if lr_m:
+                        values.append({"parameter": "linear_range", "value": lr_m.group(1), "unit": lr_m.group(2), "source": "table"})
+                        break
         return values
 
 
@@ -2138,7 +2248,16 @@ class RuleExtractor:
         _FLAT_CATALYST_HEADER = re.compile(r'Catalyst|Nanozyme|Material', re.I)
         _NUM_RE = re.compile(r'[\d.]+')
 
+        all_texts = list(kinetics_texts)
         for text in kinetics_texts:
+            table_refs = re.findall(r'Table\s+S?\d+', text, re.I)
+            if table_refs:
+                for ref in table_refs:
+                    for other_text in kinetics_texts:
+                        if other_text != text and ref.lower() in other_text.lower() and other_text not in all_texts:
+                            all_texts.append(other_text)
+
+        for text in all_texts:
             norm_text = _normalize_ocr_scientific(text)
             lines = norm_text.strip().split('\n')
             if len(lines) < 2:
@@ -4091,6 +4210,41 @@ class SingleMainNanozymePipeline:
                                                 )
                                                 record["main_activity"]["kinetics"][f"_llm_{kk}_alternative"] = val
                                             continue
+                                    else:
+                                        record["main_activity"]["kinetics"][f"_{kk}_source"] = "llm_supplement"
+                                record["main_activity"]["kinetics"][kk] = val
+                        for kk in llm_kinetics:
+                            if kk.startswith("_"):
+                                continue
+                            if kk in record["main_activity"]["kinetics"]:
+                                continue
+                            if llm_kinetics[kk] is None:
+                                continue
+                            val = llm_kinetics[kk]
+                            if kk == "substrate" and isinstance(val, (int, float)):
+                                continue
+                            if kk in ("Km", "Vmax", "kcat", "kcat_Km"):
+                                if isinstance(val, str):
+                                    try:
+                                        val = float(val)
+                                    except (ValueError, TypeError):
+                                        parsed = _parse_scientific_notation(val)
+                                        if isinstance(parsed, (int, float)):
+                                            val = parsed
+                                        else:
+                                            norm_val = _normalize_ocr_scientific(val)
+                                            parsed2 = _parse_scientific_notation(norm_val)
+                                            if isinstance(parsed2, (int, float)):
+                                                val = parsed2
+                                            else:
+                                                continue
+                                if not isinstance(val, (int, float)):
+                                    continue
+                                record["main_activity"]["kinetics"][kk] = val
+                                record["main_activity"]["kinetics"][f"_{kk}_source"] = "llm_supplement"
+                                if f"_llm_{kk}_unit" in llm_kinetics and llm_kinetics[f"_llm_{kk}_unit"]:
+                                    record["main_activity"]["kinetics"][f"{kk}_unit"] = llm_kinetics[f"_llm_{kk}_unit"]
+                            else:
                                 record["main_activity"]["kinetics"][kk] = val
                 elif key == "enzyme_like_type" and "enzyme_like_type" in llm_act and llm_act["enzyme_like_type"] is not None:
                     llm_type = self._normalize_enzyme_type(llm_act["enzyme_like_type"])

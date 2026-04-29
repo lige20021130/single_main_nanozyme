@@ -1,9 +1,20 @@
-﻿__pycache__/
+__pycache__/
 *.pyc
 *.bak
 *.log
+*.pyo
 
 temp_*.py
 
 new_lit_output/
 validation_output/
+
+venv/
+.env
+config.yaml
+
+.vscode/
+.idea/
+
+test_output_*/
+e2e_results/

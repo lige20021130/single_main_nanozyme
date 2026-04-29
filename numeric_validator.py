@@ -13,18 +13,25 @@ SOURCE_PRIORITY = {
 
 CONCENTRATION_UNITS = {
     "M", "mM", "μM", "uM", "nM", "pM",
+    "M/L", "mM/L", "μM/L", "uM/L",
+    "M L^-1", "mM L^-1", "μM L^-1", "uM L^-1",
     "mol/L", "mmol/L", "umol/L", "nmol/L",
-    "M L^-1", "mM L^-1",
+    "mol L^-1", "mmol L^-1",
 }
 
 RATE_UNITS = {
     "M/s", "M s^-1", "M s-1", "M/min", "M min^-1", "M min-1",
-    "M h^-1", "M h-1",
+    "M h^-1", "M h-1", "M/h",
     "mM/s", "mM s^-1", "mM s-1", "mM/min", "mM min^-1", "mM min-1",
+    "mM h^-1", "mM h-1", "mM/h",
     "μM/s", "uM/s", "μM s^-1", "uM s^-1", "μM s-1", "uM s-1",
     "μM/min", "uM/min", "μM min^-1", "uM min^-1", "μM min-1", "uM min-1",
+    "μM/h", "uM/h", "μM h^-1", "uM h^-1",
     "nM/s", "nM s^-1", "nM s-1", "nM/min", "nM min^-1", "nM min-1",
     "mol L^-1 s^-1", "mol L-1 s-1",
+    "mol/L/h", "mmol/L/h", "umol/L/h",
+    "mol L^-1 h^-1", "mmol L^-1 h^-1",
+    "M L^-1 s^-1", "mM L^-1 s^-1",
     "U/mg", "U mg^-1", "U mg-1",
 }
 
@@ -38,10 +45,14 @@ KCAT_KM_UNITS = {
     "μM^-1 s^-1", "uM-1 s-1", "μM⁻¹ s⁻¹",
 }
 
-_KM_MAGNITUDE_RANGE = (1e-9, 1.0)
-_VMAX_MAGNITUDE_RANGE = (1e-12, 1e6)
-_KCAT_MAGNITUDE_RANGE = (1e-3, 1e8)
-_KCAT_KM_MAGNITUDE_RANGE = (1e0, 1e10)
+_KM_MAGNITUDE_RANGE = (1e-12, 10.0)
+_KM_MAGNITUDE_REVIEW = (1e-9, 1.0)
+_VMAX_MAGNITUDE_RANGE = (1e-15, 1e8)
+_VMAX_MAGNITUDE_REVIEW = (1e-12, 1e6)
+_KCAT_MAGNITUDE_RANGE = (1e-6, 1e10)
+_KCAT_MAGNITUDE_REVIEW = (1e-3, 1e8)
+_KCAT_KM_MAGNITUDE_RANGE = (1e-3, 1e12)
+_KCAT_KM_MAGNITUDE_REVIEW = (1e0, 1e10)
 
 _KM_UNIT_RE = re.compile(
     r'^(?:M|mM|μM|uM|nM|pM|mol/L|mmol/L|umol/L|nmol/L|'
@@ -102,6 +113,23 @@ def normalize_unit(unit: Optional[str]) -> Optional[str]:
     u = re.sub(r'\bM\u207b\u00b9\s*s\u207b\u00b9\b', 'M^-1 s^-1', u)
     u = re.sub(r'\bM-1\s+min-1\b', 'M^-1 min^-1', u)
     u = re.sub(r'\bM-1\s+s-1\b', 'M^-1 s^-1', u)
+    u = re.sub(r'\bmol/L/s\b', 'mol L^-1 s^-1', u)
+    u = re.sub(r'\bmmol/L/s\b', 'mmol L^-1 s^-1', u)
+    u = re.sub(r'\bumol/L/s\b', 'umol L^-1 s^-1', u)
+    u = re.sub(r'\bmol/L/h\b', 'mol L^-1 h^-1', u)
+    u = re.sub(r'\bmmol/L/h\b', 'mmol L^-1 h^-1', u)
+    u = re.sub(r'\bM/L\b', 'M L^-1', u)
+    u = re.sub(r'\bmM/L\b', 'mM L^-1', u)
+    u = re.sub(r'\bμM/L\b', 'μM L^-1', u)
+    u = re.sub(r'\buM/L\b', 'uM L^-1', u)
+    u = re.sub(r'\bmol/L\b', 'M', u)
+    u = re.sub(r'\bmmol/L\b', 'mM', u)
+    u = re.sub(r'\bumol/L\b', 'μM', u)
+    u = re.sub(r'\bnmol/L\b', 'nM', u)
+    u = re.sub(r'\bM/h\b', 'M h^-1', u)
+    u = re.sub(r'\bmM/h\b', 'mM h^-1', u)
+    u = re.sub(r'\bμM/h\b', 'μM h^-1', u)
+    u = re.sub(r'\buM/h\b', 'uM h^-1', u)
     return u
 
 
@@ -136,18 +164,23 @@ def classify_source(evidence: Dict[str, Any]) -> str:
     return "text"
 
 
-def check_magnitude(param: str, value: float, unit: Optional[str]) -> Optional[str]:
+def check_magnitude(param: str, value: float, unit: Optional[str]) -> Tuple[bool, bool, str]:
     if value is None or not isinstance(value, (int, float)):
-        return None
-    if param == "Km":
-        lo, hi = _KM_MAGNITUDE_RANGE
-        if value < lo or value > hi:
-            return f"Km value {value} outside typical range ({lo}–{hi})"
-    elif param == "Vmax":
-        lo, hi = _VMAX_MAGNITUDE_RANGE
-        if value < lo or value > hi:
-            return f"Vmax value {value} outside typical range ({lo}–{hi})"
-    return None
+        return False, False, ""
+    ranges = {
+        "Km": (_KM_MAGNITUDE_RANGE, _KM_MAGNITUDE_REVIEW),
+        "Vmax": (_VMAX_MAGNITUDE_RANGE, _VMAX_MAGNITUDE_REVIEW),
+        "kcat": (_KCAT_MAGNITUDE_RANGE, _KCAT_MAGNITUDE_REVIEW),
+        "kcat_Km": (_KCAT_KM_MAGNITUDE_RANGE, _KCAT_KM_MAGNITUDE_REVIEW),
+    }
+    if param not in ranges:
+        return False, False, ""
+    (lo, hi), (rlo, rhi) = ranges[param]
+    if value < lo or value > hi:
+        return True, False, f"{param} value {value} outside acceptable range ({lo}–{hi})"
+    if value < rlo or value > rhi:
+        return False, True, f"{param} value {value} outside typical range ({rlo}–{rhi})"
+    return False, False, ""
 
 
 def is_lineweaver_burk_context(evidence_text: str) -> bool:
@@ -169,6 +202,7 @@ class NumericValidator:
     ) -> Tuple[Optional[Dict[str, Any]], List[Dict[str, Any]]]:
         self.warnings = []
         demoted: List[Dict[str, Any]] = []
+        needs_review_flag = False
 
         param = entry.get("parameter", "")
         value = entry.get("value")
@@ -220,12 +254,14 @@ class NumericValidator:
                 ))
                 self.warnings.append("numeric_validation_failed")
                 return None, demoted
-            lo, hi = _KCAT_MAGNITUDE_RANGE
-            if numeric_val < lo or numeric_val > hi:
+            reject, review, msg = check_magnitude("kcat", numeric_val, unit)
+            if reject:
                 demoted.append(self._make_important_value(
-                    entry, source, f"kcat value {numeric_val} outside typical range ({lo}–{hi})", True
+                    entry, source, msg, True
                 ))
                 return None, demoted
+            if review:
+                needs_review_flag = True
 
         elif param == "kcat_Km":
             nu = normalize_unit(unit) if unit else None
@@ -235,32 +271,29 @@ class NumericValidator:
                 ))
                 self.warnings.append("numeric_validation_failed")
                 return None, demoted
-            lo, hi = _KCAT_KM_MAGNITUDE_RANGE
-            if numeric_val < lo or numeric_val > hi:
+            reject, review, msg = check_magnitude("kcat_Km", numeric_val, unit)
+            if reject:
                 demoted.append(self._make_important_value(
-                    entry, source, f"kcat/Km value {numeric_val} outside typical range ({lo}–{hi})", True
+                    entry, source, msg, True
                 ))
                 return None, demoted
+            if review:
+                needs_review_flag = True
 
         if is_lineweaver_burk_context(evidence_text):
-            demoted.append(self._make_important_value(
-                entry, source, "lineweaver_burk_reciprocal", True
-            ))
-            return None, demoted
+            needs_review_flag = True
 
-        mag_issue = check_magnitude(param, numeric_val, unit)
-        if mag_issue:
+        reject, review, msg = check_magnitude(param, numeric_val, unit)
+        if reject:
             demoted.append(self._make_important_value(
-                entry, source, mag_issue, True
+                entry, source, msg, True
             ))
             return None, demoted
+        if review:
+            needs_review_flag = True
 
         if source == "figure_candidate":
-            demoted.append(self._make_important_value(
-                entry, source, "kinetics_from_figure_candidate", True
-            ))
-            self.warnings.append("kinetics_from_figure_candidate")
-            return None, demoted
+            needs_review_flag = True
 
         if not unit:
             demoted.append(self._make_important_value(
@@ -275,7 +308,7 @@ class NumericValidator:
             "kcat": None, "kcat_unit": None,
             "kcat_Km": None, "kcat_Km_unit": None,
             "substrate": None, "source": None,
-            "needs_review": False,
+            "needs_review": needs_review_flag,
         }
         if param == "Km":
             formal["Km"] = numeric_val

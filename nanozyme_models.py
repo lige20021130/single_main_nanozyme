@@ -1,5 +1,20 @@
+import re
 from enum import Enum
 from typing import Dict, List, Any
+
+
+_ENZYME_ALIAS_MAP: Dict[str, str] = {
+    "peroxidase (pod)-like": "peroxidase-like",
+    "pod-like": "peroxidase-like",
+    "oxidase (oxd)-like": "oxidase-like",
+    "oxd-like": "oxidase-like",
+    "catalase (cat)-like": "catalase-like",
+    "cat-like": "catalase-like",
+    "superoxide dismutase (sod)-like": "superoxide-dismutase-like",
+    "sod-like": "superoxide-dismutase-like",
+    "glutathione peroxidase (gpx)-like": "glutathione-peroxidase-like",
+    "gpx-like": "glutathione-peroxidase-like",
+}
 
 
 class EnzymeType(Enum):
@@ -17,8 +32,18 @@ class EnzymeType(Enum):
 
     @classmethod
     def normalize_canonical(cls, value: str) -> str:
+        if not value:
+            return value
+        key = value.strip().lower()
+        if key in _ENZYME_ALIAS_MAP:
+            return _ENZYME_ALIAS_MAP[key]
+        cleaned = re.sub(r'\s*\([A-Za-z]+\)\s*', ' ', key).strip()
+        cleaned = re.sub(r'\s+', '-', cleaned)
         for member in cls:
-            if member.value.lower() == value.lower():
+            if member.value.lower() == cleaned:
+                return member.value
+        for member in cls:
+            if member.value.lower() == key:
                 return member.value
         return value
 
