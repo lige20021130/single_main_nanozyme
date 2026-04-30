@@ -285,19 +285,30 @@ _KM_PATTERNS = [
     re.compile(r'\bKm\s+of\s+(\w[\w\d\-]*)\s+(?:was|is|=|:|≈|~)\s*([\d.]+)\s*(?:±\s*[\d.]+\s*)?(mM|μM|uM|M|mmol|umol|nmol)', re.I),
     re.compile(r'\bKm\s*[\(（]\s*(\w[\w\d\-]*)\s*[\)）]\s*=\s*([\d.]+)\s*[×x]\s*10[\^⁻\-–]?\s*[-]?(\d+)\s*(mM|μM|uM|M)', re.I),
     re.compile(r'\bMichaelis\s+constant\s*(?:for\s+)?(\w[\w\d\-]*)?\s*(?:was|=|:|≈|~)\s*([\d.]+)\s*(mM|μM|uM|M)', re.I),
+    re.compile(r'\bMichaelis[\s-]*Menten\s+constant\s*\)?\s*[^.]{0,60}?(?:was\s+)?(?:calculated\s+to\s+be|found\s+to\s+be)\s*([\d.]+)\s*(?:±\s*[\d.]+\s*|\s+[\d.]+\s+)?(mM|μM|uM|M)', re.I),
+    re.compile(r'\bKm\s*\)?\s*[^.]{0,60}?(?:was\s+)?(?:calculated\s+to\s+be|found\s+to\s+be)\s*([\d.]+)\s*(?:±\s*[\d.]+\s*|\s+[\d.]+\s+)?(mM|μM|uM|M)', re.I),
     re.compile(r'\bKm\s+(?:values?\s+)?(?:to|toward|for)\s+(\S+)\s+(?:and|&)\s+\S+\s+(?:are|were|is|was)\s*([\d.]+)\s+(?:and|&)\s*[\d.]+\s*(mM|μM|uM|M)', re.I),
     re.compile(r'\bKm\s+(?:was|is|were|are)\s*(?:calculated\s+(?:to\s+be|as)\s+)?(?:approximately\s+)?([\d.]+)\s*(?:±\s*[\d.]+\s*)?(mM|μM|uM|M)', re.I),
     re.compile(r'\bKm\b[^.]{0,40}?\(([\d.]+)\s*(mM|μM|uM|M)\)', re.I),
     re.compile(r'\bKm\s*(?:of|for)\s+\S+\s+(?:toward|to)\s+\w[\w\d\-]*\s+(?:was|is|=|:)\s*([\d.]+)\s*(mM|μM|uM|M)', re.I),
+    re.compile(r'\bKm\s+values?\s+(?:of|for)\s+\S+\s+(?:for\s+)?(?:and|&)?\s*\S*\s+(?:are|were|is|was)\s*([\d.]+)\s*(?:and|&|,)\s*[\d.]+\s*(mM|μM|uM|M)', re.I),
+    re.compile(r'\bKm\s+values?\s+of\s+([\d.]+)\s*(mM|μM|uM|M)\s+(?:and|&|,)\s*[\d.]+\s*(?:mM|μM|uM|M)?', re.I),
+    re.compile(r'\bKm\b\s*\)?\s*(?:were|was|are|is)\s*([\d.]+)\s*(?:and|&|,)\s*[\d.]+\s*(mM|μM|uM|M)', re.I),
+    re.compile(r'\bKm\b[^.]{0,30}?\bare\s*([\d.]+)\s*(?:and|&)\s*[\d.]+\s*(mM|μM|uM|M)', re.I),
 ]
 
 _KM_VMAX_JOINT_PATTERNS = [
-    re.compile(r'\bKm\b.*?\bV\s*max\b.*?(?:were|was|calculated|found)\s+(?:to\s+be\s+)?([\d.]+)\s*(mM|μM|uM|M)\s+(?:and|,)\s+([\d.]+(?:\s*[×x]\s*10[\^⁻\-–]?\s*[-]?\d+)?)\s*(M\s*[sS][\^⁻\-–]?[\-]?1|M/?s|mM/?s|μM/?s)', re.I),
-    re.compile(r'\bKm\s*=\s*([\d.]+)\s*(mM|μM|uM|M)\s*,?\s*V\s*max\s*=\s*([\d.]+(?:\s*[×x]\s*10[\^⁻\-–]?\s*[-]?\d+)?)\s*(M\s*[sS][\^⁻\-–]?[\-]?1|M/?s|mM/?s|μM/?s)', re.I),
+    re.compile(r'\bKm\b.*?\bV\s*max\b.*?(?:were|was|calculated|found)\s+(?:to\s+be\s+)?([\d.]+)\s*(mM|μM|uM|M)\s+(?:and|,)\s+([\d.]+(?:[eE][\-−\u2212]?\d+)?(?:\s*[×x]\s*10[\^⁻\-–]?\s*[-]?\d+)?)\s*(M\s*[sS][\^⁻\-–]?[\-]?1|M/?s|mM/?s|μM/?s|M\s+s-1)', re.I),
+    re.compile(r'\bKm\s*=\s*([\d.]+)\s*(mM|μM|uM|M)\s*,?\s*V\s*max\s*=\s*([\d.]+(?:[eE][\-−\u2212]?\d+)?(?:\s*[×x]\s*10[\^⁻\-–]?\s*[-]?\d+)?)\s*(M\s*[sS][\^⁻\-–]?[\-]?1|M/?s|mM/?s|μM/?s|M\s+s-1)', re.I),
     re.compile(r'\bKm\s*=\s*([\d.]+)\s*(mM|μM|uM|M)\s*[,;]\s*V\s*max\s*=\s*([\d.]+)\s*10\s*[\^⁻\-–]?\s*[-]?\s*(\d+)\s*(?:M\s*[sS]|mM\s*[sS])', re.I),
     re.compile(r'\bKm\b[^.]{0,20}?([\d.]+)\s*(mM|μM|uM|M)\s*[,;]\s*V\s*max\b[^.]{0,20}?([\d.]+)\s*10\s*[\^⁻\-–]?\s*[-]?\s*(\d+)\s*(?:M\s*[sS]|mM\s*[sS])', re.I),
-    re.compile(r'\bKm\b[^.]{0,30}?([\d.]+)\s*(mM|μM|uM|M)\s+.*?\bV\s*max\b[^.]{0,30}?([\d.]+)\s*(M\s*[sS][\^⁻\-–]?[\-]?1|M/?s|mM/?s|μM/?s)', re.I),
-    re.compile(r'\bV\s*max\s*=\s*([\d.]+(?:\s*[×x]\s*10[\^⁻\-–]?\s*[-]?\d+)?)\s*(M\s*[sS][\^⁻\-–]?[\-]?1|M/?s|mM/?s|μM/?s)\s*[,;]\s*Km\s*=\s*([\d.]+)\s*(mM|μM|uM|M)', re.I),
+    re.compile(r'\bKm\b[^.]{0,30}?([\d.]+)\s*(mM|μM|uM|M)\s+.*?\bV\s*max\b\s*=\s*([\d.]+(?:[eE][\-−\u2212]?\d+)?(?:\s*[×x\u00d7]\s*10[\^⁻\-–]?\s*[-]?\d+)?)\s*(M\s*[sS][\^⁻\-–]?[\-]?1|M/?s|mM/?s|μM/?s|M\s+s-1)', re.I),
+    re.compile(r'\bKm\b[^.]{0,30}?([\d.]+)\s*(mM|μM|uM|M)\s+.*?\bV\s*max\b[^.]{0,10}?([\d.]+(?:[eE][\-−\u2212]?\d+)?(?:\s*[×x\u00d7]\s*10[\^⁻\-–]?\s*[-]?\d+)?)\s*(M\s*[sS][\^⁻\-–]?[\-]?1|M/?s|mM/?s|μM/?s|M\s+s-1)', re.I),
+    re.compile(r'\bV\s*max\s*=\s*([\d.]+(?:[eE][\-−\u2212]?\d+)?(?:\s*[×x]\s*10[\^⁻\-–]?\s*[-]?\d+)?)\s*(M\s*[sS][\^⁻\-–]?[\-]?1|M/?s|mM/?s|μM/?s|M\s+s-1)\s*[,;]\s*Km\s*=\s*([\d.]+)\s*(mM|μM|uM|M)', re.I),
+    re.compile(r'\bKm\b\s+(?:and|&)\s+V\s*max\b\s+(?:were|was|are|is)\s+(?:calculated|found|determined)?\s*(?:to\s+be\s+)?([\d.]+)\s*(mM|μM|uM|M|mmol)\s+(?:and|,)\s+([\d.]+[eE][\-−\u2212]?\d+)\s*(M\s*[sS][\-\u207b\u2212\u2013]?1|M/?s|mM/?s|μM/?s|M\s+s-1)', re.I),
+    re.compile(r'\bKm\b\s+(?:and|&)\s+V\s*max\b\s+(?:were|was|are|is)\s+(?:calculated|found|determined)?\s*(?:to\s+be\s+)?([\d.]+)\s*(mM|μM|uM|M|mmol)\s+(?:and|,)\s+([\d.]+)\s*[×x\u00d7]\s*10[\^⁻\-\u207b\u2212\u2013]?\s*([\d]+)\s*(M\s*[sS][\-\u207b\u2212\u2013]?1|M/?s|mM/?s|μM/?s|M\s+s-1)', re.I),
+    re.compile(r'\bV\s*max\b.*?\bKm\b.*?(?:can\s+be\s+)?(?:calculated|found|determined)\s+(?:to\s+be\s+|as\s+)?([\d.]+(?:[eE][\-−\u2212]?\d+)?)\s*(mM|μM|uM|M)\s+(?:and|,)\s+([\d.]+(?:[eE][\-−\u2212]?\d+)?)\s*(M\s*[sS][\^⁻\-–]?[\-]?1|M/?s|mM/?s|μM/?s|M\s+s-1|s\u207b\u00b9)', re.I),
+    re.compile(r'\bV\s*max\b[^.]{0,30}?\bKm\b[^.]{0,30}?(?:calculated|found|was)\s+(?:to\s+be\s+|as\s+)?([\d.]+(?:[eE][\-−\u2212]?\d+)?)\s*(mM|μM|uM|M)\s+(?:and|,)\s+([\d.]+(?:[eE][\-−\u2212]?\d+)?)\s*(M\s*[sS][\^⁻\-–]?[\-]?1|M/?s|mM/?s|μM/?s|M\s+s-1|s\u207b\u00b9)', re.I),
 ]
 
 _KCAT_PATTERNS = [
@@ -336,6 +347,9 @@ def _normalize_ocr_scientific(text: str) -> str:
     if not text:
         return text
     t = text
+    t = re.sub(r'\bK\s+m\b', 'Km', t, flags=re.I)
+    t = re.sub(r'\bV\s+max\b', 'Vmax', t, flags=re.I)
+    t = re.sub(r'\bk\s+cat\b', 'kcat', t, flags=re.I)
     t = t.replace('\ufffd', '\u25a1')
     t = re.sub(r'10\s*\u25a1\s*(\d)', lambda m: '10\u207b' + m.group(1), t)
     t = re.sub(r'([\d.]+)\s*\u25a1\s*10', lambda m: m.group(1) + ' \u00d710', t)
@@ -343,14 +357,21 @@ def _normalize_ocr_scientific(text: str) -> str:
     t = re.sub(r'(\d)\s*\u25a1\s*(\d)', r'\1-\2', t)
     t = t.replace('\u00bc', '=')
     t = t.replace('\u0006', '\u00b1')
+    t = re.sub(r'([\d.]+)\s*[\u02da\u00b0\u00ba\u25e6]\s*C\b', r'\1 °C', t, flags=re.I)
+    t = re.sub(r'([\d.]+)\s*\u25a1\s*C\b', r'\1 °C', t, flags=re.I)
+    t = re.sub(r'([\d.]+)\s*°\s+C\b', r'\1 °C', t, flags=re.I)
     t = re.sub(r'(\w)e(\d)', lambda m: m.group(1) + ' \u2248 ' + m.group(2), t)
     t = re.sub(r'\b([m\u03bcunp]?M)\s+(s)\s*[\u207b\u2212\u2013\-]?\s*1\b', lambda m: m.group(1) + '\u00b7' + m.group(2) + '\u207b\u00b9', t)
+    t = re.sub(r'\b(s)\s+[\-–—]\s*1\b', lambda m: m.group(1) + '\u207b\u00b9', t, flags=re.I)
     t = re.sub(r'\b(m)\s+(M)\s*[\u207b\u2212\u2013\-]?\s*1\b', 'mM\u207b\u00b9', t)
+    t = re.sub(r'\b(m)\s+(Ms)\s*[\u207b\u2212\u2013\-]?\s*1\b', 'mM\u00b7s\u207b\u00b9', t, flags=re.I)
     t = re.sub(r'\b(m)\s+(M)\b', 'mM', t)
     t = re.sub(r'([\d.]+)\s+10\s*[\u207b\u2212\u2013\-]\s*(\d+)', lambda m: m.group(1) + ' \u00d7 10\u207b' + m.group(2), t)
     t = re.sub(r'([\d.]+)\s*[x\u00d7]\s*10\s*[\^]?\s*[\u2212\u2013\-]\s*(\d+)', lambda m: m.group(1) + ' \u00d7 10\u207b' + m.group(2), t)
     t = re.sub(r'([\d.]+)\s*[x\u00d7]\s*10\s*[\^]?\s*(\d+)', lambda m: m.group(1) + ' \u00d7 10' + m.group(2), t)
     t = re.sub(r'([\d.]+)\s*[x\u00d7]\s*10\s*(\d+)', lambda m: m.group(1) + ' \u00d7 10' + m.group(2), t)
+    t = re.sub(r'(\d+)\s+10\s+(\d+)\s+Ms?\s*[\-–—]?\s*1\b', lambda m: m.group(1) + ' \u00d7 10\u207b' + m.group(2) + ' M/s', t, flags=re.I)
+    t = re.sub(r'(\d+)\s+10\s+(\d+)\s+[Mm]\s*[Ss]\s*[\-–—]?\s*1\b', lambda m: m.group(1) + ' \u00d7 10\u207b' + m.group(2) + ' M/s', t, flags=re.I)
     t = t.replace('\u25a1', '')
     return t
 
@@ -406,7 +427,9 @@ _VMAX_PATTERNS = [
     re.compile(r'\bKm\b.*?\bV\s*max\b.*?(?:were|was|calculated|found)\s+(?:to\s+be\s+)?([\d.]+)\s*(?:mM|mM|μM|uM|M)\s+and\s+([\d.]+(?:\s*[×x]\s*10[\^⁻\-–]?\s*[-]?\d+)?)\s*(M\s*[sS][\^⁻\-–]?[\-]?1|M/?s|mM/?s|μM/?s)', re.I),
     re.compile(r'\bV\s*max\s+(?:for\s+\S+.*?)?(?:were|was)\s+([\d.]+)\s*[±\+\-]\s*[\d.]+\s*(?:and\s+([\d.]+)\s*[±\+\-]\s*[\d.]+\s+)?(M\s*[sS][\^⁻\-–]?[\-]?1|M/?s|mM/?s|μM/?s)', re.I),
     re.compile(r'\bV\s*max\s+of\s+(\w[\w\d\-]*)\s+(?:was|=|:|≈|~)\s*([\d.]+(?:\s*[×x]\s*10[\^⁻\-–]?\s*[-]?\d+)?)\s*(M\s*[sS][\^⁻\-–]?[\-]?1|M/?s|mM/?s|μM/?s)', re.I),
-    re.compile(r'\bmaximum\s+velocity\s*(?:for\s+)?(\w[\w\d\-]*)?\s*(?:was|=|:|≈|~)\s*([\d.]+(?:\s*[×x]\s*10[\^⁻\-–]?\s*[-]?\d+)?)\s*(M\s*[sS][\^⁻\-–]?[\-]?1|M/?s|mM/?s|μM/?s)', re.I),
+    re.compile(r'\bmaximum\s+velocity\s*(?:for\s+)?(\w[\w\d\-]*)?\s*(?:was|=|:|≈|~)\s*([\d.]+(?:\s*[×x]\s*10[\^⁻\-–]?\s*[-]?\d+)?)\s*(?:±\s*[\d.]+\s*)?(M\s*[sS][\^⁻\-–]?[\-]?1|M/?s|mM/?s|μM/?s|mM\u00b7s\u207b\u00b9)', re.I),
+    re.compile(r'\bmaximum\s+(?:initial\s+)?velocity\s*\)?\s*[^.]{0,40}?(?:was\s+)?(?:calculated\s+to\s+be|found\s+to\s+be)\s*([\d.]+)\s*(?:±\s*[\d.]+\s*|\s+[\d.]+\s+)?(M\s*[sS][\^⁻\-–]?[\-]?1|M/?s|mM/?s|μM/?s|mM\u00b7s\u207b\u00b9)', re.I),
+    re.compile(r'\bV\s*max\s*\)?\s*[^.]{0,40}?(?:was\s+)?(?:calculated\s+to\s+be|found\s+to\s+be)\s*([\d.]+)\s*(?:±\s*[\d.]+\s*|\s+[\d.]+\s+)?(M\s*[sS][\^⁻\-–]?[\-]?1|M/?s|mM/?s|μM/?s|mM\u00b7s\u207b\u00b9)', re.I),
     re.compile(r'\bV\s*max\s*=\s*([\d.]+)\s+10\s*[\^⁻\-–]?\s*[-]?\s*(\d+)\s*(M\s*[sS][\^⁻\-–]?[\-]?1|M/?s|mM/?s|μM/?s|mM\s*[sS])', re.I),
     re.compile(r'\bV\s*max\b[^.=]{0,30}?([\d.]+)\s*10\s*[\^⁻\-–]?\s*[-]?\s*(\d+)\s*(?:M\s*[sS]|mM\s*[sS])', re.I),
     re.compile(r'\bV\s*max\b[^.=]{0,20}?=\s*([\d.]+)\s+(mM|M|μM)\s*[sS]\s*[\^⁻\-–]?\s*[-]?\s*1', re.I),
@@ -472,7 +495,17 @@ def _extract_vmax_fallback(text: str) -> Optional[Dict[str, Any]]:
         vm = re.search(r'\bmaximum\s+velocity\b', norm, re.I)
     if vm:
         after = norm[vm.end():vm.end() + 150]
-        num_m = re.search(r'([\d.]+)\s*[×x\u00d7]?\s*10[\u207b⁻\-–\u2212\u2013]?\s*(\d+)', after)
+        e_notation_m = re.search(r'([\d.]+)\s*[eE]\s*([\-−\u2212]?\d+)', after)
+        if e_notation_m:
+            try:
+                parsed = _parse_scientific_notation(e_notation_m.group(0))
+                if isinstance(parsed, (int, float)):
+                    unit_m = _VMAX_RATE_UNIT_RE.search(after[e_notation_m.end():e_notation_m.end() + 30])
+                    unit = unit_m.group(0).strip() if unit_m else None
+                    return {"value": parsed, "unit": unit, "source": "text_ocr_fallback"}
+            except (ValueError, TypeError):
+                pass
+        num_m = re.search(r'([\d.]+)\s*[×x\u00d7]\s*10[\u207b\u207a\u2212\u2013\-–]?\s*(\d+)', after)
         if num_m:
             try:
                 base = float(num_m.group(1))
@@ -495,16 +528,6 @@ def _extract_vmax_fallback(text: str) -> Optional[Dict[str, Any]]:
                 vmax_val = float(plain_m.group(1))
                 unit = plain_m.group(2).strip() if plain_m.lastindex >= 2 else None
                 return {"value": vmax_val, "unit": unit, "source": "text_ocr_fallback"}
-            except (ValueError, TypeError):
-                pass
-        e_notation_m = re.search(r'([\d.]+)\s*[eE]\s*([\-−\u2212]?\d+)', after)
-        if e_notation_m:
-            try:
-                parsed = _parse_scientific_notation(e_notation_m.group(0))
-                if isinstance(parsed, (int, float)):
-                    unit_m = _VMAX_RATE_UNIT_RE.search(after[e_notation_m.end():e_notation_m.end() + 30])
-                    unit = unit_m.group(0).strip() if unit_m else None
-                    return {"value": parsed, "unit": unit, "source": "text_ocr_fallback"}
             except (ValueError, TypeError):
                 pass
     return None
@@ -616,12 +639,20 @@ _SYNTHESIS_METHODS = {
     "coordination": re.compile(r'\bcoordination\s+(?:polymer|complex|compound)', re.I),
     "anchoring": re.compile(r'\banchor', re.I),
     "doping": re.compile(r'\bdop(?:ed|ing)\b', re.I),
+    "general_synthesis": re.compile(r'\b(?:synthesized|prepared|fabricated|obtained)\b', re.I),
+    "striping": re.compile(r'\bstrip(?:e|ing)\s+(?:off|from|away|out)\b', re.I),
+    "nitrogen_coordination": re.compile(r'\bnitrogen[-\s]?coordinated\b', re.I),
+    "carbon_support": re.compile(r'\bcarbon[-\s]?supported\b', re.I),
+    "immobilization": re.compile(r'\bimmobiliz', re.I),
+    "encapsulation": re.compile(r'\bencapsulat', re.I),
+    "deposition": re.compile(r'\bdeposit', re.I),
+    "reduction": re.compile(r'\breduc(?:ed|tion)\s+(?:by|with|using|via|through)\b', re.I),
 }
 
 _PH_PATTERNS = {
     "optimal_pH": [
-        re.compile(r'\boptimal\s+pH\s*(?:was|=|:|≈|~)\s*([\d.]+)', re.I),
-        re.compile(r'\boptimum\s+pH\s*(?:was|=|:|≈|~)\s*([\d.]+)', re.I),
+        re.compile(r'\boptimal\s+pH\s*(?:was|=|:|≈|~|at)\s*([\d.]+)', re.I),
+        re.compile(r'\boptimum\s+pH\s*(?:was|=|:|≈|~|at)\s*([\d.]+)', re.I),
         re.compile(r'\bpH\s+optimum\s*(?:was|=|:|≈|~)\s*([\d.]+)', re.I),
         re.compile(r'\bmaximum\s+activity\s+(?:at|was\s+at)\s+pH\s*([\d.]+)', re.I),
         re.compile(r'\bhighest\s+(?:catalytic\s+)?activity\s+(?:at|was\s+at)\s+pH\s*([\d.]+)', re.I),
@@ -629,6 +660,10 @@ _PH_PATTERNS = {
         re.compile(r'\bpH\s*([\d.]+)\s+(?:showed|exhibited|displayed)\s+(?:the\s+)?(?:highest|maximum|optimal|best)', re.I),
         re.compile(r'\b(?:at|under)\s+pH\s*([\d.]+)\s*,?\s*(?:the\s+)?(?:highest|maximum|optimal|best)', re.I),
         re.compile(r'\bpH\s*([\d.]+)\s+was\s+(?:the\s+)?(?:optimal|optimum|best)', re.I),
+        re.compile(r'\boptimal\s+pH\s+of\s*([\d.]+)', re.I),
+        re.compile(r'\bpH\s*([\d.]+)\s+(?:gave|yielded|produced)\s+(?:the\s+)?(?:highest|maximum|optimal|best)', re.I),
+        re.compile(r'\bactivity\s+(?:peaked|maximum|highest)\s+(?:at|under)\s+pH\s*([\d.]+)', re.I),
+        re.compile(r'\bpH\s*([\d.]+)\s+(?:is|was)\s+(?:the\s+)?(?:most\s+)?(?:active|efficient|effective|favorable)', re.I),
     ],
     "pH_range": [
         re.compile(r'\bpH\s+range\s*(?:of|=|:|≈|~|was|from)\s*([\d.]+)\s*[-–—~to]+\s*([\d.]+)', re.I),
@@ -648,8 +683,8 @@ _PH_PATTERNS = {
 
 _TEMPERATURE_PATTERNS = {
     "optimal_temperature": [
-        re.compile(r'\boptimal\s+temperature\s*(?:was|=|:|≈|~)\s*([\d.]+)\s*°?C', re.I),
-        re.compile(r'\boptimum\s+temperature\s*(?:was|=|:|≈|~)\s*([\d.]+)\s*°?C', re.I),
+        re.compile(r'\boptimal\s+(?:reaction\s+)?temperature\s*(?:was|=|:|≈|~)\s*([\d.]+)\s*°?C', re.I),
+        re.compile(r'\boptimum\s+(?:reaction\s+)?temperature\s*(?:was|=|:|≈|~)\s*([\d.]+)\s*°?C', re.I),
         re.compile(r'\btemperature\s+optimum\s*(?:was|=|:|≈|~)\s*([\d.]+)\s*°?C', re.I),
         re.compile(r'\bmaximum\s+activity\s+(?:at|was\s+at)\s*([\d.]+)\s*°?C', re.I),
         re.compile(r'\bhighest\s+(?:catalytic\s+)?activity\s+(?:at|was\s+at)\s*([\d.]+)\s*°?C', re.I),
@@ -658,6 +693,13 @@ _TEMPERATURE_PATTERNS = {
         re.compile(r'\b([\d.]+)\s*°C\s+(?:was|showed|exhibited)\s+(?:the\s+)?(?:optimal|optimum|highest|maximum|best)', re.I),
         re.compile(r'\b(?:at|under)\s*([\d.]+)\s*°C\s*,?\s*(?:the\s+)?(?:highest|maximum|optimal|best)', re.I),
         re.compile(r'\boptimal\s+T\s*(?:was|=|:)\s*([\d.]+)', re.I),
+        re.compile(r'\boptimal\s+temperature\s+of\s*([\d.]+)\s*°?C', re.I),
+        re.compile(r'\bactivity\s+(?:peaked|maximum|highest)\s+(?:at|under)\s*([\d.]+)\s*°?C', re.I),
+        re.compile(r'\b([\d.]+)\s*°\s*C\s+(?:is|was)\s+(?:the\s+)?(?:most\s+)?(?:active|efficient|effective|favorable)', re.I),
+        re.compile(r'\b(?:activity|catalytic)\s+(?:at|under|in)\s+([\d.]+)\s*°\s*C\s+(?:catalytic\s+)?condition', re.I),
+        re.compile(r'\b([\d.]+)\s*°\s*C\s+(?:catalytic\s+)?condition', re.I),
+        re.compile(r'\bactivity\s+(?:were|was|are|is)\s+(?:also\s+)?(?:investigated|studied|measured|evaluated)\s+(?:at|under)\s+([\d.]+)\s*°?C', re.I),
+        re.compile(r'\b([\d.]+)\s*°\s*C\s*,?\s*(?:which|and)\s+(?:is|was)\s+(?:the\s+)?(?:optimal|optimum|best|most\s+active)', re.I),
     ],
     "temperature_range": [
         re.compile(r'\btemperature\s+range\s*(?:of|=|:|≈|~|was|from)\s*([\d.]+)\s*[-–—~to]+\s*([\d.]+)\s*°?C', re.I),
@@ -686,6 +728,9 @@ _SIZE_PATTERNS = [
     re.compile(r'\bhydrodynamic\s+(?:size|diameter)\s*(?:of|was|=|:|≈|~)\s*([\d.]+)\s*(nm|μm|um)', re.I),
     re.compile(r'\b([\d.]+)\s*[-–—~to]+\s*([\d.]+)\s*(nm|μm|um)\s+in\s+(?:size|diameter)\b', re.I),
     re.compile(r'\b([\d.]+)\s*(nm|μm|um)\s+in\s+(?:size|diameter)\b', re.I),
+    re.compile(r'\b(?:d|diameter|size)\s*(?:=|≈|~|was|of)\s*(?:about\s+|ca\.?\s*)?([\d.]+)\s*(nm|μm|um)\b', re.I),
+    re.compile(r'\b(?:uniform\s+)?(?:size|diameter)\s*[\(=]\s*[\w.]*\s*[:=]?\s*([\d.]+)\s*(nm|μm|um)\b', re.I),
+    re.compile(r'\b([\d.]+)\s*(nm|μm|um)\s*(?:in\s+)?(?:size|diameter|length|thickness|width)\b', re.I),
 ]
 
 _SURFACE_AREA_PATTERNS = [
@@ -715,8 +760,8 @@ _CRYSTAL_STRUCTURE_PATTERNS = [
     re.compile(r'\bhexagonal\s+(?:phase|structure)', re.I),
     re.compile(r'\borthorhombic\s+(?:phase|structure)', re.I),
     re.compile(r'\bmonoclinic\s+(?:phase|structure)', re.I),
-    re.compile(r'\bamorphous\s+(?:phase|structure|nature)', re.I),
-    re.compile(r'\bcrystalline\s+(?:phase|structure|nature)', re.I),
+    re.compile(r'\bamorphous\s+(?:phase|structure|nature|carbon|matrix|framework|material)', re.I),
+    re.compile(r'\bcrystalline\s+(?:phase|structure|nature|material)', re.I),
     re.compile(r'\bXRD\s+(?:pattern|analysis|result)\s+(?:confirmed|showed|revealed|indicated)\s+(?:the\s+)?(\w+)', re.I),
     re.compile(r'\bgraphitic\s+(?:carbon|structure|phase)', re.I),
     re.compile(r'\b(?:face-centered|body-centered)\s+cubic\b', re.I),
@@ -1774,6 +1819,7 @@ class EvidenceBucketBuilder:
     def __init__(self, max_sentences: int = 20, consistency_guard=None):
         self.max_sentences = max_sentences
         self.consistency_guard = consistency_guard
+        self.warnings = []
 
     def build(self, doc: PreprocessedDocument, selected_name: str,
               all_candidates: Optional[List[str]] = None) -> Dict[str, List[str]]:
@@ -1862,6 +1908,17 @@ class EvidenceBucketBuilder:
                         buckets[fb_bucket].append(text)
             if buckets[fb_bucket]:
                 self.warnings.append(f"{fb_bucket}_bucket_fallback_applied")
+
+        for fb_bucket in ("activity", "synthesis", "characterization", "material"):
+            if buckets[fb_bucket]:
+                continue
+            for text, section in all_sentences:
+                pattern = _BUCKET_KEYWORDS.get(fb_bucket)
+                if not pattern or not pattern.search(text):
+                    continue
+                buckets[fb_bucket].append(text)
+            if buckets[fb_bucket]:
+                self.warnings.append(f"{fb_bucket}_bucket_loose_fallback_applied")
 
         for key in buckets:
             seen = set()
@@ -2008,9 +2065,9 @@ class TableProcessor:
                                    "substrate": groups[0], "source": "table"})
                 elif len(groups) == 2:
                     g0, g1 = groups
-                    _RATE_UNITS = ("M s⁻¹", "M s-1", "M s–1", "M s^-1", "M/s", "mM/s", "μM/s", "M S⁻¹", "M S-1")
-                    g0_is_unit = g0 in _RATE_UNITS or bool(re.match(r'10[−\-–]?\d*\s*M\s*[sS]', g0))
-                    g1_is_unit = g1 in _RATE_UNITS or bool(re.match(r'10[−\-–]?\d*\s*M\s*[sS]', g1))
+                    _RATE_UNITS = ("M s⁻¹", "M s-1", "M s–1", "M s^-1", "M/s", "mM/s", "μM/s", "M S⁻¹", "M S-1", "mM·s⁻¹", "mM\u00b7s\u207b\u00b9")
+                    g0_is_unit = g0 in _RATE_UNITS or bool(re.match(r'10[−\-–]?\d*\s*M\s*[sS]', g0)) or bool(re.match(r'[mμunp]?M[·\s]*s[⁻\-–]1', g0))
+                    g1_is_unit = g1 in _RATE_UNITS or bool(re.match(r'10[−\-–]?\d*\s*M\s*[sS]', g1)) or bool(re.match(r'[mμunp]?M[·\s]*s[⁻\-–]1', g1))
                     if g1_is_unit and not g0_is_unit:
                         values.append({"parameter": "Vmax", "value": g0, "unit": g1,
                                        "substrate": None, "source": "table"})
@@ -2121,13 +2178,17 @@ class RuleExtractor:
             self._extract_kinetics_from_table(record, table_values)
 
         self._extract_kcat_from_text(record, buckets.get("kinetics", []))
-        self._extract_pH_profile(record, buckets.get("activity", []))
-        self._extract_temperature_profile(record, buckets.get("activity", []))
+        self._extract_pH_profile(record, buckets)
+        self._extract_temperature_profile(record, buckets)
         self._extract_synthesis_method(record, buckets.get("synthesis", []) + buckets.get("material", [])[:5] + buckets.get("characterization", [])[:3])
         self._extract_size_properties(record, buckets.get("material", []) + buckets.get("characterization", []) + buckets.get("synthesis", [])[:3])
         self._extract_physical_properties(record, buckets.get("characterization", []) + buckets.get("material", [])[:3])
+        self._extract_morphology_from_text(record, buckets.get("characterization", []) + buckets.get("material", [])[:5])
 
         self._extract_applications_from_text(record, buckets.get("application", []))
+
+        if doc:
+            self._fulltext_fallback_extract(record, doc, selected_name)
 
         return record
 
@@ -2199,9 +2260,9 @@ class RuleExtractor:
                         groups = m.groups()
                         if len(groups) == 2:
                             g0, g1 = groups
-                            _RATE_UNITS = ("M s⁻¹", "M s-1", "M s–1", "M s^-1", "M/s", "mM/s", "μM/s", "M S⁻¹", "M S-1")
-                            g0_is_unit = g0 in _RATE_UNITS or bool(re.match(r'10[−\-–]?\d*\s*M\s*[sS]', g0))
-                            g1_is_unit = g1 in _RATE_UNITS or bool(re.match(r'10[−\-–]?\d*\s*M\s*[sS]', g1))
+                            _RATE_UNITS = ("M s⁻¹", "M s-1", "M s–1", "M s^-1", "M/s", "mM/s", "μM/s", "M S⁻¹", "M S-1", "mM·s⁻¹", "mM\u00b7s\u207b\u00b9")
+                            g0_is_unit = g0 in _RATE_UNITS or bool(re.match(r'10[−\-–]?\d*\s*M\s*[sS]', g0)) or bool(re.match(r'[mμunp]?M[·\s]*s[⁻\-–]1', g0))
+                            g1_is_unit = g1 in _RATE_UNITS or bool(re.match(r'10[−\-–]?\d*\s*M\s*[sS]', g1)) or bool(re.match(r'[mμunp]?M[·\s]*s[⁻\-–]1', g1))
                             if g1_is_unit and not g0_is_unit:
                                 value, unit = g0, g1
                                 substrate = None
@@ -2601,15 +2662,21 @@ class RuleExtractor:
                     record["main_activity"]["kinetics"]["kcat_unit"] = "s^-1"
                     logger.info(f"[SMN] kcat derived from kcat/Km={kcat_km:.2e} * Km={km} {km_unit} = {kcat_val:.2e} s^-1")
 
-    def _extract_pH_profile(self, record: Dict[str, Any], activity_texts: List[str]):
+    def _extract_pH_profile(self, record: Dict[str, Any], buckets):
         ph_profile = record["main_activity"].get("pH_profile", {})
         if not isinstance(ph_profile, dict):
             ph_profile = {}
             record["main_activity"]["pH_profile"] = ph_profile
 
-        search_texts = activity_texts
-        if ph_profile.get("optimal_pH") is None and ph_profile.get("pH_range") is None:
-            search_texts = activity_texts + record.get("raw_supporting_text", {}).get("kinetics", [])[:5]
+        if isinstance(buckets, dict):
+            search_texts = (
+                buckets.get("activity", [])
+                + buckets.get("kinetics", [])
+                + buckets.get("application", [])[:5]
+                + record.get("raw_supporting_text", {}).get("kinetics", [])[:5]
+            )
+        else:
+            search_texts = list(buckets) + record.get("raw_supporting_text", {}).get("kinetics", [])[:5]
 
         if ph_profile.get("optimal_pH") is None:
             for text in search_texts:
@@ -2627,6 +2694,19 @@ class RuleExtractor:
 
         if ph_profile.get("optimal_pH") is None:
             for text in search_texts:
+                m = re.search(r'\boptimal\s+pH\s+(?:of\s+)?([\d.]+)', text, re.I)
+                if m:
+                    try:
+                        val = float(m.group(1))
+                        if 0 <= val <= 14:
+                            ph_profile["optimal_pH"] = val
+                            record["main_activity"]["conditions"]["pH"] = m.group(1)
+                            break
+                    except (ValueError, IndexError):
+                        pass
+
+        if ph_profile.get("optimal_pH") is None:
+            for text in search_texts:
                 m = re.search(r'\bpH\s*(?:was|=|:)\s*([\d.]+)\b', text, re.I)
                 if m:
                     try:
@@ -2634,9 +2714,48 @@ class RuleExtractor:
                         if 0 <= val <= 14:
                             ph_profile["optimal_pH"] = val
                             record["main_activity"]["conditions"]["pH"] = m.group(1)
+                            break
                     except (ValueError, IndexError):
                         pass
-                    break
+
+        if ph_profile.get("optimal_pH") is None:
+            for text in search_texts:
+                m = re.search(r'\bpH\s*=\s*([\d.]+)\b', text, re.I)
+                if m:
+                    try:
+                        val = float(m.group(1))
+                        if 0 <= val <= 14:
+                            ph_profile["optimal_pH"] = val
+                            record["main_activity"]["conditions"]["pH"] = m.group(1)
+                            break
+                    except (ValueError, IndexError):
+                        pass
+
+        if ph_profile.get("optimal_pH") is None:
+            for text in search_texts:
+                m = re.search(r'\bpH\s+([\d.]+)\b', text, re.I)
+                if m:
+                    try:
+                        val = float(m.group(1))
+                        if 0 <= val <= 14:
+                            ph_profile["optimal_pH"] = val
+                            record["main_activity"]["conditions"]["pH"] = m.group(1)
+                            break
+                    except (ValueError, IndexError):
+                        pass
+
+        if ph_profile.get("optimal_pH") is None:
+            for text in search_texts:
+                m = re.search(r'\b(?:buffer|solution)\s*\([^)]*pH\s*([\d.]+)', text, re.I)
+                if m:
+                    try:
+                        val = float(m.group(1))
+                        if 0 <= val <= 14:
+                            ph_profile["optimal_pH"] = val
+                            record["main_activity"]["conditions"]["pH"] = m.group(1)
+                            break
+                    except (ValueError, IndexError):
+                        pass
 
         if ph_profile.get("pH_range") is None:
             for text in search_texts:
@@ -2648,6 +2767,18 @@ class RuleExtractor:
                 if ph_profile.get("pH_range") is not None:
                     break
 
+        if ph_profile.get("pH_range") is None:
+            for text in search_texts:
+                m = re.search(r'\bpH\s+(?:from\s+)?([\d.]+)\s*[-–—~to]+\s*([\d.]+)', text, re.I)
+                if m:
+                    try:
+                        low, high = float(m.group(1)), float(m.group(2))
+                        if 0 <= low <= 14 and 0 <= high <= 14:
+                            ph_profile["pH_range"] = f"{m.group(1)}-{m.group(2)}"
+                            break
+                    except (ValueError, IndexError):
+                        pass
+
         if ph_profile.get("pH_stability_range") is None:
             for text in search_texts:
                 for pat in _PH_PATTERNS["pH_stability"]:
@@ -2658,20 +2789,30 @@ class RuleExtractor:
                 if ph_profile.get("pH_stability_range") is not None:
                     break
 
-    def _extract_temperature_profile(self, record: Dict[str, Any], activity_texts: List[str]):
+    def _extract_temperature_profile(self, record: Dict[str, Any], buckets):
         temp_profile = record["main_activity"].get("temperature_profile", {})
         if not isinstance(temp_profile, dict):
             temp_profile = {}
             record["main_activity"]["temperature_profile"] = temp_profile
 
-        search_texts = activity_texts
-        if temp_profile.get("optimal_temperature") is None:
-            search_texts = activity_texts + record.get("raw_supporting_text", {}).get("kinetics", [])[:5]
+        if isinstance(buckets, dict):
+            search_texts = (
+                buckets.get("activity", [])
+                + buckets.get("kinetics", [])
+                + buckets.get("application", [])[:5]
+                + record.get("raw_supporting_text", {}).get("kinetics", [])[:5]
+            )
+        else:
+            search_texts = list(buckets) + record.get("raw_supporting_text", {}).get("kinetics", [])[:5]
+
+        norm_texts = [_normalize_ocr_scientific(t) for t in search_texts]
 
         if temp_profile.get("optimal_temperature") is None:
-            for text in search_texts:
+            for text, norm in zip(search_texts, norm_texts):
                 for pat in _TEMPERATURE_PATTERNS["optimal_temperature"]:
                     m = pat.search(text)
+                    if not m:
+                        m = pat.search(norm)
                     if m:
                         temp_profile["optimal_temperature"] = f"{m.group(1)} °C"
                         record["main_activity"]["conditions"]["temperature"] = f"{m.group(1)} °C"
@@ -2680,25 +2821,59 @@ class RuleExtractor:
                     break
 
         if temp_profile.get("optimal_temperature") is None:
-            for text in search_texts:
-                m = re.search(r'\b(?:reaction\s+)?temperature\s*(?:was|=|:)\s*([\d.]+)\s*°?C', text, re.I)
-                if m:
-                    try:
-                        val = float(m.group(1))
-                        if 15 <= val <= 80:
-                            temp_profile["optimal_temperature"] = f"{m.group(1)} °C"
-                            record["main_activity"]["conditions"]["temperature"] = f"{m.group(1)} °C"
-                    except (ValueError, IndexError):
-                        pass
+            _TEMP_OPTIMAL_FALLBACK = [
+                re.compile(r'\boptimal\s+(?:reaction\s+)?temperature\s*(?:was|=|:|of)\s*([\d.]+)\s*°?\s*C', re.I),
+                re.compile(r'\b(?:reaction\s+)?temperature\s*(?:was|=|:)\s*([\d.]+)\s*°?C', re.I),
+                re.compile(r'\b(?:at|under)\s*([\d.]+)\s*°?\s*C\b', re.I),
+                re.compile(r'\bincubat\w*\s+(?:at\s+)?([\d.]+)\s*°?\s*C', re.I),
+                re.compile(r'\b([\d.]+)\s*°\s*C\b', re.I),
+            ]
+            for text, norm in zip(search_texts, norm_texts):
+                for pat in _TEMP_OPTIMAL_FALLBACK:
+                    m = pat.search(text)
+                    if not m:
+                        m = pat.search(norm)
+                    if m:
+                        try:
+                            val = float(m.group(1))
+                            if 15 <= val <= 80:
+                                temp_profile["optimal_temperature"] = f"{m.group(1)} °C"
+                                record["main_activity"]["conditions"]["temperature"] = f"{m.group(1)} °C"
+                                break
+                        except (ValueError, IndexError):
+                            pass
+                if temp_profile.get("optimal_temperature") is not None:
                     break
 
         if temp_profile.get("temperature_range") is None:
-            for text in search_texts:
+            for text, norm in zip(search_texts, norm_texts):
                 for pat in _TEMPERATURE_PATTERNS["temperature_range"]:
                     m = pat.search(text)
+                    if not m:
+                        m = pat.search(norm)
                     if m:
                         temp_profile["temperature_range"] = f"{m.group(1)}-{m.group(2)} °C"
                         break
+                if temp_profile.get("temperature_range") is not None:
+                    break
+
+        if temp_profile.get("temperature_range") is None:
+            _TEMP_RANGE_FALLBACK = [
+                re.compile(r'\btemperature\s+(?:ranging\s+)?(?:from\s+)?([\d.]+)\s*[-–—~to]+\s*([\d.]+)\s*°?C', re.I),
+            ]
+            for text, norm in zip(search_texts, norm_texts):
+                for pat in _TEMP_RANGE_FALLBACK:
+                    m = pat.search(text)
+                    if not m:
+                        m = pat.search(norm)
+                    if m:
+                        try:
+                            low, high = float(m.group(1)), float(m.group(2))
+                            if 10 <= low <= 100 and 10 <= high <= 100:
+                                temp_profile["temperature_range"] = f"{m.group(1)}-{m.group(2)} °C"
+                                break
+                        except (ValueError, IndexError):
+                            pass
                 if temp_profile.get("temperature_range") is not None:
                     break
 
@@ -2844,6 +3019,212 @@ class RuleExtractor:
                         break
                 if sel.get("pore_size"):
                     break
+
+    _MORPHOLOGY_TERMS = [
+        "nanoparticle", "nanoparticles", "nanosphere", "nanospheres",
+        "nanosheet", "nanosheets", "nanorod", "nanorods",
+        "nanowire", "nanowires", "nanotube", "nanotubes",
+        "nanofiber", "nanofibers", "nanocube", "nanocubes",
+        "nanoprism", "nanoprisms", "nanostar", "nanostars",
+        "nanoflower", "nanoflowers", "nanocluster", "nanoclusters",
+        "nanodot", "nanodots", "nanoring", "nanorings",
+        "octahedr", "cuboctahedr", "dodecahedr", "icosahedr",
+        "sphere", "spherical", "cubic", "cubical",
+        "rod-shaped", "sheet-like", "wire-like", "flower-like",
+        "core-shell", "yolk-shell", "hollow sphere", "hollow structure",
+        "mesoporous", "porous", "lamellar", "layered",
+        "dendritic", "branched", "urchin-like", "bundle",
+        "platelet", "flake", "belt", "ribbon",
+        "needle-like", "spindle", "ellipsoid", "ellipsoidal",
+        "irregular", "aggregat",
+    ]
+
+    def _extract_morphology_from_text(self, record, char_texts):
+        sel = record.get("selected_nanozyme", {})
+        if not isinstance(sel, dict):
+            return
+        if sel.get("morphology"):
+            return
+        found_terms = []
+        for text in char_texts:
+            tl = text.lower()
+            for term in self._MORPHOLOGY_TERMS:
+                if term in tl and term not in found_terms:
+                    found_terms.append(term)
+        if found_terms:
+            sel["morphology"] = ", ".join(found_terms[:3])
+
+    def _fulltext_fallback_extract(self, record, doc, selected_name):
+        all_text = "\n".join(doc.chunks) if doc.chunks else ""
+        if not all_text:
+            return
+
+        norm_text = _normalize_ocr_scientific(all_text)
+
+        sel = record.get("selected_nanozyme", {})
+        act = record.get("main_activity", {})
+        kin = act.get("kinetics", {})
+        ph_prof = act.get("pH_profile", {})
+        temp_prof = act.get("temperature_profile", {})
+
+        if ph_prof.get("optimal_pH") is None:
+            for pat in _PH_PATTERNS["optimal_pH"]:
+                m = pat.search(all_text)
+                if not m:
+                    m = pat.search(norm_text)
+                if m:
+                    try:
+                        val = float(m.group(1))
+                        if 0 <= val <= 14:
+                            ph_prof["optimal_pH"] = val
+                            logger.info(f"[SMN] Fulltext fallback: optimal_pH={val}")
+                            break
+                    except (ValueError, IndexError):
+                        pass
+
+        if ph_prof.get("optimal_pH") is None:
+            for pat in [
+                re.compile(r'\bpH\s*(?:was|=|:)\s*([\d.]+)\b', re.I),
+                re.compile(r'\bpH\s*=\s*([\d.]+)\b', re.I),
+                re.compile(r'\bpH\s+([\d.]+)\b', re.I),
+            ]:
+                m = pat.search(all_text)
+                if not m:
+                    m = pat.search(norm_text)
+                if m:
+                    try:
+                        val = float(m.group(1))
+                        if 0 <= val <= 14:
+                            ph_prof["optimal_pH"] = val
+                            logger.info(f"[SMN] Fulltext fallback: pH={val}")
+                            break
+                    except (ValueError, IndexError):
+                        pass
+
+        if temp_prof.get("optimal_temperature") is None:
+            for pat in _TEMPERATURE_PATTERNS["optimal_temperature"]:
+                m = pat.search(all_text)
+                if not m:
+                    m = pat.search(norm_text)
+                if m:
+                    temp_prof["optimal_temperature"] = f"{m.group(1)} °C"
+                    logger.info(f"[SMN] Fulltext fallback: optimal_temperature={m.group(1)}°C")
+                    break
+
+        if temp_prof.get("optimal_temperature") is not None:
+            for pat in _TEMPERATURE_PATTERNS["optimal_temperature"]:
+                m = pat.search(all_text)
+                if not m:
+                    m = pat.search(norm_text)
+                if m:
+                    try:
+                        val = float(m.group(1))
+                        if 15 <= val <= 80:
+                            old_val = temp_prof.get("optimal_temperature")
+                            temp_prof["optimal_temperature"] = f"{m.group(1)} °C"
+                            logger.info(f"[SMN] Fulltext fallback: optimal_temperature upgraded from {old_val} to {m.group(1)}°C")
+                            break
+                    except (ValueError, IndexError):
+                        pass
+
+        if temp_prof.get("optimal_temperature") is None:
+            _TEMP_FALLBACK_PATTERNS = [
+                re.compile(r'\b(?:reaction\s+)?temperature\s*(?:was|=|:)\s*([\d.]+)\s*°?\s*C', re.I),
+                re.compile(r'\b(?:at|under)\s*([\d.]+)\s*°?\s*C\b', re.I),
+                re.compile(r'\bincubat\w*\s+(?:at\s+)?([\d.]+)\s*°?\s*C', re.I),
+                re.compile(r'\b([\d.]+)\s*°\s*C\b', re.I),
+            ]
+            for pat in _TEMP_FALLBACK_PATTERNS:
+                m = pat.search(all_text)
+                if not m:
+                    m = pat.search(norm_text)
+                if m:
+                    try:
+                        val = float(m.group(1))
+                        if 15 <= val <= 80:
+                            temp_prof["optimal_temperature"] = f"{m.group(1)} °C"
+                            logger.info(f"[SMN] Fulltext fallback: temperature={m.group(1)}°C")
+                            break
+                    except (ValueError, IndexError):
+                        pass
+
+        if temp_prof.get("optimal_temperature") is None:
+            m = re.search(r'\b([\d.]+)\s*°\s*C\s+(?:catalytic\s+)?condition', norm_text, re.I)
+            if m:
+                try:
+                    val = float(m.group(1))
+                    if 15 <= val <= 80:
+                        temp_prof["optimal_temperature"] = f"{m.group(1)} °C"
+                        logger.info(f"[SMN] Fulltext fallback: catalytic condition temp={m.group(1)}°C")
+                except (ValueError, IndexError):
+                    pass
+
+        if temp_prof.get("optimal_temperature") is None:
+            m = re.search(r'\bactivity\s+(?:were|was|are|is)\s+(?:also\s+)?(?:investigated|studied|measured|evaluated)\s+(?:at|under)\s+([\d.]+)\s*°?C', norm_text, re.I)
+            if m:
+                try:
+                    val = float(m.group(1))
+                    if 15 <= val <= 80:
+                        temp_prof["optimal_temperature"] = f"{m.group(1)} °C"
+                        logger.info(f"[SMN] Fulltext fallback: activity studied at={m.group(1)}°C")
+                except (ValueError, IndexError):
+                    pass
+
+        if sel.get("synthesis_method") is None:
+            method_scores = {}
+            for method_name, pattern in _SYNTHESIS_METHODS.items():
+                if pattern.search(all_text):
+                    method_scores[method_name] = method_scores.get(method_name, 0) + 1
+            if method_scores:
+                best = max(method_scores, key=method_scores.get)
+                if best != "general_synthesis" or len(method_scores) == 1:
+                    sel["synthesis_method"] = best.replace("_", " ")
+                    logger.info(f"[SMN] Fulltext fallback: synthesis_method={best}")
+
+        if sel.get("size") is None:
+            for pat in _SIZE_PATTERNS:
+                m = pat.search(all_text)
+                if m:
+                    groups = m.groups()
+                    if len(groups) == 3:
+                        sel["size"] = f"{groups[0]}-{groups[1]} {groups[2]}"
+                        sel["size_unit"] = groups[2]
+                    elif len(groups) == 2:
+                        sel["size"] = f"{groups[0]} {groups[1]}"
+                        sel["size_unit"] = groups[1]
+                    logger.info(f"[SMN] Fulltext fallback: size={sel.get('size')}")
+                    break
+
+        if sel.get("morphology") is None:
+            found_terms = []
+            tl = all_text.lower()
+            for term in self._MORPHOLOGY_TERMS:
+                if term in tl and term not in found_terms:
+                    found_terms.append(term)
+            if found_terms:
+                sel["morphology"] = ", ".join(found_terms[:3])
+                logger.info(f"[SMN] Fulltext fallback: morphology={sel['morphology']}")
+
+        if sel.get("crystal_structure") is None:
+            for pat in _CRYSTAL_STRUCTURE_PATTERNS:
+                m = pat.search(all_text)
+                if m:
+                    if m.lastindex and m.group(1):
+                        sel["crystal_structure"] = m.group(1).lower()
+                    else:
+                        match_text = m.group(0).lower()
+                        for struct_name in ("spinel", "perovskite", "fluorite", "cubic",
+                                           "tetragonal", "hexagonal", "orthorhombic",
+                                           "monoclinic", "amorphous", "crystalline",
+                                           "anatase", "rutile", "brookite"):
+                            if struct_name in match_text:
+                                sel["crystal_structure"] = struct_name
+                                break
+                    logger.info(f"[SMN] Fulltext fallback: crystal_structure={sel.get('crystal_structure')}")
+                    break
+
+        act["pH_profile"] = ph_prof
+        act["temperature_profile"] = temp_prof
 
     _APP_TYPE_KEYWORDS = {
         "detection": ["detection", "sensing", "sensor", "biosensor", "assay", "monitoring", "determin"],
@@ -3027,10 +3408,30 @@ class SingleMainNanozymePipeline:
         self.table_proc = TableProcessor()
         self.figure_proc = FigureProcessor()
         self.rule_ext = RuleExtractor()
+        try:
+            from extraction_agents import RuleExtractorAdapter
+            self.rule_ext = RuleExtractorAdapter()
+            logger.info("[SMN] Using RuleExtractorAdapter (4 specialized agents)")
+        except ImportError:
+            logger.warning("[SMN] extraction_agents not available, using original RuleExtractor")
         self.num_val = NumericValidator()
         self.diag_builder = DiagnosticsBuilder()
         self._guard: Optional[Any] = None
         self._agentic_guard: Optional[Any] = None
+        try:
+            from cross_validation_agent import CrossValidationAgent
+            self.cross_validator = CrossValidationAgent()
+            logger.info("[SMN] CrossValidationAgent loaded")
+        except ImportError:
+            self.cross_validator = None
+            logger.warning("[SMN] CrossValidationAgent not available")
+        try:
+            from consistency_agent import ConsistencyAgent
+            self.consistency_agent = ConsistencyAgent()
+            logger.info("[SMN] ConsistencyAgent loaded")
+        except ImportError:
+            self.consistency_agent = None
+            logger.warning("[SMN] ConsistencyAgent not available")
 
     async def _call_vlm(self, vlm_tasks: List[Dict], selected_name: str) -> Optional[List[Dict]]:
         if not self.client:
@@ -3215,17 +3616,19 @@ class SingleMainNanozymePipeline:
                         if record["main_activity"]["kinetics"]["Km"] is None:
                             try:
                                 val = float(km_item["value"])
-                                if record["main_activity"]["kinetics"].get("Km") is not None:
-                                    rule_val = record["main_activity"]["kinetics"]["Km"]
-                                    if isinstance(rule_val, (int, float)) and abs(val - rule_val) / max(abs(rule_val), 1e-10) > 0.5:
-                                        logger.warning(
-                                            f"[SMN] VLM Km={val} differs from rule Km={rule_val}. "
-                                            f"Keeping rule-based value."
-                                        )
-                                        continue
                                 record["main_activity"]["kinetics"]["Km"] = val
                                 record["main_activity"]["kinetics"]["Km_unit"] = km_item.get("unit")
                                 record["main_activity"]["kinetics"]["source"] = "VLM"
+                            except (ValueError, TypeError):
+                                pass
+                        elif isinstance(record["main_activity"]["kinetics"]["Km"], (int, float)):
+                            try:
+                                val = float(km_item["value"])
+                                if abs(val - record["main_activity"]["kinetics"]["Km"]) / max(abs(record["main_activity"]["kinetics"]["Km"]), 1e-10) > 0.5:
+                                    logger.warning(
+                                        f"[SMN] VLM Km={val} differs from rule Km={record['main_activity']['kinetics']['Km']}. "
+                                        f"Keeping rule-based value."
+                                    )
                             except (ValueError, TypeError):
                                 pass
 
@@ -3243,17 +3646,19 @@ class SingleMainNanozymePipeline:
                         if record["main_activity"]["kinetics"]["Vmax"] is None:
                             try:
                                 val = float(vmax_item["value"])
-                                if record["main_activity"]["kinetics"].get("Vmax") is not None:
-                                    rule_val = record["main_activity"]["kinetics"]["Vmax"]
-                                    if isinstance(rule_val, (int, float)) and abs(val - rule_val) / max(abs(rule_val), 1e-10) > 0.5:
-                                        logger.warning(
-                                            f"[SMN] VLM Vmax={val} differs from rule Vmax={rule_val}. "
-                                            f"Keeping rule-based value."
-                                        )
-                                        continue
                                 record["main_activity"]["kinetics"]["Vmax"] = val
                                 record["main_activity"]["kinetics"]["Vmax_unit"] = vmax_item.get("unit")
                                 record["main_activity"]["kinetics"]["source"] = "VLM"
+                            except (ValueError, TypeError):
+                                pass
+                        elif isinstance(record["main_activity"]["kinetics"]["Vmax"], (int, float)):
+                            try:
+                                val = float(vmax_item["value"])
+                                if abs(val - record["main_activity"]["kinetics"]["Vmax"]) / max(abs(record["main_activity"]["kinetics"]["Vmax"]), 1e-10) > 0.5:
+                                    logger.warning(
+                                        f"[SMN] VLM Vmax={val} differs from rule Vmax={record['main_activity']['kinetics']['Vmax']}. "
+                                        f"Keeping rule-based value."
+                                    )
                             except (ValueError, TypeError):
                                 pass
 
@@ -3438,7 +3843,11 @@ class SingleMainNanozymePipeline:
                                     logger.info(
                                         f"[SMN] LLM conflict resolved: {resolved.field} -> {resolved.resolved_by}"
                                     )
-                record = self._merge_llm(record, llm_result)
+                if self.cross_validator:
+                    record = self.cross_validator.merge_results(record, llm_result, [])
+                    logger.info("[SMN] LLM merged via CrossValidationAgent")
+                else:
+                    record = self._merge_llm(record, llm_result)
                 logger.info("[SMN] LLM extraction succeeded")
             else:
                 warnings.append("llm_failed")
@@ -3453,7 +3862,11 @@ class SingleMainNanozymePipeline:
         if self.config.enable_vlm and self.client and doc.vlm_tasks:
             vlm_results = await self._call_vlm(doc.vlm_tasks, selected_name)
             if vlm_results:
-                record = self._merge_vlm(record, vlm_results)
+                if self.cross_validator:
+                    record = self.cross_validator.merge_results(record, {}, vlm_results)
+                    logger.info("[SMN] VLM merged via CrossValidationAgent")
+                else:
+                    record = self._merge_vlm(record, vlm_results)
                 logger.info(f"[SMN] VLM extraction succeeded, {len(vlm_results)} figures processed")
             else:
                 warnings.append("vlm_failed_or_no_results")
@@ -3503,6 +3916,13 @@ class SingleMainNanozymePipeline:
         record["diagnostics"]["warnings"] = warnings
         diag = self.diag_builder.build(record, doc, selected_name, ambiguous, table_classified, figure_summ)
         record["diagnostics"] = diag
+
+        if self.consistency_agent:
+            record, consistency_warnings = self.consistency_agent.normalize_output(record)
+            if consistency_warnings:
+                warnings.extend(consistency_warnings)
+                record["diagnostics"]["warnings"] = warnings
+                logger.info(f"[SMN] ConsistencyAgent warnings: {consistency_warnings}")
 
         record = validate_schema(record)
 

@@ -20,10 +20,51 @@ WARNING_ENUMS = {
     "no_temperature_profile",
     "no_synthesis_method",
     "no_size_info",
+    "Km_negative",
+    "Vmax_negative",
+    "Vmax_empty_string",
+    "suspect_Km_unit",
+    "suspect_Vmax_unit",
+    "LOD_no_numeric_value",
+    "material_mismatch",
+    "attribution_mismatch",
+    "Km_unit_not_concentration",
+    "Vmax_unit_not_rate",
+    "kcat_Km_unreasonable",
+    "catalase_like_low_pH",
+    "peroxidase_like_high_pH",
+    "hydrothermal_low_temperature",
+    "calcination_low_temperature",
+    "llm_failed",
+    "llm_disabled",
+    "llm_unavailable",
+    "vlm_failed_or_no_results",
+    "vlm_disabled",
+    "vlm_unavailable",
+    "no_candidates_found",
+    "sparse_evidence",
+    "kinetics_bucket_fallback_applied",
+    "application_bucket_fallback_applied",
+    "mechanism_bucket_fallback_applied",
+    "schema_auto_fixed",
 }
 
 
 class DiagnosticsBuilder:
+    _regex_hit_stats: Dict[str, int] = {}
+
+    @classmethod
+    def record_regex_hit(cls, pattern_name: str):
+        cls._regex_hit_stats[pattern_name] = cls._regex_hit_stats.get(pattern_name, 0) + 1
+
+    @classmethod
+    def get_regex_hit_stats(cls) -> Dict[str, int]:
+        return dict(cls._regex_hit_stats)
+
+    @classmethod
+    def reset_regex_hit_stats(cls):
+        cls._regex_hit_stats = {}
+
     def __init__(self):
         self._parse_status: Optional[str] = None
         self._is_supplementary: bool = False
@@ -96,6 +137,40 @@ class DiagnosticsBuilder:
     def set_kinetics_from_figure(self, flag: bool) -> "DiagnosticsBuilder":
         self._kinetics_from_figure = flag
         return self
+
+    def compute_field_coverage(self, record: Dict[str, Any]) -> Dict[str, str]:
+        coverage = {}
+        sel = record.get("selected_nanozyme", {})
+        act = record.get("main_activity", {})
+        kin = act.get("kinetics", {})
+
+        field_paths = {
+            "selected_nanozyme.name": sel.get("name"),
+            "selected_nanozyme.synthesis_method": sel.get("synthesis_method"),
+            "selected_nanozyme.size": sel.get("size"),
+            "selected_nanozyme.morphology": sel.get("morphology"),
+            "selected_nanozyme.crystal_structure": sel.get("crystal_structure"),
+            "selected_nanozyme.surface_area": sel.get("surface_area"),
+            "main_activity.enzyme_like_type": act.get("enzyme_like_type"),
+            "main_activity.substrates": act.get("substrates"),
+            "main_activity.kinetics.Km": kin.get("Km"),
+            "main_activity.kinetics.Vmax": kin.get("Vmax"),
+            "main_activity.kinetics.kcat": kin.get("kcat"),
+            "main_activity.kinetics.kcat_Km": kin.get("kcat_Km"),
+            "main_activity.pH_profile.optimal_pH": act.get("pH_profile", {}).get("optimal_pH"),
+            "main_activity.temperature_profile.optimal_temperature": act.get("temperature_profile", {}).get("optimal_temperature"),
+            "applications": record.get("applications"),
+        }
+
+        for path, value in field_paths.items():
+            if value is None or value == [] or value == "" or value == "unknown":
+                coverage[path] = "missing"
+            elif value == 0 or (isinstance(value, float) and value == 0.0):
+                coverage[path] = "extracted"
+            else:
+                coverage[path] = "extracted"
+
+        return coverage
 
     def build(self) -> Dict[str, Any]:
         warnings: List[str] = []
@@ -217,3 +292,32 @@ class DiagnosticsBuilder:
             return "medium"
 
         return "medium"
+
+
+def generate_batch_report(records: List[Dict[str, Any]]) -> Dict[str, Any]:
+    if not records:
+        return {"total": 0, "field_rates": {}, "summary": "No records to analyze"}
+
+    builder = DiagnosticsBuilder()
+    all_coverage = [builder.compute_field_coverage(r) for r in records]
+
+    field_rates = {}
+    for field in all_coverage[0].keys():
+        extracted_count = sum(1 for c in all_coverage if c.get(field) == "extracted")
+        field_rates[field] = round(extracted_count / len(records) * 100, 1)
+
+    status_counts = {}
+    for r in records:
+        s = r.get("diagnostics", {}).get("status", "unknown")
+        status_counts[s] = status_counts.get(s, 0) + 1
+
+    avg_warnings = sum(len(r.get("diagnostics", {}).get("warnings", [])) for r in records) / len(records)
+
+    return {
+        "total": len(records),
+        "field_rates": field_rates,
+        "status_distribution": status_counts,
+        "avg_warnings_per_record": round(avg_warnings, 1),
+        "low_rate_fields": {k: v for k, v in field_rates.items() if v < 50},
+        "regex_hit_stats": DiagnosticsBuilder.get_regex_hit_stats(),
+    }
