@@ -301,7 +301,7 @@ class CrossValidationAgent:
                     is_dup = False
                     for ex in existing:
                         if (ex.get("application_type") == llm_app.get("application_type") and
-                            ex.get("target_analyte", "").lower() == llm_app.get("target_analyte", "").lower()):
+                            (ex.get("target_analyte") or "").lower() == (llm_app.get("target_analyte") or "").lower()):
                             is_dup = True
                             for k in ("detection_limit", "linear_range", "method", "sample_type", "notes"):
                                 if ex.get(k) is None and llm_app.get(k) is not None:
@@ -376,7 +376,7 @@ class CrossValidationAgent:
             return
         matched = False
         for app in apps:
-            if analyte and app.get("target_analyte", "").lower() == str(analyte).lower():
+            if analyte and (app.get("target_analyte") or "").lower() == str(analyte).lower():
                 if lod and app.get("detection_limit") is None:
                     app["detection_limit"] = str(lod)
                 if lr and app.get("linear_range") is None:

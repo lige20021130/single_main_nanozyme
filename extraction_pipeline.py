@@ -130,8 +130,12 @@ class ExtractionPipeline:
         self.output_dir.mkdir(parents=True, exist_ok=True)
         
         # 初始化组件
-        self.integrator = ResultIntegrator(self.confidence_threshold)
-        self.rule_learner = RuleLearner(str(self.rulebook_path))
+        if MODULES_AVAILABLE:
+            self.integrator = ResultIntegrator(self.confidence_threshold)
+            self.rule_learner = RuleLearner(str(self.rulebook_path))
+        else:
+            self.integrator = None
+            self.rule_learner = None
         
         logger.info(f"提取管道初始化完成: output_dir={self.output_dir}")
         if self.enable_cache:

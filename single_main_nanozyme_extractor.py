@@ -296,6 +296,8 @@ _KM_PATTERNS = [
     re.compile(r'\bKm\s+values?\s+of\s+([\d.]+)\s*(mM|μM|uM|M)\s+(?:and|&|,)\s*[\d.]+\s*(?:mM|μM|uM|M)?', re.I),
     re.compile(r'\bKm\b\s*\)?\s*(?:were|was|are|is)\s*([\d.]+)\s*(?:and|&|,)\s*[\d.]+\s*(mM|μM|uM|M)', re.I),
     re.compile(r'\bKm\b[^.]{0,30}?\bare\s*([\d.]+)\s*(?:and|&)\s*[\d.]+\s*(mM|μM|uM|M)', re.I),
+    re.compile(r'\bKm\s+values?\s+of\s+[^.]{0,80}?\b(?:are|were|is|was)\s+([\d.]+)\s*(?:and|&|,)\s*[\d.]+\s*(mM|μM|uM|M)', re.I),
+    re.compile(r'\bKm\s+values?\s+of\s+\S+\s+(?:and|&)\s+\S+\s+(?:are|were)\s+([\d.]+)\s+(?:and|&|,)\s*[\d.]+\s*(mM|μM|uM|M)', re.I),
 ]
 
 _KM_VMAX_JOINT_PATTERNS = [
@@ -350,6 +352,7 @@ def _normalize_ocr_scientific(text: str) -> str:
     t = text
     t = re.sub(r'\bK\s+m\b', 'Km', t, flags=re.I)
     t = re.sub(r'\bV\s+max\b', 'Vmax', t, flags=re.I)
+    t = re.sub(r'\bV\s+m\b(?!\s*ax)', 'Vmax', t, flags=re.I)
     t = re.sub(r'\bk\s+cat\b', 'kcat', t, flags=re.I)
     t = t.replace('\ufffd', '\u25a1')
     t = re.sub(r'10\s*\u25a1\s*(\d)', lambda m: '10\u207b' + m.group(1), t)
@@ -363,6 +366,7 @@ def _normalize_ocr_scientific(text: str) -> str:
     t = re.sub(r'([\d.]+)\s*°\s+C\b', r'\1 °C', t, flags=re.I)
     t = re.sub(r'(\w)e(\d)', lambda m: m.group(1) + ' \u2248 ' + m.group(2), t)
     t = re.sub(r'\b([m\u03bcunp]?M)\s+(s)\s*[\u207b\u2212\u2013\-]?\s*1\b', lambda m: m.group(1) + '\u00b7' + m.group(2) + '\u207b\u00b9', t)
+    t = re.sub(r'\b([m\u03bcunp]?M)(s)\s*[\u207b\u2212\u2013\-]?\s*1\b', lambda m: m.group(1) + '\u00b7' + m.group(2) + '\u207b\u00b9', t)
     t = re.sub(r'\b(s)\s+[\-–—]\s*1\b', lambda m: m.group(1) + '\u207b\u00b9', t, flags=re.I)
     t = re.sub(r'\b(m)\s+(M)\s*[\u207b\u2212\u2013\-]?\s*1\b', 'mM\u207b\u00b9', t)
     t = re.sub(r'\b(m)\s+(Ms)\s*[\u207b\u2212\u2013\-]?\s*1\b', 'mM\u00b7s\u207b\u00b9', t, flags=re.I)
@@ -434,6 +438,8 @@ _VMAX_PATTERNS = [
     re.compile(r'\bV\s*max\s*=\s*([\d.]+)\s+10\s*[\^⁻\-–]?\s*[-]?\s*(\d+)\s*(M\s*[sS][\^⁻\-–]?[\-]?1|M/?s|mM/?s|μM/?s|mM\s*[sS])', re.I),
     re.compile(r'\bV\s*max\b[^.=]{0,30}?([\d.]+)\s*10\s*[\^⁻\-–]?\s*[-]?\s*(\d+)\s*(?:M\s*[sS]|mM\s*[sS])', re.I),
     re.compile(r'\bV\s*max\b[^.=]{0,20}?=\s*([\d.]+)\s+(mM|M|μM)\s*[sS]\s*[\^⁻\-–]?\s*[-]?\s*1', re.I),
+    re.compile(r'\bV\s*max\s+values?\s+of\s+[^.]{0,80}?\b(?:are|were|is|was)\s+([\d.]+(?:[eE][\-]?\d+)?)\s*(?:and|&|,)\s*[\d.]+(?:[eE][\-]?\d+)?\s*(M\s*[sS][\^⁻\-–]?[\-]?1|M/?s|mM/?s|μM/?s|M\s+s-1|M\u00b7s\u207b\u00b9)', re.I),
+    re.compile(r'\bV\s*max\s+values?\s+of\s+\S+\s+(?:and|&)\s+\S+\s+(?:are|were)\s+([\d.]+(?:[eE][\-]?\d+)?)\s+(?:and|&|,)\s*[\d.]+(?:[eE][\-]?\d+)?\s*(M\s*[sS][\^⁻\-–]?[\-]?1|M/?s|mM/?s|μM/?s|M\s+s-1|M\u00b7s\u207b\u00b9)', re.I),
 ]
 
 _VMAX_OCR_PATTERNS = [
