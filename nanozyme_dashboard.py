@@ -264,10 +264,11 @@ class QualityRing:
 
 
 class NanozymeDashboard:
-    PIPELINE_STAGES = ["idle", "parsing", "preprocessing", "extracting", "done", "error"]
+    PIPELINE_STAGES = ["idle", "parsing", "preprocessing", "waiting_extract", "extracting", "done", "error"]
     STAGE_LABELS = {
-        "idle": "就绪", "parsing": "解析PDF", "preprocessing": "预处理",
-        "extracting": "智能提取", "done": "完成", "error": "错误"
+        "idle": "等待", "parsing": "解析中", "preprocessing": "预处理中",
+        "waiting_extract": "等待提取", "extracting": "提取中",
+        "done": "完成", "error": "错误"
     }
 
     def __init__(self, root: tk.Tk):
@@ -433,8 +434,8 @@ class NanozymeDashboard:
         self.file_tree.heading("file", text="文件名")
         self.file_tree.heading("status", text="状态")
         self.file_tree.heading("quality", text="质量")
-        self.file_tree.column("file", width=160, minwidth=120)
-        self.file_tree.column("status", width=60, minwidth=50)
+        self.file_tree.column("file", width=140, minwidth=100)
+        self.file_tree.column("status", width=80, minwidth=60)
         self.file_tree.column("quality", width=50, minwidth=40)
 
         vsb = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=self.file_tree.yview)
@@ -808,17 +809,23 @@ class NanozymeDashboard:
 
     def _refresh_file_tree(self):
         self.file_tree.delete(*self.file_tree.get_children())
+        phase_icons = {
+            "idle": "⏳", "parsing": "📖", "preprocessing": "⚙️",
+            "waiting_extract": "📋", "extracting": "🧠",
+            "done": "✅", "error": "❌",
+        }
         for i, f in enumerate(self.files):
-            status_text = self.STAGE_LABELS.get(f.phase, f.phase)
+            icon = phase_icons.get(f.phase, "")
+            status_text = f"{icon} {self.STAGE_LABELS.get(f.phase, f.phase)}"
+            if f.phase == "error" and f.error:
+                status_text = f"❌ {f.error[:12]}"
             quality_text = f"{int(f.quality_score * 100)}%" if f.quality_score > 0 else "—"
-            if f.phase == "error":
-                status_text = "错误"
-                quality_text = "✗"
-            elif f.phase == "done":
-                quality_text = f"{int(f.quality_score * 100)}%"
             self.file_tree.insert("", tk.END, iid=str(i), values=(f.stem, status_text, quality_text))
         n = len(self.files)
-        self.file_count_label.config(text=f"{n} 个文件" if n else "0 个文件")
+        done = sum(1 for f in self.files if f.phase == "done")
+        errors = sum(1 for f in self.files if f.phase == "error")
+        waiting = sum(1 for f in self.files if f.phase in ("idle", "waiting_extract"))
+        self.file_count_label.config(text=f"{n} 文件 | ✅{done} ⏳{waiting} ❌{errors}")
 
     def _update_file_phase(self, idx: int, phase: str, error: str = ""):
         if 0 <= idx < len(self.files):
@@ -1042,101 +1049,94 @@ class NanozymeDashboard:
     async def _pipeline_run_async(self):
         total = len(self.files)
         output_dir = self._get_output_dir()
-        max_concurrent = 3
+        parse_concurrent = 5
 
-        semaphore = asyncio.Semaphore(max_concurrent)
-        completed = [0]
-        lock = asyncio.Lock()
+        self.root.after(0, lambda: self.progress_label.config(text="阶段1: 解析与预处理..."))
 
-        async def process_file(idx: int, fstate: FileState):
-            async with semaphore:
+        parse_sem = asyncio.Semaphore(parse_concurrent)
+
+        async def parse_and_preprocess(idx: int, fstate: FileState):
+            async with parse_sem:
                 if self.stop_event.is_set():
-                    return
-                await self._process_single_file(idx, total, fstate, output_dir)
-                async with lock:
-                    completed[0] += 1
-                    cur = completed[0]
-                self.root.after(0, lambda c=cur, t=total: self._update_progress(c, t, ""))
+                    return None
+                fstate.start_time = time.time()
+                self._update_file_phase(idx, "parsing")
+                self.root.after(0, lambda i=idx, t=total: self._update_progress(i, t, "解析PDF"))
 
-        tasks = [process_file(i, fstate) for i, fstate in enumerate(self.files)]
-        await asyncio.gather(*tasks)
+                pdf_json = await asyncio.get_event_loop().run_in_executor(
+                    None, self._parse_pdf, fstate.path, output_dir
+                )
+                if pdf_json is None:
+                    self._update_file_phase(idx, "error", "PDF解析失败")
+                    return None
+                if self.stop_event.is_set():
+                    return None
+
+                self._update_file_phase(idx, "preprocessing")
+                self.root.after(0, lambda i=idx, t=total: self._update_progress(i, t, "预处理"))
+
+                mid_task = await asyncio.get_event_loop().run_in_executor(
+                    None, self._preprocess, pdf_json, fstate.path, output_dir
+                )
+                if mid_task is None:
+                    self._update_file_phase(idx, "error", "预处理失败")
+                    return None
+
+                self._update_file_phase(idx, "waiting_extract")
+                return (idx, fstate, pdf_json, mid_task)
+
+        parse_tasks = [parse_and_preprocess(i, f) for i, f in enumerate(self.files)]
+        parse_results = await asyncio.gather(*parse_tasks)
+
+        ready = [r for r in parse_results if r is not None]
+        logger.info(f"阶段1完成: {len(ready)}/{total} 文件解析预处理成功")
+
+        if not ready or self.stop_event.is_set():
+            elapsed = time.time() - self._start_time
+            self.root.after(0, lambda: self.progress_label.config(
+                text=f"完成 ({elapsed:.1f}s)" if not self.stop_event.is_set() else "已停止"
+            ))
+            return
+
+        self.root.after(0, lambda: self.progress_label.config(
+            text=f"阶段2: 逐篇提取 ({len(ready)}篇)..."
+        ))
+
+        for seq, (idx, fstate, pdf_json, mid_task) in enumerate(ready, 1):
+            if self.stop_event.is_set():
+                for remaining_idx, remaining_fstate, _, _ in ready[seq - 1:]:
+                    if remaining_fstate.phase == "waiting_extract":
+                        self._update_file_phase(remaining_idx, "idle")
+                break
+
+            self._update_file_phase(idx, "extracting")
+            self.root.after(0, lambda s=seq, t=len(ready): self._update_progress(s, t, "大模型提取"))
+
+            try:
+                result = await self._extract_async(mid_task, output_dir, fstate.stem)
+
+                fstate.end_time = time.time()
+                if result is not None:
+                    fstate.result = result
+                    fstate.quality_score = self._compute_quality(result)
+                    self._update_file_phase(idx, "done")
+                    self._save_extracted(result, output_dir, fstate.stem)
+                    fstate.result = None
+                    self._cleanup_intermediate(output_dir, fstate.stem, pdf_json, mid_task)
+                else:
+                    self._update_file_phase(idx, "error", "提取失败")
+            except Exception as e:
+                fstate.end_time = time.time()
+                self._update_file_phase(idx, "error", str(e))
+                logger.error(f"[{fstate.stem}] Extract error: {e}")
+
+            if seq < len(ready):
+                await asyncio.sleep(1)
 
         elapsed = time.time() - self._start_time
         self.root.after(0, lambda: self.progress_label.config(
             text=f"完成 ({elapsed:.1f}s)" if not self.stop_event.is_set() else "已停止"
         ))
-
-    async def _process_single_file(self, idx: int, total: int, fstate: FileState, output_dir: str):
-        fstate.start_time = time.time()
-        self.root.after(0, lambda i=idx: self._update_progress(i, total, "解析PDF"))
-
-        try:
-            self._update_file_phase(idx, "parsing")
-            self._set_pipeline_stage(0, "active")
-            self._set_pipeline_stage(1, "active")
-
-            pdf_json = await asyncio.get_event_loop().run_in_executor(
-                None, self._parse_pdf, fstate.path, output_dir
-            )
-            if pdf_json is None:
-                self._update_file_phase(idx, "error", "PDF解析失败")
-                self._set_pipeline_stage(1, "error")
-                return
-
-            if self.stop_event.is_set():
-                return
-
-            self.root.after(0, lambda i=idx: self._update_progress(i, total, "预处理"))
-            self._update_file_phase(idx, "preprocessing")
-            self._set_pipeline_stage(1, "done")
-            self._set_pipeline_stage(2, "active")
-
-            mid_task = await asyncio.get_event_loop().run_in_executor(
-                None, self._preprocess, pdf_json, fstate.path, output_dir
-            )
-            if mid_task is None:
-                self._update_file_phase(idx, "error", "预处理失败")
-                self._set_pipeline_stage(2, "error")
-                return
-
-            if self.stop_event.is_set():
-                return
-
-            self.root.after(0, lambda i=idx: self._update_progress(i, total, "提取"))
-            self._update_file_phase(idx, "extracting")
-            self._set_pipeline_stage(2, "done")
-            self._set_pipeline_stage(3, "active")
-            if self.llm_var.get():
-                self._set_pipeline_stage(4, "active")
-            if self.vlm_var.get():
-                self._set_pipeline_stage(5, "active")
-
-            result = await self._extract_async(mid_task, output_dir, fstate.stem)
-
-            self._set_pipeline_stage(3, "done")
-            self._set_pipeline_stage(4, "done" if self.llm_var.get() else "idle")
-            self._set_pipeline_stage(5, "done" if self.vlm_var.get() else "idle")
-            self._set_pipeline_stage(6, "active")
-
-            fstate.end_time = time.time()
-            if result is not None:
-                fstate.result = result
-                fstate.quality_score = self._compute_quality(result)
-                self._update_file_phase(idx, "done")
-                self._set_pipeline_stage(6, "done")
-                self._set_pipeline_stage(7, "active")
-                self._save_extracted(result, output_dir, fstate.stem)
-                self._set_pipeline_stage(7, "done")
-                fstate.result = None
-                self._cleanup_intermediate(output_dir, fstate.stem, pdf_json, mid_task)
-            else:
-                self._update_file_phase(idx, "error", "提取失败")
-                self._set_pipeline_stage(6, "error")
-
-        except Exception as e:
-            fstate.end_time = time.time()
-            self._update_file_phase(idx, "error", str(e))
-            logger.error(f"[{fstate.stem}] Error: {e}")
 
     async def _extract_async(self, mid_task_path: str, output_dir: str, stem: str) -> Optional[Dict]:
         try:
