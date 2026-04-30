@@ -221,10 +221,11 @@ _MORPHOLOGY_WORDS = frozenset({
 })
 
 _MATERIAL_PATTERN_RE = re.compile(
-    r"(?:\b[A-Z][a-z]?\d*(?:[A-Z][a-z]?\d*)+\b)"
+    r"(?:\b(?:MIL|UiO|HKUST|PCN|NU|NOTT|DUT|MOF|COF|ZIF)[-\s]?\d+(?:\([A-Z][a-z]?(?:[A-Z][a-z]?\d*)*\))?(?=\s|$|[^A-Za-z0-9(-]))"
+    r"|(?:\b[A-Z][a-z]?\d*(?:[A-Z][a-z]?\d*)+\b)"
     r"|(?:\b[A-Z][a-z]?O\d*\b)"
     r"|(?:\b(?:Fe|Co|Ni|Mn|Cu|Zn|Ce|Au|Ag|Pt|Pd|Ti|V|Cr|Mo|W|Ru|Rh|Ir|"
-    r"La|Pr|Nd|Sm|Eu|Gd|Tb|Dy|Ho|Er|Tm|Yb|Lu)\d*(?:O\d*)?"
+    r"La|Pr|Nd|Sm|Eu|Gd|Tb|Dy|Ho|Er|Tm|Yb|Lu|Zr|Al|Sn|Bi|In|Ga|Ge|Sb|Te|Hf|Ta|Re|Os|Y|Sc|Cd|Hg|Tl|Pb|Nb)\d*(?:O\d*)?"
     r"(?:[A-Z][a-z]?\d*(?:O\d*)?)*"
     r"(?:@|[-/])?"
     r"(?:[A-Z][a-z]?\d*(?:O\d*)?)*\b)"
@@ -1398,13 +1399,13 @@ class CandidateRecaller:
             name = m.group(0).strip()
             if self._is_valid_candidate(name):
                 results.append(name)
-        for m in re.finditer(r'\bMOF[-\s]?\d+\b|\bCOF[-\s]?\d+\b|\bZIF[-\s]?\d+\b', title, re.I):
+        for m in re.finditer(r'\b(?:MIL|UiO|HKUST|PCN|NU|NOTT|DUT|MOF|COF|ZIF)[-\s]?\d+(?:\([A-Z][a-z]?(?:[A-Z][a-z]?\d*)*\))?\b', title, re.I):
             name = m.group(0).strip()
             if self._is_valid_candidate(name):
                 results.append(name)
         for m in re.finditer(
-            r'\b(?:Fe|Co|Ni|Mn|Cu|Zn|Ce|Au|Ag|Pt|Pd|Ti|V|Cr|Mo|W|Ru|Rh|Ir|La)'
-            r'-(?:[A-Z][a-z]*-?)+\b',
+            r'\b(?:Fe|Co|Ni|Mn|Cu|Zn|Ce|Au|Ag|Pt|Pd|Ti|V|Cr|Mo|W|Ru|Rh|Ir|La|Zr|Al|Sn|Bi|In|Ga|Ge|Sb|Te|Hf|Ta|Re|Os|Y|Sc|Cd|Hg|Tl|Pb|Nb)'
+            r'-(?:[A-Z][a-z]*-?)+(?=\s|$|[^A-Za-z0-9-])',
             title,
         ):
             name = m.group(0).strip()
@@ -1528,10 +1529,12 @@ class CandidateRecaller:
             elem = re.match(r'^([A-Z][a-z]?)\d+$', name)
             if elem and elem.group(1) in {"Fe", "Co", "Ni", "Mn", "Cu", "Zn", "Ce", "Au",
                                            "Ag", "Pt", "Pd", "Ti", "V", "Cr", "Mo", "W",
-                                           "Ru", "Rh", "Ir", "La"}:
+                                           "Ru", "Rh", "Ir", "La", "Zr", "Al", "Sn", "Bi",
+                                           "In", "Ga", "Ge", "Sb", "Te", "Hf", "Ta", "Re",
+                                           "Os", "Y", "Sc", "Cd", "Hg", "Tl", "Pb", "Nb"}:
                 return False
         if re.match(r'^[a-z]{1,3}-[a-z]{1,3}$', name, re.I):
-            if not re.match(r'^(?:Fe|Co|Ni|Mn|Cu|Zn|Ce|Au|Ag|Pt|Pd|Ti|V|Cr|Mo|W|Ru|Rh|Ir|La)-', name, re.I):
+            if not re.match(r'^(?:Fe|Co|Ni|Mn|Cu|Zn|Ce|Au|Ag|Pt|Pd|Ti|V|Cr|Mo|W|Ru|Rh|Ir|La|Zr|Al|Sn|Bi|In|Ga|Ge|Sb|Te|Hf|Ta|Re|Os|Y|Sc|Cd|Hg|Tl|Pb|Nb)-', name, re.I):
                 return False
         for sub in _SUBSTRATE_NAMES:
             if sub.lower() in lower.split("/") and len(lower.split("/")) > 1:
@@ -1878,7 +1881,7 @@ class EvidenceBucketBuilder:
             if caption:
                 all_sentences.append((caption, "characterization_caption"))
 
-        name_lower = selected_name.lower()
+        name_lower = (selected_name or "").lower()
         variants = {name_lower}
         if "@" in name_lower:
             variants.update(p.strip() for p in name_lower.split("@") if p.strip())
@@ -2142,7 +2145,7 @@ class FigureProcessor:
         for vlm_task in vlm_tasks:
             caption = vlm_task.get("caption", "")
             fig_type = self._infer_figure_type(caption)
-            mentions_selected = selected_name.lower() in caption.lower()
+            mentions_selected = (selected_name or "").lower() in caption.lower()
             summaries.append({
                 "caption": caption[:200],
                 "figure_type": fig_type,
@@ -2386,7 +2389,7 @@ class RuleExtractor:
                     continue
 
                 line_lower = line.lower()
-                name_lower = selected_name.lower().replace(" ", "")
+                name_lower = (selected_name or "").lower().replace(" ", "")
                 line_compact = line_lower.replace(" ", "").replace("-", "")
 
                 is_match = (name_lower in line_compact or
@@ -2480,7 +2483,7 @@ class RuleExtractor:
                          vmax_header_m.end() if vmax_header_m else 0)
         data_part = text[header_end:].strip()
 
-        name_lower = selected_name.lower()
+        name_lower = (selected_name or "").lower()
         name_variants = [name_lower]
         name_variants.append(name_lower.replace(" ", ""))
         for prefix in ["nanosized ", "nano ", "the "]:

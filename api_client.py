@@ -448,7 +448,8 @@ class APIClient:
         data = {
             'messages': messages,
             'temperature': temperature,
-            'max_tokens': max_tokens
+            'max_tokens': max_tokens,
+            'thinking': {"type": "disabled"}
         }
         
         result = await self._make_request(
