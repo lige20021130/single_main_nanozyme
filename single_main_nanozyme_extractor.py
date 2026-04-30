@@ -240,7 +240,7 @@ _COMPOSITE_PATTERN_RE = re.compile(
 )
 
 _METAL_ELEMENTS_RE = re.compile(
-    r'\b(?:Fe|Co|Ni|Mn|Cu|Zn|Ce|Au|Ag|Pt|Pd|Ti|V|Cr|Mo|W|Ru|Rh|Ir|La|Pr|Nd|Sm|Eu|Gd|Tb|Dy|Ho|Er|Tm|Yb|Lu)\d*'
+    r'\b(?:Fe|Co|Ni|Mn|Cu|Zn|Ce|Au|Ag|Pt|Pd|Ti|V|Cr|Mo|W|Ru|Rh|Ir|La|Pr|Nd|Sm|Eu|Gd|Tb|Dy|Ho|Er|Tm|Yb|Lu|Zr|Al|Sn|Bi|In|Ga|Ge|Sb|Te|Hf|Ta|Re|Os|Y|Sc|Cd|Hg|Tl|Pb|Nb)\d*'
 )
 
 _SECTION_SCORE_MAP = {
@@ -660,6 +660,16 @@ _PH_PATTERNS = {
         re.compile(r'\bpH\s*([\d.]+)\s+(?:gave|yielded|produced)\s+(?:the\s+)?(?:highest|maximum|optimal|best)', re.I),
         re.compile(r'\bactivity\s+(?:peaked|maximum|highest)\s+(?:at|under)\s+pH\s*([\d.]+)', re.I),
         re.compile(r'\bpH\s*([\d.]+)\s+(?:is|was)\s+(?:the\s+)?(?:most\s+)?(?:active|efficient|effective|favorable)', re.I),
+        re.compile(r'\bpH\s*([\d.]+)\s+(?:showed|exhibited|displayed|demonstrated)\s+(?:the\s+)?(?:highest|maximum|max|best|greatest)\s+(?:catalytic\s+)?activity', re.I),
+        re.compile(r'\b(?:highest|maximum|max|best|greatest)\s+(?:catalytic\s+)?activity\s+(?:was\s+)?(?:observed|found|achieved|measured|obtained|recorded)\s+at\s+pH\s*([\d.]+)', re.I),
+        re.compile(r'\bpH\s*([\d.]+)\s+(?:was|is)\s+(?:the\s+)?(?:most\s+)?(?:favorable|suitable|preferred)', re.I),
+        re.compile(r'\bpH\s*(?:value\s+)?(?:of\s+)?([\d.]+)\s+(?:gave|showed|had)\s+(?:the\s+)?(?:highest|maximum|best)', re.I),
+        re.compile(r'\b(?:at|under)\s+pH\s*([\d.]+)[,.]?\s*(?:the\s+)?(?:activity\s+)?(?:was\s+)?(?:the\s+)?(?:highest|maximum|best|optimal)', re.I),
+        re.compile(r'\b(?:the\s+)?activity\s+(?:of\s+)?(?:the\s+)?(?:nanozyme|catalyst|enzyme|material)\s+(?:reached|attained)\s+(?:its\s+)?(?:maximum|peak|highest)\s+(?:at|under)\s+pH\s*([\d.]+)', re.I),
+        re.compile(r'\bpH\s*([\d.]+)\s*\([^)]*optimal[^)]*\)', re.I),
+        re.compile(r'\bpH\s*([\d.]+)\s*\([^)]*max[^)]*\)', re.I),
+        re.compile(r'\b(?:the\s+)?(?:relative|nanozyme|catalytic)\s+activity\s+(?:reached|was)\s+(?:the\s+)?(?:highest|maximum)\s+at\s+pH\s*([\d.]+)', re.I),
+        re.compile(r'\bpH\s*([\d.]+)\s*\)[^)]*(?:optimal|maximum|highest)', re.I),
     ],
     "pH_range": [
         re.compile(r'\bpH\s+range\s*(?:of|=|:|≈|~|was|from)\s*([\d.]+)\s*[-–—~to]+\s*([\d.]+)', re.I),
@@ -667,6 +677,9 @@ _PH_PATTERNS = {
         re.compile(r'\bpH\s*([\d.]+)\s*[-–—~to]+\s*([\d.]+)\s+(?:was|showed|exhibited)\s+(?:the\s+)?(?:highest|maximum|optimal)', re.I),
         re.compile(r'\bpH\s+range\s+of\s*([\d.]+)\s*[\u2013\-–—]\s*([\d.]+)', re.I),
         re.compile(r'\bpH\s+([\d.]+)\s*[\u2013\-–—]\s*([\d.]+)\s+(?:with|showed)', re.I),
+        re.compile(r'\bpH\s*([\d.]+)\s*[-–—~to]+\s*([\d.]+)\s*,?\s*(?:with|and|showing)\s+(?:the\s+)?(?:highest|maximum|optimal|best)', re.I),
+        re.compile(r'\b(?:within|over|in)\s+(?:the\s+)?pH\s+(?:range\s+)?(?:of\s+)?([\d.]+)\s*[-–—~to]+\s*([\d.]+)', re.I),
+        re.compile(r'\bpH\s+([\d.]+)\s*[-–—]\s*([\d.]+)\s+was\s+(?:the\s+)?(?:optimal|active)', re.I),
     ],
     "pH_stability": [
         re.compile(r'\bpH\s+stability\s*(?:range|window)?\s*(?:of|=|:|≈|~|was)?\s*([\d.]+)\s*[-–—~to]+\s*([\d.]+)', re.I),
@@ -674,6 +687,8 @@ _PH_PATTERNS = {
         re.compile(r'\bretained\s+.*?activity\s+(?:over|in)\s+pH\s*([\d.]+)\s*[-–—~to]+\s*([\d.]+)', re.I),
         re.compile(r'\b(?:maintained|preserved)\s+.*?activity\s+(?:over|in|within)\s+pH\s*([\d.]+)\s*[-–—~to]+\s*([\d.]+)', re.I),
         re.compile(r'\bpH\s+stability\s+was\s+(?:studied|evaluated|examined)\s+(?:from|over|in)\s*([\d.]+)\s*[-–—~to]+\s*([\d.]+)', re.I),
+        re.compile(r'\b(?:remained|stayed)\s+(?:stable|active)\s+(?:over|in|within|from)\s+pH\s*([\d.]+)\s*[-–—~to]+\s*([\d.]+)', re.I),
+        re.compile(r'\b(?:more\s+than\s+\d+%\s+)?(?:of\s+)?(?:its\s+)?(?:original|initial|catalytic)\s+activity\s+(?:was\s+)?(?:retained|maintained|preserved)\s+(?:over|in|within)\s+pH\s*([\d.]+)\s*[-–—~to]+\s*([\d.]+)', re.I),
     ],
 }
 
@@ -683,11 +698,21 @@ _TEMPERATURE_PATTERNS = {
         re.compile(r'\boptimum\s+(?:reaction\s+)?temperature\s*(?:was|=|:|≈|~)\s*([\d.]+)\s*°?C', re.I),
         re.compile(r'\btemperature\s+optimum\s*(?:was|=|:|≈|~)\s*([\d.]+)\s*°?C', re.I),
         re.compile(r'\boptimal\s+temperature\s+of\s*([\d.]+)\s*°?C', re.I),
+        re.compile(r'\b(?:highest|maximum|max|best)\s+(?:catalytic\s+)?activity\s+(?:was\s+)?(?:observed|found|achieved|measured|obtained|recorded)\s+at\s*([\d.]+)\s*°?C', re.I),
+        re.compile(r'\bactivity\s+(?:peaked|peak|reached\s+(?:its\s+)?(?:maximum|peak|highest))\s+at\s*([\d.]+)\s*°?C', re.I),
+        re.compile(r'\b([\d.]+)\s*°?\s*C\s+(?:was|is)\s+(?:the\s+)?(?:optimal|optimum|best|most\s+favorable)\s+temperature', re.I),
+        re.compile(r'\b(?:at|under)\s*([\d.]+)\s*°?\s*C[,.]?\s*(?:the\s+)?(?:activity\s+)?(?:was\s+)?(?:the\s+)?(?:highest|maximum|best|optimal)', re.I),
+        re.compile(r'\btemperature\s*(?:of\s+)?([\d.]+)\s*°?C\s+(?:gave|showed|yielded|produced|had)\s+(?:the\s+)?(?:highest|maximum|best|optimal)\s+(?:activity|performance)', re.I),
+        re.compile(r'\b(?:the\s+)?(?:relative|nanozyme|catalytic)\s+activity\s+(?:reached|was)\s+(?:the\s+)?(?:highest|maximum)\s+at\s*([\d.]+)\s*°?C', re.I),
+        re.compile(r'\b([\d.]+)\s*°?\s*C\s*\([^)]*optimal[^)]*\)', re.I),
+        re.compile(r'\b([\d.]+)\s*°?\s*C\s*\([^)]*max[^)]*\)', re.I),
     ],
     "temperature_range": [
         re.compile(r'\btemperature\s+range\s*(?:of|=|:|≈|~|was|from)\s*([\d.]+)\s*[-–—~to]+\s*([\d.]+)\s*°?C', re.I),
         re.compile(r'\bactive\s+temperature\s+range\s*([\d.]+)\s*[-–—~to]+\s*([\d.]+)\s*°?C', re.I),
         re.compile(r'\btemperature\s+([\d.]+)\s*[-–—~to]+\s*([\d.]+)\s*°C\s+(?:with|showed)', re.I),
+        re.compile(r'\b(?:within|over|in)\s+(?:the\s+)?temperature\s+(?:range\s+)?(?:of\s+)?([\d.]+)\s*[-–—~to]+\s*([\d.]+)\s*°?C', re.I),
+        re.compile(r'\b([\d.]+)\s*[-–—]\s*([\d.]+)\s*°C\s+(?:was|were)\s+(?:the\s+)?(?:optimal|active|best)', re.I),
     ],
     "thermal_stability": [
         re.compile(r'\bthermal\s+stability\s*(?:up\s+to|until|≤|<=)\s*([\d.]+)\s*°?C', re.I),
@@ -697,6 +722,8 @@ _TEMPERATURE_PATTERNS = {
         re.compile(r'\bTGA\s+(?:showed|revealed|indicated)\s+.*?decompos\w+\s+(?:at|above|around)\s*([\d.]+)\s*°?C', re.I),
         re.compile(r'\b(?:maintained|preserved|retained)\s+.*?(?:activity|structure|stability)\s+(?:up\s+to|until|at)\s*([\d.]+)\s*°?C', re.I),
         re.compile(r'\bno\s+(?:significant\s+)?(?:loss|decrease|change)\s+in\s+activity\s+(?:up\s+to|until|below)\s*([\d.]+)\s*°?C', re.I),
+        re.compile(r'\b(?:remained|stayed)\s+(?:stable|active)\s+(?:up\s+to|until|at)\s*([\d.]+)\s*°?C', re.I),
+        re.compile(r'\b(?:more\s+than\s+\d+%\s+)?(?:of\s+)?(?:its\s+)?(?:original|initial|catalytic)\s+activity\s+(?:was\s+)?(?:retained|maintained|preserved)\s+(?:up\s+to|until|at)\s*([\d.]+)\s*°?C', re.I),
     ],
 }
 
@@ -1251,6 +1278,11 @@ class CandidateRecaller:
         (re.compile(r'Rhh(?=[A-Z\d])', re.I), 'Rh'),
         (re.compile(r'Irr(?=[A-Z\d])', re.I), 'Ir'),
         (re.compile(r'Laa(?=[A-Z\d])', re.I), 'La'),
+        (re.compile(r'Zrr(?=[A-Z\d])', re.I), 'Zr'),
+        (re.compile(r'All(?=[A-Z\d])', re.I), 'Al'),
+        (re.compile(r'Snn(?=[A-Z\d])', re.I), 'Sn'),
+        (re.compile(r'Bii(?=[A-Z\d])', re.I), 'Bi'),
+        (re.compile(r'Inn(?=[A-Z\d])', re.I), 'In'),
         (re.compile(r'0(?=[A-Z][a-z])'), 'O'),
         (re.compile(r'(?<=[A-Z])0(?=[a-z])'), 'O'),
     ]
@@ -1259,6 +1291,19 @@ class CandidateRecaller:
         (re.compile(r'(\w)e([A-Z])C\b'), r'\1-\2-C'),
         (re.compile(r'(\w)e([A-Z])N\b'), r'\1-\2-N'),
         (re.compile(r'(\w)Ne([A-Z])\b'), r'\1-N-\2'),
+        (re.compile(r'([A-Z][a-z]?)e([A-Z][a-z]?)e([A-Z])C\b'), r'\1-\2-\3-C'),
+        (re.compile(r'([A-Z][a-z]?)e([A-Z][a-z]?)e([A-Z])N\b'), r'\1-\2-\3-N'),
+        (re.compile(r'CuFe'), 'Cu-Fe'),
+        (re.compile(r'FeCu'), 'Fe-Cu'),
+        (re.compile(r'CoFe'), 'Co-Fe'),
+        (re.compile(r'FeCo'), 'Fe-Co'),
+        (re.compile(r'NiFe'), 'Ni-Fe'),
+        (re.compile(r'FeNi'), 'Fe-Ni'),
+        (re.compile(r'MnFe'), 'Mn-Fe'),
+        (re.compile(r'FeMn'), 'Fe-Mn'),
+        (re.compile(r'CuCo'), 'Cu-Co'),
+        (re.compile(r'CoCu'), 'Co-Cu'),
+        (re.compile(r'ZrO'), 'Zr-O'),
     ]
 
     def __init__(self, top_k: int = 5):
@@ -1548,7 +1593,11 @@ class CandidateRecaller:
                     longer_has_composite = bool(re.search(r'[@/]', longer))
                     shorter_digit_count = sum(c.isdigit() for c in shorter)
                     longer_digit_count = sum(c.isdigit() for c in longer)
-                    if longer_has_composite and not shorter_has_composite:
+                    longer_has_mof = bool(re.search(r'\b(?:MIL|UiO|ZIF|MOF|COF|HKUST|NU|PCN|NOTT|DUT)\b', longer, re.I))
+                    shorter_has_mof = bool(re.search(r'\b(?:MIL|UiO|ZIF|MOF|COF|HKUST|NU|PCN|NOTT|DUT)\b', shorter, re.I))
+                    if longer_has_mof and not shorter_has_mof:
+                        keep_name, keep_lower = longer, longer_lower
+                    elif longer_has_composite and not shorter_has_composite:
                         keep_name, keep_lower = longer, longer_lower
                     elif longer_digit_count > shorter_digit_count:
                         keep_name, keep_lower = longer, longer_lower
@@ -1581,6 +1630,8 @@ class NanozymeScorer:
         abstract_text = self._get_abstract(doc)
 
         for cand in candidates:
+            if not cand.get("name"):
+                continue
             score = sum(_SECTION_SCORE_MAP.get(s, 0) for s in cand.get("sources", set()))
             name_lower = cand["name"].lower().strip()
 
@@ -1655,6 +1706,8 @@ class NanozymeScorer:
 
     def _score_data_richness(self, cand: Dict[str, Any], doc: PreprocessedDocument) -> int:
         bonus = 0
+        if not cand.get("name"):
+            return bonus
         name_lower = cand["name"].lower().strip()
 
         if name_lower in _GENERIC_PHRASES:
@@ -1718,6 +1771,8 @@ class NanozymeScorer:
 
     def _score_narrative_importance(self, cand: Dict[str, Any], title: str, abstract: str) -> int:
         bonus = 0
+        if not cand.get("name"):
+            return bonus
         name_lower = cand["name"].lower().strip()
 
         if name_lower in _GENERIC_PHRASES:

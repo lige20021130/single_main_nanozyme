@@ -738,7 +738,6 @@ class RuleExtractorAdapter:
             + record.get("raw_supporting_text", {}).get("kinetics", [])[:5]
         )
 
-        # 1. 严格匹配：optimal/optimum pH
         if ph_profile.get("optimal_pH") is None:
             for text in search_texts:
                 for pat in _PH_PATTERNS["optimal_pH"]:
@@ -753,7 +752,6 @@ class RuleExtractorAdapter:
                 if ph_profile.get("optimal_pH") is not None:
                     break
 
-        # 2. 动力学实验条件中的pH（只记录为conditions，不标记为optimal_pH）
         if ph_profile.get("optimal_pH") is None:
             for text in search_texts:
                 if re.search(r'\b(?:kinetic|reaction|catalytic|assay|steady-state)\b', text, re.I):
@@ -766,6 +764,27 @@ class RuleExtractorAdapter:
                                 break
                         except (ValueError, IndexError):
                             pass
+
+        if ph_profile.get("optimal_pH") is None:
+            _PH_LOOSE_PATTERNS = [
+                re.compile(r'\bpH\s*([\d.]+)\s*\)', re.I),
+                re.compile(r'\bpH\s+([\d.]+)', re.I),
+            ]
+            for text in search_texts:
+                if re.search(r'\b(?:optimal|optimum|best|highest|maximum|peak)\b', text, re.I) and re.search(r'\bpH\b', text, re.I):
+                    for pat in _PH_LOOSE_PATTERNS:
+                        m = pat.search(text)
+                        if m:
+                            try:
+                                val = float(m.group(1))
+                                if 0 < val <= 14:
+                                    ph_profile["optimal_pH"] = val
+                                    record["main_activity"]["conditions"]["pH"] = m.group(1)
+                                    break
+                            except (ValueError, IndexError):
+                                pass
+                    if ph_profile.get("optimal_pH") is not None:
+                        break
 
         if ph_profile.get("pH_range") is None:
             for text in search_texts:
@@ -815,7 +834,6 @@ class RuleExtractorAdapter:
                 if temp_profile.get("optimal_temperature") is not None:
                     break
 
-        # 2. 动力学实验条件中的温度（只记录为conditions，不标记为optimal_temperature）
         if temp_profile.get("optimal_temperature") is None:
             for text, norm in zip(search_texts, norm_texts):
                 if re.search(r'\b(?:kinetic|reaction|catalytic|assay|steady-state)\b', text, re.I):
@@ -830,6 +848,29 @@ class RuleExtractorAdapter:
                                 break
                         except (ValueError, IndexError):
                             pass
+
+        if temp_profile.get("optimal_temperature") is None:
+            _TEMP_LOOSE_PATTERNS = [
+                re.compile(r'([\d.]+)\s*°\s*C', re.I),
+                re.compile(r'([\d.]+)\s*°C', re.I),
+            ]
+            for text, norm in zip(search_texts, norm_texts):
+                if re.search(r'\b(?:optimal|optimum|best|highest|maximum|peak|dependent|effect)\b', text, re.I) and re.search(r'\b(?:temperature|temp|°C)\b', text, re.I):
+                    for pat in _TEMP_LOOSE_PATTERNS:
+                        m = pat.search(text)
+                        if not m:
+                            m = pat.search(norm)
+                        if m:
+                            try:
+                                val = float(m.group(1))
+                                if 15 <= val <= 80:
+                                    temp_profile["optimal_temperature"] = f"{m.group(1)} °C"
+                                    record["main_activity"]["conditions"]["temperature"] = f"{m.group(1)} °C"
+                                    break
+                            except (ValueError, IndexError):
+                                pass
+                    if temp_profile.get("optimal_temperature") is not None:
+                        break
 
         if temp_profile.get("temperature_range") is None:
             for text, norm in zip(search_texts, norm_texts):
