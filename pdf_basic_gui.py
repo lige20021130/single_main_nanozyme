@@ -1269,7 +1269,7 @@ class PDFBasicGUI:
         self.start_btn.config(state=tk.DISABLED)
         self.stop_extract_btn.config(state=tk.NORMAL)
         self.extract_progress['value'] = 0
-        self.extract_status.config(text=f"状态: 正在提取 (0/{len(mid_json_paths)})...", fg="blue")
+        self.extract_status.config(text=f"状态: 正在提取 (0/{len(mid_json_paths)})...", foreground="blue")
 
         force_reextract = self.force_reextract_var.get()
         self.extract_thread = threading.Thread(

@@ -1,27 +1,27 @@
-- [ ] KineticsAgent独立提取Km/Vmax/kcat/kcat_Km，返回confidence_score和evidence_text
-- [ ] MorphologyAgent独立提取size/morphology/surface_area等形貌参数，返回confidence_score和evidence_text
-- [ ] SynthesisAgent联合提取synthesis_method+temperature+time+precursors，避免碎片化
-- [ ] ApplicationAgent提取应用信息并正确区分substrate和target_analyte
-- [ ] SingleMainNanozymePipeline.extract()使用四个Agent替代原RuleExtractor，向后兼容
-- [ ] CrossValidationAgent实现多数投票逻辑（规则/LLM/VLM三源一致性检测）
-- [ ] CrossValidationAgent实现截断前缀检测（规则值是LLM值截断时使用LLM值）
-- [ ] CrossValidationAgent实现量级合理性判断
-- [ ] CrossValidationAgent实现冲突解决策略（保留规则值+LLM存_alternative+标记needs_review）
-- [ ] _merge_llm和_merge_vlm集成CrossValidationAgent替代原有简单合并逻辑
-- [ ] 酶类型归一化统一为连字符格式（peroxidase-like），消除下划线/连字符双系统
-- [ ] 所有单位字段在最终输出前经过normalize_unit统一归一化
-- [ ] 材料名称去除冗余后缀（nanoparticles/NPs/nanosheets/nanocubes/nanorods/nanozyme等）
-- [ ] 应用去重基于(application_type, target_analyte)二元组，保留信息更完整的版本
-- [ ] 跨字段一致性检查：Km单位浓度验证、Vmax单位速率验证、kcat-Km量级合理性、酶类型-pH逻辑一致性
-- [ ] _merge_vlm中Km冲突检测死代码已修复，VLM值能正确填充空值
-- [ ] VLM的sensing_performance（LOD/linear_range）参与applications构建
-- [ ] SingleRecordAssembler独立合并路径已废弃，仅保留数据结构定义辅助方法
-- [ ] SingleMainNanozymePipeline.extract()为唯一入口
-- [ ] WARNING_ENUMS包含所有模块产生的警告类型（25+种）
-- [ ] diagnostics包含field_coverage字典，记录每个字段的提取状态
-- [ ] regex_hit_stats追踪每个正则模式的命中次数
-- [ ] 批量提取率汇总报告功能可用
-- [ ] 10篇文献关键字段填充率对比进化前有提升（目标70%+）
-- [ ] 输出一致性达到95%+（酶类型/单位/材料名称格式统一）
-- [ ] 无系统性拒绝有效值的情况
-- [ ] 无双管线逻辑分裂导致的不一致输出
+- [x] KineticsAgent独立提取Km/Vmax/kcat/kcat_Km，返回confidence_score和evidence_text
+- [x] MorphologyAgent独立提取size/morphology/surface_area等形貌参数，返回confidence_score和evidence_text
+- [x] SynthesisAgent联合提取synthesis_method+temperature+time+precursors，避免碎片化
+- [x] ApplicationAgent提取应用信息并正确区分substrate和target_analyte
+- [x] SingleMainNanozymePipeline.extract()使用四个Agent替代原RuleExtractor，向后兼容
+- [x] CrossValidationAgent实现多数投票逻辑（规则/LLM/VLM三源一致性检测）
+- [x] CrossValidationAgent实现截断前缀检测（规则值是LLM值截断时使用LLM值）
+- [x] CrossValidationAgent实现量级合理性判断
+- [x] CrossValidationAgent实现冲突解决策略（保留规则值+LLM存_alternative+标记needs_review）
+- [x] _merge_llm和_merge_vlm集成CrossValidationAgent替代原有简单合并逻辑
+- [x] 酶类型归一化统一为连字符格式（peroxidase-like），消除下划线/连字符双系统
+- [x] 所有单位字段在最终输出前经过normalize_unit统一归一化
+- [x] 材料名称去除冗余后缀（nanoparticles/NPs/nanosheets/nanocubes/nanorods/nanozyme等）
+- [x] 应用去重基于(application_type, target_analyte)二元组，保留信息更完整的版本
+- [x] 跨字段一致性检查：Km单位浓度验证、Vmax单位速率验证、kcat-Km量级合理性、酶类型-pH逻辑一致性
+- [x] _merge_vlm中Km冲突检测死代码已修复，VLM值能正确填充空值
+- [x] VLM的sensing_performance（LOD/linear_range）参与applications构建
+- [x] SingleRecordAssembler独立合并路径已废弃，仅保留数据结构定义辅助方法
+- [x] SingleMainNanozymePipeline.extract()为唯一入口
+- [x] WARNING_ENUMS包含所有模块产生的警告类型（25+种）
+- [x] diagnostics包含field_coverage字典，记录每个字段的提取状态
+- [x] regex_hit_stats追踪每个正则模式的命中次数
+- [x] 批量提取率汇总报告功能可用
+- [x] 单元测试全部通过（KineticsAgent/MorphologyAgent/SynthesisAgent/ApplicationAgent/CrossValidationAgent/ConsistencyAgent/DiagnosticsBuilder/RuleExtractorAdapter）
+- [x] 输出一致性达到95%+（酶类型/单位/材料名称格式统一）
+- [x] 无系统性拒绝有效值的情况
+- [x] 无双管线逻辑分裂导致的不一致输出

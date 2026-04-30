@@ -1,6 +1,15 @@
 import re
 import logging
+import warnings as _deprecation_warnings
 from typing import Dict, List, Optional, Any
+
+_deprecation_warnings.warn(
+    "SingleRecordAssembler's independent merge path is deprecated. "
+    "Use SingleMainNanozymePipeline.extract() as the sole entry point. "
+    "This class is kept only for data structure helper methods.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 from numeric_validator import NumericValidator, normalize_unit
 from activity_selector import ActivitySelector, normalize_enzyme_type, normalize_assay_method

@@ -651,14 +651,10 @@ _SYNTHESIS_METHODS = {
 
 _PH_PATTERNS = {
     "optimal_pH": [
-        re.compile(r'\boptimal\s+pH\s*(?:was|=|:|≈|~|at)\s*([\d.]+)', re.I),
-        re.compile(r'\boptimum\s+pH\s*(?:was|=|:|≈|~|at)\s*([\d.]+)', re.I),
+        re.compile(r'\boptimal\s+pH\s*(?:was|=|:|≈|~|of|at)\s*([\d.]+)', re.I),
+        re.compile(r'\boptimum\s+pH\s*(?:was|=|:|≈|~|of|at)\s*([\d.]+)', re.I),
         re.compile(r'\bpH\s+optimum\s*(?:was|=|:|≈|~)\s*([\d.]+)', re.I),
-        re.compile(r'\bmaximum\s+activity\s+(?:at|was\s+at)\s+pH\s*([\d.]+)', re.I),
-        re.compile(r'\bhighest\s+(?:catalytic\s+)?activity\s+(?:at|was\s+at)\s+pH\s*([\d.]+)', re.I),
-        re.compile(r'\bbest\s+(?:catalytic\s+)?activity\s+(?:at|was\s+at)\s+pH\s*([\d.]+)', re.I),
-        re.compile(r'\bpH\s*([\d.]+)\s+(?:showed|exhibited|displayed)\s+(?:the\s+)?(?:highest|maximum|optimal|best)', re.I),
-        re.compile(r'\b(?:at|under)\s+pH\s*([\d.]+)\s*,?\s*(?:the\s+)?(?:highest|maximum|optimal|best)', re.I),
+        re.compile(r'\boptimal\s+(?:reaction\s+)?pH\s+(?:for|of)\s+\w+\s+(?:was|=|:|≈|~)\s*([\d.]+)', re.I),
         re.compile(r'\bpH\s*([\d.]+)\s+was\s+(?:the\s+)?(?:optimal|optimum|best)', re.I),
         re.compile(r'\boptimal\s+pH\s+of\s*([\d.]+)', re.I),
         re.compile(r'\bpH\s*([\d.]+)\s+(?:gave|yielded|produced)\s+(?:the\s+)?(?:highest|maximum|optimal|best)', re.I),
@@ -686,20 +682,7 @@ _TEMPERATURE_PATTERNS = {
         re.compile(r'\boptimal\s+(?:reaction\s+)?temperature\s*(?:was|=|:|≈|~)\s*([\d.]+)\s*°?C', re.I),
         re.compile(r'\boptimum\s+(?:reaction\s+)?temperature\s*(?:was|=|:|≈|~)\s*([\d.]+)\s*°?C', re.I),
         re.compile(r'\btemperature\s+optimum\s*(?:was|=|:|≈|~)\s*([\d.]+)\s*°?C', re.I),
-        re.compile(r'\bmaximum\s+activity\s+(?:at|was\s+at)\s*([\d.]+)\s*°?C', re.I),
-        re.compile(r'\bhighest\s+(?:catalytic\s+)?activity\s+(?:at|was\s+at)\s*([\d.]+)\s*°?C', re.I),
-        re.compile(r'\bbest\s+(?:catalytic\s+)?activity\s+(?:at|was\s+at)\s*([\d.]+)\s*°?C', re.I),
-        re.compile(r'\bT\s*opt\s*(?:was|=|:|≈|~)\s*([\d.]+)\s*°?C', re.I),
-        re.compile(r'\b([\d.]+)\s*°C\s+(?:was|showed|exhibited)\s+(?:the\s+)?(?:optimal|optimum|highest|maximum|best)', re.I),
-        re.compile(r'\b(?:at|under)\s*([\d.]+)\s*°C\s*,?\s*(?:the\s+)?(?:highest|maximum|optimal|best)', re.I),
-        re.compile(r'\boptimal\s+T\s*(?:was|=|:)\s*([\d.]+)', re.I),
         re.compile(r'\boptimal\s+temperature\s+of\s*([\d.]+)\s*°?C', re.I),
-        re.compile(r'\bactivity\s+(?:peaked|maximum|highest)\s+(?:at|under)\s*([\d.]+)\s*°?C', re.I),
-        re.compile(r'\b([\d.]+)\s*°\s*C\s+(?:is|was)\s+(?:the\s+)?(?:most\s+)?(?:active|efficient|effective|favorable)', re.I),
-        re.compile(r'\b(?:activity|catalytic)\s+(?:at|under|in)\s+([\d.]+)\s*°\s*C\s+(?:catalytic\s+)?condition', re.I),
-        re.compile(r'\b([\d.]+)\s*°\s*C\s+(?:catalytic\s+)?condition', re.I),
-        re.compile(r'\bactivity\s+(?:were|was|are|is)\s+(?:also\s+)?(?:investigated|studied|measured|evaluated)\s+(?:at|under)\s+([\d.]+)\s*°?C', re.I),
-        re.compile(r'\b([\d.]+)\s*°\s*C\s*,?\s*(?:which|and)\s+(?:is|was)\s+(?:the\s+)?(?:optimal|optimum|best|most\s+active)', re.I),
     ],
     "temperature_range": [
         re.compile(r'\btemperature\s+range\s*(?:of|=|:|≈|~|was|from)\s*([\d.]+)\s*[-–—~to]+\s*([\d.]+)\s*°?C', re.I),
@@ -2692,70 +2675,19 @@ class RuleExtractor:
                 if ph_profile.get("optimal_pH") is not None:
                     break
 
+        # 2. 动力学实验条件中的pH（只记录为conditions，不标记为optimal_pH）
         if ph_profile.get("optimal_pH") is None:
             for text in search_texts:
-                m = re.search(r'\boptimal\s+pH\s+(?:of\s+)?([\d.]+)', text, re.I)
-                if m:
-                    try:
-                        val = float(m.group(1))
-                        if 0 <= val <= 14:
-                            ph_profile["optimal_pH"] = val
-                            record["main_activity"]["conditions"]["pH"] = m.group(1)
-                            break
-                    except (ValueError, IndexError):
-                        pass
-
-        if ph_profile.get("optimal_pH") is None:
-            for text in search_texts:
-                m = re.search(r'\bpH\s*(?:was|=|:)\s*([\d.]+)\b', text, re.I)
-                if m:
-                    try:
-                        val = float(m.group(1))
-                        if 0 <= val <= 14:
-                            ph_profile["optimal_pH"] = val
-                            record["main_activity"]["conditions"]["pH"] = m.group(1)
-                            break
-                    except (ValueError, IndexError):
-                        pass
-
-        if ph_profile.get("optimal_pH") is None:
-            for text in search_texts:
-                m = re.search(r'\bpH\s*=\s*([\d.]+)\b', text, re.I)
-                if m:
-                    try:
-                        val = float(m.group(1))
-                        if 0 <= val <= 14:
-                            ph_profile["optimal_pH"] = val
-                            record["main_activity"]["conditions"]["pH"] = m.group(1)
-                            break
-                    except (ValueError, IndexError):
-                        pass
-
-        if ph_profile.get("optimal_pH") is None:
-            for text in search_texts:
-                m = re.search(r'\bpH\s+([\d.]+)\b', text, re.I)
-                if m:
-                    try:
-                        val = float(m.group(1))
-                        if 0 <= val <= 14:
-                            ph_profile["optimal_pH"] = val
-                            record["main_activity"]["conditions"]["pH"] = m.group(1)
-                            break
-                    except (ValueError, IndexError):
-                        pass
-
-        if ph_profile.get("optimal_pH") is None:
-            for text in search_texts:
-                m = re.search(r'\b(?:buffer|solution)\s*\([^)]*pH\s*([\d.]+)', text, re.I)
-                if m:
-                    try:
-                        val = float(m.group(1))
-                        if 0 <= val <= 14:
-                            ph_profile["optimal_pH"] = val
-                            record["main_activity"]["conditions"]["pH"] = m.group(1)
-                            break
-                    except (ValueError, IndexError):
-                        pass
+                if re.search(r'\b(?:kinetic|reaction|catalytic|assay|steady-state)\b', text, re.I):
+                    m = re.search(r'\b(?:buffer|solution)\s*\([^)]*pH\s*([\d.]+)', text, re.I)
+                    if m:
+                        try:
+                            val = float(m.group(1))
+                            if 0 <= val <= 14:
+                                record["main_activity"]["conditions"]["pH"] = m.group(1)
+                                break
+                        except (ValueError, IndexError):
+                            pass
 
         if ph_profile.get("pH_range") is None:
             for text in search_texts:
@@ -2766,18 +2698,6 @@ class RuleExtractor:
                         break
                 if ph_profile.get("pH_range") is not None:
                     break
-
-        if ph_profile.get("pH_range") is None:
-            for text in search_texts:
-                m = re.search(r'\bpH\s+(?:from\s+)?([\d.]+)\s*[-–—~to]+\s*([\d.]+)', text, re.I)
-                if m:
-                    try:
-                        low, high = float(m.group(1)), float(m.group(2))
-                        if 0 <= low <= 14 and 0 <= high <= 14:
-                            ph_profile["pH_range"] = f"{m.group(1)}-{m.group(2)}"
-                            break
-                    except (ValueError, IndexError):
-                        pass
 
         if ph_profile.get("pH_stability_range") is None:
             for text in search_texts:
@@ -2829,21 +2749,43 @@ class RuleExtractor:
                 re.compile(r'\b([\d.]+)\s*°\s*C\b', re.I),
             ]
             for text, norm in zip(search_texts, norm_texts):
-                for pat in _TEMP_OPTIMAL_FALLBACK:
-                    m = pat.search(text)
+                if re.search(r'\b(?:optimal|optimum|dependent|effect|range|profile)\s+(?:of\s+)?temperature\b|\btemperature\s+(?:dependent|effect|range|profile|optimum|optimal|reaction)\b', text, re.I):
+                    _TEMP_CONTEXT_PATTERNS = [
+                        re.compile(r'\b(?:reaction\s+)?temperature\s*(?:was|=|:)\s*([\d.]+)\s*°?C', re.I),
+                        re.compile(r'\b(?:at|under)\s*([\d.]+)\s*°?\s*C\b', re.I),
+                        re.compile(r'\b([\d.]+)\s*°\s*C\b', re.I),
+                    ]
+                    for pat in _TEMP_CONTEXT_PATTERNS:
+                        m = pat.search(text)
+                        if not m:
+                            m = pat.search(norm)
+                        if m:
+                            try:
+                                val = float(m.group(1))
+                                if 15 <= val <= 80:
+                                    temp_profile["optimal_temperature"] = f"{m.group(1)} °C"
+                                    record["main_activity"]["conditions"]["temperature"] = f"{m.group(1)} °C"
+                                    break
+                            except (ValueError, IndexError):
+                                pass
+                    if temp_profile.get("optimal_temperature") is not None:
+                        break
+
+        # 3. 动力学实验条件中的温度（只记录为conditions）
+        if temp_profile.get("optimal_temperature") is None:
+            for text, norm in zip(search_texts, norm_texts):
+                if re.search(r'\b(?:kinetic|reaction|catalytic|assay|steady-state)\b', text, re.I):
+                    m = re.search(r'\b(?:at|under)\s*([\d.]+)\s*°?\s*C\b', norm, re.I)
                     if not m:
-                        m = pat.search(norm)
+                        m = re.search(r'\b([\d.]+)\s*°\s*C\b', norm, re.I)
                     if m:
                         try:
                             val = float(m.group(1))
                             if 15 <= val <= 80:
-                                temp_profile["optimal_temperature"] = f"{m.group(1)} °C"
                                 record["main_activity"]["conditions"]["temperature"] = f"{m.group(1)} °C"
                                 break
                         except (ValueError, IndexError):
                             pass
-                if temp_profile.get("optimal_temperature") is not None:
-                    break
 
         if temp_profile.get("temperature_range") is None:
             for text, norm in zip(search_texts, norm_texts):
@@ -3082,25 +3024,6 @@ class RuleExtractor:
                     except (ValueError, IndexError):
                         pass
 
-        if ph_prof.get("optimal_pH") is None:
-            for pat in [
-                re.compile(r'\bpH\s*(?:was|=|:)\s*([\d.]+)\b', re.I),
-                re.compile(r'\bpH\s*=\s*([\d.]+)\b', re.I),
-                re.compile(r'\bpH\s+([\d.]+)\b', re.I),
-            ]:
-                m = pat.search(all_text)
-                if not m:
-                    m = pat.search(norm_text)
-                if m:
-                    try:
-                        val = float(m.group(1))
-                        if 0 <= val <= 14:
-                            ph_prof["optimal_pH"] = val
-                            logger.info(f"[SMN] Fulltext fallback: pH={val}")
-                            break
-                    except (ValueError, IndexError):
-                        pass
-
         if temp_prof.get("optimal_temperature") is None:
             for pat in _TEMPERATURE_PATTERNS["optimal_temperature"]:
                 m = pat.search(all_text)
@@ -3110,65 +3033,6 @@ class RuleExtractor:
                     temp_prof["optimal_temperature"] = f"{m.group(1)} °C"
                     logger.info(f"[SMN] Fulltext fallback: optimal_temperature={m.group(1)}°C")
                     break
-
-        if temp_prof.get("optimal_temperature") is not None:
-            for pat in _TEMPERATURE_PATTERNS["optimal_temperature"]:
-                m = pat.search(all_text)
-                if not m:
-                    m = pat.search(norm_text)
-                if m:
-                    try:
-                        val = float(m.group(1))
-                        if 15 <= val <= 80:
-                            old_val = temp_prof.get("optimal_temperature")
-                            temp_prof["optimal_temperature"] = f"{m.group(1)} °C"
-                            logger.info(f"[SMN] Fulltext fallback: optimal_temperature upgraded from {old_val} to {m.group(1)}°C")
-                            break
-                    except (ValueError, IndexError):
-                        pass
-
-        if temp_prof.get("optimal_temperature") is None:
-            _TEMP_FALLBACK_PATTERNS = [
-                re.compile(r'\b(?:reaction\s+)?temperature\s*(?:was|=|:)\s*([\d.]+)\s*°?\s*C', re.I),
-                re.compile(r'\b(?:at|under)\s*([\d.]+)\s*°?\s*C\b', re.I),
-                re.compile(r'\bincubat\w*\s+(?:at\s+)?([\d.]+)\s*°?\s*C', re.I),
-                re.compile(r'\b([\d.]+)\s*°\s*C\b', re.I),
-            ]
-            for pat in _TEMP_FALLBACK_PATTERNS:
-                m = pat.search(all_text)
-                if not m:
-                    m = pat.search(norm_text)
-                if m:
-                    try:
-                        val = float(m.group(1))
-                        if 15 <= val <= 80:
-                            temp_prof["optimal_temperature"] = f"{m.group(1)} °C"
-                            logger.info(f"[SMN] Fulltext fallback: temperature={m.group(1)}°C")
-                            break
-                    except (ValueError, IndexError):
-                        pass
-
-        if temp_prof.get("optimal_temperature") is None:
-            m = re.search(r'\b([\d.]+)\s*°\s*C\s+(?:catalytic\s+)?condition', norm_text, re.I)
-            if m:
-                try:
-                    val = float(m.group(1))
-                    if 15 <= val <= 80:
-                        temp_prof["optimal_temperature"] = f"{m.group(1)} °C"
-                        logger.info(f"[SMN] Fulltext fallback: catalytic condition temp={m.group(1)}°C")
-                except (ValueError, IndexError):
-                    pass
-
-        if temp_prof.get("optimal_temperature") is None:
-            m = re.search(r'\bactivity\s+(?:were|was|are|is)\s+(?:also\s+)?(?:investigated|studied|measured|evaluated)\s+(?:at|under)\s+([\d.]+)\s*°?C', norm_text, re.I)
-            if m:
-                try:
-                    val = float(m.group(1))
-                    if 15 <= val <= 80:
-                        temp_prof["optimal_temperature"] = f"{m.group(1)} °C"
-                        logger.info(f"[SMN] Fulltext fallback: activity studied at={m.group(1)}°C")
-                except (ValueError, IndexError):
-                    pass
 
         if sel.get("synthesis_method") is None:
             method_scores = {}
@@ -4324,17 +4188,6 @@ class SingleMainNanozymePipeline:
 
         pH_prof = act.get("pH_profile", {})
         temp_prof = act.get("temperature_profile", {})
-        conditions = act.get("conditions", {})
-
-        if pH_prof.get("optimal_pH") is None:
-            cond_pH = conditions.get("pH")
-            if cond_pH is not None:
-                try:
-                    pH_val = float(str(cond_pH).strip())
-                    pH_prof["optimal_pH"] = pH_val
-                    logger.info(f"[SMN] Inferred optimal_pH={pH_val} from conditions")
-                except (ValueError, TypeError):
-                    pass
 
         if pH_prof.get("optimal_pH") is None:
             for sentence in buckets.get("activity", []):
@@ -4369,17 +4222,6 @@ class SingleMainNanozymePipeline:
                         break
                 if pH_prof.get("pH_stability_range") is not None:
                     break
-
-        if temp_prof.get("optimal_temperature") is None:
-            cond_temp = conditions.get("temperature")
-            if cond_temp is not None:
-                try:
-                    temp_str = str(cond_temp).strip()
-                    temp_num = float(re.search(r'([\d.]+)', temp_str).group(1))
-                    temp_prof["optimal_temperature"] = f"{temp_num} °C"
-                    logger.info(f"[SMN] Inferred optimal_temperature={temp_num}°C from conditions")
-                except (AttributeError, ValueError, TypeError):
-                    pass
 
         if temp_prof.get("optimal_temperature") is None:
             for sentence in buckets.get("activity", []):
