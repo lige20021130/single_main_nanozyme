@@ -188,27 +188,36 @@ def main():
     success_count = 0
     fail_count = 0
 
-    for i, mid_path in enumerate(mid_tasks, 1):
-        logger.info(f"\n{'='*60}")
-        logger.info(f"处理 [{i}/{len(mid_tasks)}]: {mid_path.name}")
-        logger.info(f"{'='*60}")
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        for i, mid_path in enumerate(mid_tasks, 1):
+            logger.info(f"\n{'='*60}")
+            logger.info(f"处理 [{i}/{len(mid_tasks)}]: {mid_path.name}")
+            logger.info(f"{'='*60}")
 
-        try:
-            result = asyncio.run(run_single(
-                mid_path, output_dir, smn_config,
-                use_cache=not args.no_cache,
-            ))
-            diag = result.get("diagnostics", {})
-            logger.info(
-                f"完成: status={diag.get('status')}, "
-                f"confidence={diag.get('confidence')}, "
-                f"nanozyme={result.get('selected_nanozyme', {}).get('name')}, "
-                f"activity={result.get('main_activity', {}).get('enzyme_like_type')}"
-            )
-            success_count += 1
-        except Exception as e:
-            logger.error(f"处理失败: {mid_path.name}: {e}")
-            fail_count += 1
+            try:
+                result = loop.run_until_complete(run_single(
+                    mid_path, output_dir, smn_config,
+                    use_cache=not args.no_cache,
+                ))
+                diag = result.get("diagnostics", {})
+                logger.info(
+                    f"完成: status={diag.get('status')}, "
+                    f"confidence={diag.get('confidence')}, "
+                    f"nanozyme={result.get('selected_nanozyme', {}).get('name')}, "
+                    f"activity={result.get('main_activity', {}).get('enzyme_like_type')}"
+                )
+                success_count += 1
+            except Exception as e:
+                logger.error(f"处理失败: {mid_path.name}: {e}")
+                fail_count += 1
+
+            if i < len(mid_tasks):
+                import time as _time
+                _time.sleep(1)
+    finally:
+        loop.close()
 
     logger.info(f"\n{'='*60}")
     logger.info(f"全部完成: 成功 {success_count}, 失败 {fail_count}, 共 {len(mid_tasks)}")

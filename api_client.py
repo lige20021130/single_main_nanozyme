@@ -13,6 +13,7 @@ import asyncio
 import logging
 import time
 import json
+import random
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -292,13 +293,17 @@ class APIClient:
                             retry_after = response.headers.get('Retry-After')
                         
                         if retry_after:
-                            wait_time = int(retry_after)
+                            try:
+                                wait_time = float(retry_after)
+                            except (ValueError, TypeError):
+                                wait_time = self.rate_config.base_delay * (2 ** attempt)
                         else:
-                            # 指数退避
                             wait_time = min(
                                 self.rate_config.base_delay * (2 ** attempt),
                                 self.rate_config.max_delay
-)
+                            )
+                        jitter = random.uniform(0, wait_time * 0.25)
+                        wait_time += jitter
                         
                         logger.warning(
                             f"API速率限制触发，等待 {wait_time:.1f}秒 "
@@ -313,21 +318,23 @@ class APIClient:
                         raise Exception("API认证失败，请检查API密钥")
                     
                     elif status == 500:
-                        # 服务器错误，重试
                         wait_time = self.rate_config.base_delay * (2 ** attempt)
+                        jitter = random.uniform(0, wait_time * 0.25)
+                        wait_time += jitter
                         logger.warning(f"API服务器错误 (500)，等待 {wait_time:.1f}秒后重试")
                         await asyncio.sleep(wait_time)
                         retry_count += 1
                         continue
                     
                     else:
-                        # 其他错误
                         error_text = await response.text()
                         raise Exception(f"API错误 ({status}): {error_text[:200]}")
                         
             except asyncio.TimeoutError:
                 last_error = f"请求超时 (>{timeout}秒)"
                 wait_time = self.rate_config.base_delay * (2 ** attempt)
+                jitter = random.uniform(0, wait_time * 0.25)
+                wait_time += jitter
                 logger.warning(f"{last_error}，等待 {wait_time:.1f}秒后重试")
                 await asyncio.sleep(wait_time)
                 retry_count += 1
@@ -336,6 +343,8 @@ class APIClient:
             except aiohttp.ClientError as e:
                 last_error = str(e)
                 wait_time = self.rate_config.base_delay * (2 ** attempt)
+                jitter = random.uniform(0, wait_time * 0.25)
+                wait_time += jitter
                 logger.warning(f"请求失败: {e}，等待 {wait_time:.1f}秒后重试")
                 await asyncio.sleep(wait_time)
                 retry_count += 1

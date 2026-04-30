@@ -1025,7 +1025,12 @@ class NanozymeDashboard:
 
     def _pipeline_worker(self):
         try:
-            self._pipeline_run()
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                loop.run_until_complete(self._pipeline_run_async())
+            finally:
+                loop.close()
         except Exception as e:
             logger.error(f"Pipeline error: {e}", exc_info=True)
         finally:
@@ -1034,85 +1039,132 @@ class NanozymeDashboard:
             self.root.after(0, lambda: self.stop_btn.config(state=tk.DISABLED, fg=ColorTheme.TEXT_MUTED))
             self._update_analytics()
 
-    def _pipeline_run(self):
+    async def _pipeline_run_async(self):
         total = len(self.files)
         output_dir = self._get_output_dir()
+        max_concurrent = 3
 
-        for i, fstate in enumerate(self.files):
-            if self.stop_event.is_set():
-                break
+        semaphore = asyncio.Semaphore(max_concurrent)
+        completed = [0]
+        lock = asyncio.Lock()
 
-            fstate.start_time = time.time()
-            self.root.after(0, lambda idx=i: self._update_progress(idx, total, "解析PDF"))
-
-            try:
-                self._update_file_phase(i, "parsing")
-                self._set_pipeline_stage(0, "active")
-                self._set_pipeline_stage(1, "active")
-
-                pdf_json = self._parse_pdf(fstate.path, output_dir)
-                if pdf_json is None:
-                    self._update_file_phase(i, "error", "PDF解析失败")
-                    self._set_pipeline_stage(1, "error")
-                    continue
-
+        async def process_file(idx: int, fstate: FileState):
+            async with semaphore:
                 if self.stop_event.is_set():
-                    break
+                    return
+                await self._process_single_file(idx, total, fstate, output_dir)
+                async with lock:
+                    completed[0] += 1
+                    cur = completed[0]
+                self.root.after(0, lambda c=cur, t=total: self._update_progress(c, t, ""))
 
-                self.root.after(0, lambda idx=i: self._update_progress(idx, total, "预处理"))
-                self._update_file_phase(i, "preprocessing")
-                self._set_pipeline_stage(1, "done")
-                self._set_pipeline_stage(2, "active")
-
-                mid_task = self._preprocess(pdf_json, fstate.path, output_dir)
-                if mid_task is None:
-                    self._update_file_phase(i, "error", "预处理失败")
-                    self._set_pipeline_stage(2, "error")
-                    continue
-
-                if self.stop_event.is_set():
-                    break
-
-                self.root.after(0, lambda idx=i: self._update_progress(idx, total, "提取"))
-                self._update_file_phase(i, "extracting")
-                self._set_pipeline_stage(2, "done")
-                self._set_pipeline_stage(3, "active")
-                if self.llm_var.get():
-                    self._set_pipeline_stage(4, "active")
-                if self.vlm_var.get():
-                    self._set_pipeline_stage(5, "active")
-
-                result = self._extract(mid_task, output_dir, fstate.stem)
-
-                self._set_pipeline_stage(3, "done")
-                self._set_pipeline_stage(4, "done" if self.llm_var.get() else "idle")
-                self._set_pipeline_stage(5, "done" if self.vlm_var.get() else "idle")
-                self._set_pipeline_stage(6, "active")
-
-                fstate.end_time = time.time()
-                if result is not None:
-                    fstate.result = result
-                    fstate.quality_score = self._compute_quality(result)
-                    self._update_file_phase(i, "done")
-                    self._set_pipeline_stage(6, "done")
-                    self._set_pipeline_stage(7, "active")
-                    self._save_extracted(result, output_dir, fstate.stem)
-                    self._set_pipeline_stage(7, "done")
-                else:
-                    self._update_file_phase(i, "error", "提取失败")
-                    self._set_pipeline_stage(6, "error")
-
-            except Exception as e:
-                fstate.end_time = time.time()
-                self._update_file_phase(i, "error", str(e))
-                logger.error(f"[{fstate.stem}] Error: {e}")
-
-            self.root.after(0, lambda idx=i: self._update_progress(idx + 1, total, ""))
+        tasks = [process_file(i, fstate) for i, fstate in enumerate(self.files)]
+        await asyncio.gather(*tasks)
 
         elapsed = time.time() - self._start_time
         self.root.after(0, lambda: self.progress_label.config(
             text=f"完成 ({elapsed:.1f}s)" if not self.stop_event.is_set() else "已停止"
         ))
+
+    async def _process_single_file(self, idx: int, total: int, fstate: FileState, output_dir: str):
+        fstate.start_time = time.time()
+        self.root.after(0, lambda i=idx: self._update_progress(i, total, "解析PDF"))
+
+        try:
+            self._update_file_phase(idx, "parsing")
+            self._set_pipeline_stage(0, "active")
+            self._set_pipeline_stage(1, "active")
+
+            pdf_json = await asyncio.get_event_loop().run_in_executor(
+                None, self._parse_pdf, fstate.path, output_dir
+            )
+            if pdf_json is None:
+                self._update_file_phase(idx, "error", "PDF解析失败")
+                self._set_pipeline_stage(1, "error")
+                return
+
+            if self.stop_event.is_set():
+                return
+
+            self.root.after(0, lambda i=idx: self._update_progress(i, total, "预处理"))
+            self._update_file_phase(idx, "preprocessing")
+            self._set_pipeline_stage(1, "done")
+            self._set_pipeline_stage(2, "active")
+
+            mid_task = await asyncio.get_event_loop().run_in_executor(
+                None, self._preprocess, pdf_json, fstate.path, output_dir
+            )
+            if mid_task is None:
+                self._update_file_phase(idx, "error", "预处理失败")
+                self._set_pipeline_stage(2, "error")
+                return
+
+            if self.stop_event.is_set():
+                return
+
+            self.root.after(0, lambda i=idx: self._update_progress(i, total, "提取"))
+            self._update_file_phase(idx, "extracting")
+            self._set_pipeline_stage(2, "done")
+            self._set_pipeline_stage(3, "active")
+            if self.llm_var.get():
+                self._set_pipeline_stage(4, "active")
+            if self.vlm_var.get():
+                self._set_pipeline_stage(5, "active")
+
+            result = await self._extract_async(mid_task, output_dir, fstate.stem)
+
+            self._set_pipeline_stage(3, "done")
+            self._set_pipeline_stage(4, "done" if self.llm_var.get() else "idle")
+            self._set_pipeline_stage(5, "done" if self.vlm_var.get() else "idle")
+            self._set_pipeline_stage(6, "active")
+
+            fstate.end_time = time.time()
+            if result is not None:
+                fstate.result = result
+                fstate.quality_score = self._compute_quality(result)
+                self._update_file_phase(idx, "done")
+                self._set_pipeline_stage(6, "done")
+                self._set_pipeline_stage(7, "active")
+                self._save_extracted(result, output_dir, fstate.stem)
+                self._set_pipeline_stage(7, "done")
+                fstate.result = None
+                self._cleanup_intermediate(output_dir, fstate.stem, pdf_json, mid_task)
+            else:
+                self._update_file_phase(idx, "error", "提取失败")
+                self._set_pipeline_stage(6, "error")
+
+        except Exception as e:
+            fstate.end_time = time.time()
+            self._update_file_phase(idx, "error", str(e))
+            logger.error(f"[{fstate.stem}] Error: {e}")
+
+    async def _extract_async(self, mid_task_path: str, output_dir: str, stem: str) -> Optional[Dict]:
+        try:
+            from extraction_pipeline import ExtractionPipeline
+            from config_manager import ConfigManager
+            cm = ConfigManager()
+            pipeline = ExtractionPipeline(cm)
+            enable_llm = self.llm_var.get()
+            enable_vlm = self.vlm_var.get()
+            result = await pipeline.process_mid_json(
+                mid_task_path, enable_llm=enable_llm, enable_vlm=enable_vlm
+            )
+            return result
+        except Exception as e:
+            logger.error(f"Extract error: {e}")
+            try:
+                from single_main_nanozyme_extractor import SingleMainNanozymePipeline, SMNConfig
+                from config_manager import ConfigManager
+                cm = ConfigManager()
+                config = SMNConfig(enable_llm=False, enable_vlm=False)
+                pipeline = SingleMainNanozymePipeline(client=None, config=config)
+                with open(mid_task_path, "r", encoding="utf-8") as f:
+                    mid = json.load(f)
+                result = await pipeline.extract(mid)
+                return result
+            except Exception as e2:
+                logger.error(f"Fallback extract error: {e2}")
+                return None
 
     def _set_pipeline_stage(self, idx: int, state: str):
         self.root.after(0, lambda: self._set_pipeline_stage_ui(idx, state))
@@ -1170,47 +1222,34 @@ class NanozymeDashboard:
             logger.error(f"Preprocess error: {e}")
             return None
 
-    def _extract(self, mid_task_path: str, output_dir: str, stem: str) -> Optional[Dict]:
-        try:
-            from extraction_pipeline import ExtractionPipeline
-            from config_manager import ConfigManager
-            cm = ConfigManager()
-            pipeline = ExtractionPipeline(cm)
-            loop = asyncio.new_event_loop()
-            try:
-                enable_llm = self.llm_var.get()
-                enable_vlm = self.vlm_var.get()
-                result = loop.run_until_complete(
-                    pipeline.process_mid_json(mid_task_path, enable_llm=enable_llm, enable_vlm=enable_vlm)
-                )
-            finally:
-                loop.close()
-            return result
-        except Exception as e:
-            logger.error(f"Extract error: {e}")
-            try:
-                from single_main_nanozyme_extractor import SingleMainNanozymePipeline, SMNConfig
-                from config_manager import ConfigManager
-                cm = ConfigManager()
-                config = SMNConfig(enable_llm=False, enable_vlm=False)
-                pipeline = SingleMainNanozymePipeline(client=None, config=config)
-                with open(mid_task_path, "r", encoding="utf-8") as f:
-                    mid = json.load(f)
-                loop = asyncio.new_event_loop()
-                try:
-                    result = loop.run_until_complete(pipeline.extract(mid))
-                finally:
-                    loop.close()
-                return result
-            except Exception as e2:
-                logger.error(f"Fallback extract error: {e2}")
-                return None
-
     def _save_extracted(self, result: Dict, output_dir: str, stem: str):
         out_path = Path(output_dir) / f"{stem}_extracted.json"
         with open(out_path, "w", encoding="utf-8") as f:
             json.dump(result, f, ensure_ascii=False, indent=2)
         logger.info(f"[{stem}] 结果已保存: {out_path}")
+
+    def _cleanup_intermediate(self, output_dir: str, stem: str, pdf_json: Optional[str], mid_task: Optional[str]):
+        cleaned = []
+        try:
+            if pdf_json:
+                p = Path(pdf_json)
+                if p.exists() and p.suffix == ".json" and stem in p.name:
+                    p.unlink()
+                    cleaned.append(f"PDF JSON: {p.name}")
+            if mid_task:
+                p = Path(mid_task)
+                if p.exists() and "_mid_task" in p.name:
+                    p.unlink()
+                    cleaned.append(f"mid_task: {p.name}")
+            images_dir = Path(output_dir) / f"{stem}_images"
+            if images_dir.exists() and images_dir.is_dir():
+                import shutil
+                shutil.rmtree(images_dir, ignore_errors=True)
+                cleaned.append(f"images: {images_dir.name}/")
+        except Exception as e:
+            logger.debug(f"[{stem}] Cleanup warning: {e}")
+        if cleaned:
+            logger.info(f"[{stem}] Cleaned intermediate files: {', '.join(cleaned)}")
 
     def _get_output_dir(self) -> str:
         if self.files:
