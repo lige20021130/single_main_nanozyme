@@ -25,6 +25,23 @@ def _norm_unit(unit):
 
 
 class KineticsAgent:
+    _METHOD_PRIORITY = {
+        "uv-vis": 1, "uv/vis": 1, "uv vis": 1, "absorption": 1,
+        "spectrophotometric": 1,
+        "fluorescence": 2, "fluorometric": 2,
+        "colorimetric": 2, "colorimetry": 2,
+        "electrochemical": 3, "amperometric": 3,
+        "sers": 4, "surface-enhanced": 4, "raman": 4,
+        "other": 5,
+    }
+
+    def _detect_method(self, text):
+        tl = text.lower()
+        for key in self._METHOD_PRIORITY:
+            if key in tl:
+                return key
+        return "other"
+
     def extract(self, record, buckets, table_values, selected_name, doc=None):
         if record["main_activity"]["kinetics"]["Km"] is None or record["main_activity"]["kinetics"]["Vmax"] is None:
             self._extract_kinetics_from_text(record, buckets.get("kinetics", []))
@@ -36,110 +53,104 @@ class KineticsAgent:
         return record
 
     def _extract_kinetics_from_text(self, record, kinetics_texts):
+        km_candidates = []
+        vmax_candidates = []
+
         for idx, text in enumerate(kinetics_texts):
             norm_text = _normalize_ocr_scientific(text)
-            if record["main_activity"]["kinetics"]["Km"] is None or record["main_activity"]["kinetics"]["Vmax"] is None:
-                for pat in _KM_VMAX_JOINT_PATTERNS:
-                    m = pat.search(text)
-                    if not m:
-                        m = pat.search(norm_text)
-                    if m:
-                        km_val = _parse_scientific_notation(m.group(1))
-                        km_unit = m.group(2)
-                        vmax_raw = m.group(3)
-                        vmax_unit = m.group(4)
-                        vmax_val = _parse_scientific_notation(vmax_raw)
-                        if isinstance(km_val, (int, float)) and record["main_activity"]["kinetics"]["Km"] is None:
-                            record["main_activity"]["kinetics"]["Km"] = km_val
-                            nu = _norm_unit(km_unit)
-                            record["main_activity"]["kinetics"]["Km_unit"] = nu if nu else km_unit
-                            record["main_activity"]["kinetics"]["source"] = "text"
-                        if isinstance(vmax_val, (int, float)) and record["main_activity"]["kinetics"]["Vmax"] is None:
-                            record["main_activity"]["kinetics"]["Vmax"] = vmax_val
-                            nu = _norm_unit(vmax_unit)
-                            record["main_activity"]["kinetics"]["Vmax_unit"] = nu if nu else vmax_unit
-                            record["main_activity"]["kinetics"]["source"] = "text"
-                            logger.info(f"[KineticsAgent] Vmax set by joint pattern: {vmax_val} {vmax_unit}")
-                        break
+            method = self._detect_method(text)
+            method_pri = self._METHOD_PRIORITY.get(method, 5)
+            matched_vmax = False
 
-            if record["main_activity"]["kinetics"]["Km"] is None:
-                for pat in _KM_PATTERNS:
-                    m = pat.search(text)
-                    if not m:
-                        m = pat.search(norm_text)
-                    if m:
-                        groups = m.groups()
-                        if len(groups) == 3:
-                            if groups[0] in ("mM", "μM", "uM", "M", "mmol", "umol", "nmol"):
-                                value, unit = groups[1], groups[0]
-                                substrate = None
-                            else:
-                                substrate, value, unit = groups
-                        elif len(groups) == 2:
-                            value, unit = groups
-                            substrate = None
+            for pat in _KM_VMAX_JOINT_PATTERNS:
+                m = pat.search(text)
+                if not m:
+                    m = pat.search(norm_text)
+                if m:
+                    km_val = _parse_scientific_notation(m.group(1))
+                    km_unit = m.group(2)
+                    vmax_raw = m.group(3)
+                    vmax_unit = m.group(4)
+                    vmax_val = _parse_scientific_notation(vmax_raw)
+                    if isinstance(km_val, (int, float)):
+                        km_candidates.append((method_pri, km_val, km_unit, "text"))
+                    if isinstance(vmax_val, (int, float)):
+                        vmax_candidates.append((method_pri, vmax_val, vmax_unit, "text"))
+                    break
+
+            for pat in _KM_PATTERNS:
+                m = pat.search(text)
+                if not m:
+                    m = pat.search(norm_text)
+                if m:
+                    groups = m.groups()
+                    if len(groups) == 3:
+                        if groups[0] in ("mM", "μM", "uM", "M", "mmol", "umol", "nmol"):
+                            value, unit = groups[1], groups[0]
                         else:
-                            continue
-                        try:
-                            record["main_activity"]["kinetics"]["Km"] = float(value)
-                            nu = _norm_unit(unit)
-                            record["main_activity"]["kinetics"]["Km_unit"] = nu if nu else unit
-                            if substrate:
-                                record["main_activity"]["kinetics"]["substrate"] = substrate
-                            record["main_activity"]["kinetics"]["source"] = "text"
-                        except ValueError:
-                            pass
-                        break
+                            value, unit = groups[0], groups[2]
+                    elif len(groups) == 2:
+                        value, unit = groups
+                    else:
+                        continue
+                    try:
+                        km_candidates.append((method_pri, float(value), unit, "text"))
+                    except ValueError:
+                        pass
+                    break
 
-            if record["main_activity"]["kinetics"]["Vmax"] is None:
-                for pat in _VMAX_PATTERNS:
-                    m = pat.search(text)
-                    if not m:
-                        m = pat.search(norm_text)
-                    if m:
-                        groups = m.groups()
-                        logger.info(f"[KineticsAgent] VMAX_PATTERNS match: groups={groups} in '{text[:80]}'")
-                        if len(groups) == 2:
-                            g0, g1 = groups
-                            _RATE_UNITS = ("M s⁻¹", "M s-1", "M s–1", "M s^-1", "M/s", "mM/s", "μM/s", "M S⁻¹", "M S-1", "mM·s⁻¹", "mM\u00b7s\u207b\u00b9")
-                            g0_is_unit = g0 in _RATE_UNITS or bool(re.match(r'10[−\-–]?\d*\s*M\s*[sS]', g0)) or bool(re.match(r'[mμunp]?M[·\s]*s[⁻\-–]1', g0))
-                            g1_is_unit = g1 in _RATE_UNITS or bool(re.match(r'10[−\-–]?\d*\s*M\s*[sS]', g1)) or bool(re.match(r'[mμunp]?M[·\s]*s[⁻\-–]1', g1))
-                            if g1_is_unit and not g0_is_unit:
-                                value, unit = g0, g1
-                                substrate = None
-                            elif g0_is_unit:
-                                value, unit = g1, g0
-                                substrate = None
-                            else:
-                                substrate, value = g0, g1
-                                unit = None
-                        elif len(groups) == 3:
-                            substrate, value, unit = groups
+            for pat in _VMAX_PATTERNS:
+                m = pat.search(text)
+                if not m:
+                    m = pat.search(norm_text)
+                if m:
+                    groups = m.groups()
+                    if len(groups) == 2:
+                        g0, g1 = groups
+                        _RATE_UNITS = ("M s⁻¹", "M s-1", "M s–1", "M s^-1", "M/s", "mM/s", "μM/s", "M S⁻¹", "M S-1", "mM·s⁻¹", "mM\u00b7s\u207b\u00b9")
+                        g0_is_unit = g0 in _RATE_UNITS or bool(re.match(r'10[−\-–]?\d*\s*M\s*[sS]', g0)) or bool(re.match(r'[mμunp]?M[·\s]*s[⁻\-–]1', g0))
+                        g1_is_unit = g1 in _RATE_UNITS or bool(re.match(r'10[−\-–]?\d*\s*M\s*[sS]', g1)) or bool(re.match(r'[mμunp]?M[·\s]*s[⁻\-–]1', g1))
+                        if g1_is_unit and not g0_is_unit:
+                            value, unit = g0, g1
+                        elif g0_is_unit:
+                            value, unit = g1, g0
                         else:
-                            continue
-                        vmax_val = _parse_scientific_notation(value.strip())
-                        record["main_activity"]["kinetics"]["Vmax"] = vmax_val
-                        if unit:
-                            nu = _norm_unit(unit)
-                            record["main_activity"]["kinetics"]["Vmax_unit"] = nu if nu else unit
-                        if substrate and not record["main_activity"]["kinetics"]["substrate"]:
-                            record["main_activity"]["kinetics"]["substrate"] = substrate
-                        record["main_activity"]["kinetics"]["source"] = "text"
-                        break
+                            value, unit = g0, None
+                    elif len(groups) == 3:
+                        value, unit = groups[1], groups[2]
+                    else:
+                        continue
+                    vmax_val = _parse_scientific_notation(value.strip())
+                    if isinstance(vmax_val, (int, float)):
+                        vmax_candidates.append((method_pri, vmax_val, unit, "text"))
+                        matched_vmax = True
+                    break
 
-            if record["main_activity"]["kinetics"]["Vmax"] is None:
+            if not matched_vmax:
                 fallback = _extract_vmax_fallback(text)
                 if fallback and isinstance(fallback.get("value"), (int, float)):
-                    record["main_activity"]["kinetics"]["Vmax"] = fallback["value"]
-                    print(f'[TRACE] Vmax set to {fallback["value"]} at line 135 (OCR fallback) from text[{idx}]: {text[:80]}')
-                    if fallback.get("unit"):
-                        nu = _norm_unit(fallback["unit"])
-                        record["main_activity"]["kinetics"]["Vmax_unit"] = nu if nu else fallback["unit"]
-                    record["main_activity"]["kinetics"]["source"] = fallback.get("source", "text_ocr_fallback")
-                    logger.info(f"[KineticsAgent] Vmax OCR fallback: {fallback['value']} {fallback.get('unit', '')}")
-            else:
-                if 'Vmax' in text or 'vmax' in text.lower():
-                    logger.info(f"[KineticsAgent] Vmax already set ({record['main_activity']['kinetics']['Vmax']}), skipping text with Vmax mention")
+                    vmax_candidates.append((method_pri, fallback["value"], fallback.get("unit"), fallback.get("source", "text_ocr_fallback")))
+
+        kin = record["main_activity"]["kinetics"]
+        if km_candidates and kin.get("Km") is None:
+            km_candidates.sort(key=lambda c: c[0])
+            best = km_candidates[0]
+            kin["Km"] = best[1]
+            nu = _norm_unit(best[2])
+            kin["Km_unit"] = nu if nu else best[2]
+            kin["source"] = best[3]
+            if len(km_candidates) > 1:
+                logger.info(f"[KineticsAgent] Km multi-method: picked {best[1]} {best[2]} (pri={best[0]}) from {len(km_candidates)} candidates")
+
+        if vmax_candidates and kin.get("Vmax") is None:
+            vmax_candidates.sort(key=lambda c: c[0])
+            best = vmax_candidates[0]
+            kin["Vmax"] = best[1]
+            nu = _norm_unit(best[2])
+            kin["Vmax_unit"] = nu if nu else best[2]
+            kin["source"] = best[3]
+            if len(vmax_candidates) > 1:
+                logger.info(f"[KineticsAgent] Vmax multi-method: picked {best[1]} {best[2]} (pri={best[0]}) from {len(vmax_candidates)} candidates")
 
     def _extract_kinetics_from_flattened_table(self, record, kinetics_texts, selected_name):
         _FLAT_KM_HEADER = re.compile(r'Km\s*[\(（]\s*(mM|μM|uM|M|mmol|umol|nmol)\s*[\)）]', re.I)

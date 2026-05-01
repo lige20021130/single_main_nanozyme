@@ -440,6 +440,7 @@ _VMAX_PATTERNS = [
     re.compile(r'\bV\s*max\b[^.=]{0,20}?=\s*([\d.]+)\s+(mM|M|μM)\s*[sS]\s*[\^⁻\-–]?\s*[-]?\s*1', re.I),
     re.compile(r'\bV\s*max\s+values?\s+of\s+[^.]{0,80}?\b(?:are|were|is|was)\s+([\d.]+(?:[eE][\-]?\d+)?)\s*(?:and|&|,)\s*[\d.]+(?:[eE][\-]?\d+)?\s*(M\s*[sS][\^⁻\-–]?[\-]?1|M/?s|mM/?s|μM/?s|M\s+s-1|M\u00b7s\u207b\u00b9)', re.I),
     re.compile(r'\bV\s*max\s+values?\s+of\s+\S+\s+(?:and|&)\s+\S+\s+(?:are|were)\s+([\d.]+(?:[eE][\-]?\d+)?)\s+(?:and|&|,)\s*[\d.]+(?:[eE][\-]?\d+)?\s*(M\s*[sS][\^⁻\-–]?[\-]?1|M/?s|mM/?s|μM/?s|M\s+s-1|M\u00b7s\u207b\u00b9)', re.I),
+    re.compile(r'\bare\s+([\d.]+(?:[eE][\-]?\d+)?)\s+(?:and|&|,)\s*[\d.]+(?:[eE][\-]?\d+)?\s*(M\u00b7s\u207b\u00b9|M\s*s\s*[\-–]\s*1|M/?s|mM/?s|μM/?s)', re.I),
 ]
 
 _VMAX_OCR_PATTERNS = [
@@ -784,6 +785,11 @@ _CRYSTAL_STRUCTURE_PATTERNS = [
     re.compile(r'\b(?:face-centered|body-centered)\s+cubic\b', re.I),
     re.compile(r'\bXRD\s+(?:confirmed|showed)\s+(?:a\s+)?(\w+)\s+(?:phase|structure)', re.I),
     re.compile(r'\bSAED\s+(?:pattern|analysis)\s+(?:confirmed|showed|indicated)\s+(?:the\s+)?(\w+)', re.I),
+    re.compile(r'\((\d{3})\)\s*,\s*\((\d{3})\)\s*,\s*(?:and\s+)?\((\d{3})\)\s+planes?\b', re.I),
+    re.compile(r'\((\d{3})\)\s+(?:and|&)\s*\((\d{3})\)\s+planes?\b', re.I),
+    re.compile(r'\b(?:ascribed|assigned|indexed|attributed)\s+to\s+(?:the\s+)?\((\d{3})\)\s+planes?\b', re.I),
+    re.compile(r'\bd\s*[\s-]?\s*spacing\s+(?:values?\s+)?(?:of\s+)?(?:approximately\s+)?([\d.]+)\s*(?:,|and|&|\s)\s*([\d.]+)\s*(?:,|and|&|\s)\s*([\d.]+)\s*(nm|Å)', re.I),
+    re.compile(r'\bd\s*[\s-]?\s*spacing\s+(?:value\s+)?(?:of\s+)?(?:approximately\s+)?([\d.]+)\s*(nm|Å)', re.I),
 ]
 
 _SYNTHESIS_CONDITION_PATTERNS = {
@@ -2215,8 +2221,7 @@ class RuleExtractor:
             if found:
                 record["main_activity"]["substrates"] = sorted(found)
 
-        if record["main_activity"]["kinetics"]["Km"] is None or record["main_activity"]["kinetics"]["Vmax"] is None:
-            self._extract_kinetics_from_text(record, buckets.get("kinetics", []))
+        self._extract_kinetics_from_text(record, buckets.get("kinetics", []))
 
         if record["main_activity"]["kinetics"]["Km"] is None or record["main_activity"]["kinetics"]["Vmax"] is None:
             self._extract_kinetics_from_flattened_table(record, buckets.get("kinetics", []), selected_name)
@@ -2239,109 +2244,129 @@ class RuleExtractor:
 
         return record
 
+    _METHOD_PRIORITY = {
+        "uv-vis": 1, "uv/vis": 1, "uv vis": 1, "absorption": 1,
+        "spectrophotometric": 1,
+        "fluorescence": 2, "fluorometric": 2,
+        "colorimetric": 2, "colorimetry": 2,
+        "electrochemical": 3, "amperometric": 3,
+        "sers": 4, "surface-enhanced": 4, "raman": 4,
+        "other": 5,
+    }
+
+    def _detect_kinetics_method(self, text: str) -> str:
+        tl = text.lower()
+        for key in self._METHOD_PRIORITY:
+            if key in tl:
+                return key
+        return "other"
+
     def _extract_kinetics_from_text(self, record: Dict[str, Any], kinetics_texts: List[str]):
         try:
             from numeric_validator import normalize_unit as _norm_unit
         except ImportError:
             _norm_unit = None
+
+        km_candidates = []
+        vmax_candidates = []
+
         for text in kinetics_texts:
             norm_text = _normalize_ocr_scientific(text)
-            if record["main_activity"]["kinetics"]["Km"] is None or record["main_activity"]["kinetics"]["Vmax"] is None:
-                for pat in _KM_VMAX_JOINT_PATTERNS:
-                    m = pat.search(norm_text)
-                    if not m:
-                        m = pat.search(text)
-                    if m:
-                        km_val = _parse_scientific_notation(m.group(1))
-                        km_unit = m.group(2)
-                        vmax_raw = m.group(3)
-                        vmax_unit = m.group(4)
-                        vmax_val = _parse_scientific_notation(vmax_raw)
-                        if isinstance(km_val, (int, float)) and record["main_activity"]["kinetics"]["Km"] is None:
-                            record["main_activity"]["kinetics"]["Km"] = km_val
-                            _nu = _norm_unit(km_unit) if _norm_unit and km_unit else km_unit
-                            record["main_activity"]["kinetics"]["Km_unit"] = _nu if _nu else km_unit
-                            record["main_activity"]["kinetics"]["source"] = "text"
-                        if isinstance(vmax_val, (int, float)) and record["main_activity"]["kinetics"]["Vmax"] is None:
-                            record["main_activity"]["kinetics"]["Vmax"] = vmax_val
-                            _nu = _norm_unit(vmax_unit) if _norm_unit and vmax_unit else vmax_unit
-                            record["main_activity"]["kinetics"]["Vmax_unit"] = _nu if _nu else vmax_unit
-                            record["main_activity"]["kinetics"]["source"] = "text"
-                        break
+            method = self._detect_kinetics_method(text)
+            method_pri = self._METHOD_PRIORITY.get(method, 5)
+            matched_vmax = False
 
-            if record["main_activity"]["kinetics"]["Km"] is None:
-                for pat in _KM_PATTERNS:
-                    m = pat.search(norm_text)
-                    if not m:
-                        m = pat.search(text)
-                    if m:
-                        groups = m.groups()
-                        if len(groups) == 3:
-                            if groups[0] in ("mM", "μM", "uM", "M", "mmol", "umol", "nmol"):
-                                value, unit = groups[1], groups[0]
-                                substrate = None
-                            else:
-                                substrate, value, unit = groups
-                        elif len(groups) == 2:
-                            value, unit = groups
-                            substrate = None
+            for pat in _KM_VMAX_JOINT_PATTERNS:
+                m = pat.search(norm_text)
+                if not m:
+                    m = pat.search(text)
+                if m:
+                    km_val = _parse_scientific_notation(m.group(1))
+                    km_unit = m.group(2)
+                    vmax_raw = m.group(3)
+                    vmax_unit = m.group(4)
+                    vmax_val = _parse_scientific_notation(vmax_raw)
+                    if isinstance(km_val, (int, float)):
+                        km_candidates.append((method_pri, km_val, km_unit, "text"))
+                    if isinstance(vmax_val, (int, float)):
+                        vmax_candidates.append((method_pri, vmax_val, vmax_unit, "text"))
+                    break
+
+            for pat in _KM_PATTERNS:
+                m = pat.search(norm_text)
+                if not m:
+                    m = pat.search(text)
+                if m:
+                    groups = m.groups()
+                    if len(groups) == 3:
+                        if groups[0] in ("mM", "μM", "uM", "M", "mmol", "umol", "nmol"):
+                            value, unit = groups[1], groups[0]
                         else:
-                            continue
-                        try:
-                            record["main_activity"]["kinetics"]["Km"] = float(value)
-                            _nu = _norm_unit(unit) if _norm_unit and unit else unit
-                            record["main_activity"]["kinetics"]["Km_unit"] = _nu if _nu else unit
-                            if substrate:
-                                record["main_activity"]["kinetics"]["substrate"] = substrate
-                            record["main_activity"]["kinetics"]["source"] = "text"
-                        except ValueError:
-                            pass
-                        break
+                            value, unit = groups[0], groups[2]
+                    elif len(groups) == 2:
+                        value, unit = groups
+                    else:
+                        continue
+                    try:
+                        km_candidates.append((method_pri, float(value), unit, "text"))
+                    except ValueError:
+                        pass
+                    break
 
-            if record["main_activity"]["kinetics"]["Vmax"] is None:
-                for pat in _VMAX_PATTERNS:
-                    m = pat.search(norm_text)
-                    if not m:
-                        m = pat.search(text)
-                    if m:
-                        groups = m.groups()
-                        if len(groups) == 2:
-                            g0, g1 = groups
-                            _RATE_UNITS = ("M s⁻¹", "M s-1", "M s–1", "M s^-1", "M/s", "mM/s", "μM/s", "M S⁻¹", "M S-1", "mM·s⁻¹", "mM\u00b7s\u207b\u00b9")
-                            g0_is_unit = g0 in _RATE_UNITS or bool(re.match(r'10[−\-–]?\d*\s*M\s*[sS]', g0)) or bool(re.match(r'[mμunp]?M[·\s]*s[⁻\-–]1', g0))
-                            g1_is_unit = g1 in _RATE_UNITS or bool(re.match(r'10[−\-–]?\d*\s*M\s*[sS]', g1)) or bool(re.match(r'[mμunp]?M[·\s]*s[⁻\-–]1', g1))
-                            if g1_is_unit and not g0_is_unit:
-                                value, unit = g0, g1
-                                substrate = None
-                            elif g0_is_unit:
-                                value, unit = g1, g0
-                                substrate = None
-                            else:
-                                substrate, value = g0, g1
-                                unit = None
-                        elif len(groups) == 3:
-                            substrate, value, unit = groups
+            for pat in _VMAX_PATTERNS:
+                m = pat.search(norm_text)
+                if not m:
+                    m = pat.search(text)
+                if m:
+                    groups = m.groups()
+                    if len(groups) == 2:
+                        g0, g1 = groups
+                        _RATE_UNITS = ("M s⁻¹", "M s-1", "M s–1", "M s^-1", "M/s", "mM/s", "μM/s", "M S⁻¹", "M S-1", "mM·s⁻¹", "mM\u00b7s\u207b\u00b9")
+                        g0_is_unit = g0 in _RATE_UNITS or bool(re.match(r'10[−\-–]?\d*\s*M\s*[sS]', g0)) or bool(re.match(r'[mμunp]?M[·\s]*s[⁻\-–]1', g0))
+                        g1_is_unit = g1 in _RATE_UNITS or bool(re.match(r'10[−\-–]?\d*\s*M\s*[sS]', g1)) or bool(re.match(r'[mμunp]?M[·\s]*s[⁻\-–]1', g1))
+                        if g1_is_unit and not g0_is_unit:
+                            value, unit = g0, g1
+                        elif g0_is_unit:
+                            value, unit = g1, g0
                         else:
-                            continue
-                        vmax_val = _parse_scientific_notation(value.strip())
-                        record["main_activity"]["kinetics"]["Vmax"] = vmax_val
-                        if unit:
-                            _nu = _norm_unit(unit) if _norm_unit else unit
-                            record["main_activity"]["kinetics"]["Vmax_unit"] = _nu if _nu else unit
-                        if substrate and not record["main_activity"]["kinetics"]["substrate"]:
-                            record["main_activity"]["kinetics"]["substrate"] = substrate
-                        record["main_activity"]["kinetics"]["source"] = "text"
-                        break
+                            value, unit = g0, None
+                    elif len(groups) == 3:
+                        value, unit = groups[1], groups[2]
+                    else:
+                        continue
+                    vmax_val = _parse_scientific_notation(value.strip())
+                    if isinstance(vmax_val, (int, float)):
+                        vmax_candidates.append((method_pri, vmax_val, unit, "text"))
+                        matched_vmax = True
+                    break
 
-            if record["main_activity"]["kinetics"]["Vmax"] is None:
+            if not matched_vmax:
                 fallback = _extract_vmax_fallback(text)
                 if fallback and isinstance(fallback.get("value"), (int, float)):
-                    record["main_activity"]["kinetics"]["Vmax"] = fallback["value"]
-                    if fallback.get("unit"):
-                        _nu = _norm_unit(fallback["unit"]) if _norm_unit else fallback["unit"]
-                        record["main_activity"]["kinetics"]["Vmax_unit"] = _nu if _nu else fallback["unit"]
-                    record["main_activity"]["kinetics"]["source"] = fallback.get("source", "text_ocr_fallback")
-                    logger.info(f"[SMN] Vmax OCR fallback: {fallback['value']} {fallback.get('unit', '')}")
+                    vmax_candidates.append((method_pri, fallback["value"], fallback.get("unit"), fallback.get("source", "text_ocr_fallback")))
+
+        kin = record["main_activity"]["kinetics"]
+        if km_candidates:
+            km_candidates.sort(key=lambda c: c[0])
+            best = km_candidates[0]
+            if kin.get("Km") is None or best[0] < 5:
+                kin["Km"] = best[1]
+                _nu = _norm_unit(best[2]) if _norm_unit and best[2] else best[2]
+                kin["Km_unit"] = _nu if _nu else best[2]
+                kin["source"] = best[3]
+                if len(km_candidates) > 1:
+                    logger.info(f"[SMN] Km multi-method: picked {best[1]} {best[2]} (method={best[0]}) from {len(km_candidates)} candidates")
+
+        if vmax_candidates:
+            vmax_candidates.sort(key=lambda c: (c[0], 0 if c[3] == "text" else 1))
+            best = vmax_candidates[0]
+            if kin.get("Vmax") is None or best[0] < 5 or (best[0] == 5 and best[3] == "text" and kin.get("source", "").endswith("fallback")):
+                kin["Vmax"] = best[1]
+                _nu = _norm_unit(best[2]) if _norm_unit and best[2] else best[2]
+                kin["Vmax_unit"] = _nu if _nu else best[2]
+                kin["source"] = best[3]
+                if len(vmax_candidates) > 1:
+                    logger.info(f"[SMN] Vmax multi-method: picked {best[1]} {best[2]} (method={best[0]}) from {len(vmax_candidates)} candidates")
 
     def _extract_kinetics_from_flattened_table(self, record: Dict[str, Any],
                                                 kinetics_texts: List[str],
@@ -2976,8 +3001,18 @@ class RuleExtractor:
                 for pat in _CRYSTAL_STRUCTURE_PATTERNS:
                     m = pat.search(text)
                     if m:
-                        if m.lastindex and m.group(1):
-                            sel["crystal_structure"] = m.group(1).lower()
+                        groups = m.groups()
+                        all_digits = [g for g in groups if g and re.match(r'^\d{3}$', g)]
+                        if all_digits:
+                            sel["crystal_structure"] = ", ".join(f"({p})" for p in all_digits)
+                        elif m.lastindex and m.group(1):
+                            raw = m.group(1).strip()
+                            if re.match(r'^[\d\s,]+$', raw):
+                                planes = re.findall(r'\d{3}', raw)
+                                if planes:
+                                    sel["crystal_structure"] = ", ".join(f"({p})" for p in planes)
+                            else:
+                                sel["crystal_structure"] = raw.lower()
                         else:
                             match_text = m.group(0).lower()
                             for struct_name in ("spinel", "perovskite", "fluorite", "cubic",
@@ -2987,6 +3022,10 @@ class RuleExtractor:
                                 if struct_name in match_text:
                                     sel["crystal_structure"] = struct_name
                                     break
+                            if sel.get("crystal_structure") is None:
+                                planes = re.findall(r'\((\d{3})\)', m.group(0))
+                                if planes:
+                                    sel["crystal_structure"] = ", ".join(f"({p})" for p in planes)
                         break
                 if sel.get("crystal_structure"):
                     break
@@ -3051,14 +3090,21 @@ class RuleExtractor:
             return
         if sel.get("morphology"):
             return
-        found_terms = []
+        selected_name = (sel.get("name") or "").lower()
+        term_scores = {}
         for text in char_texts:
             tl = text.lower()
+            has_name = selected_name and selected_name in tl
+            is_caption = "figure" in tl or "fig." in tl or "tem " in tl or "sem " in tl or "hrtem" in tl or "afm" in tl
+            weight = 3 if (has_name and is_caption) else (2 if has_name else (2 if is_caption else 1))
             for term in self._MORPHOLOGY_TERMS:
-                if term in tl and term not in found_terms:
-                    found_terms.append(term)
-        if found_terms:
-            sel["morphology"] = ", ".join(found_terms[:3])
+                if term in tl:
+                    term_scores[term] = term_scores.get(term, 0) + weight
+        if term_scores:
+            sorted_terms = sorted(term_scores.items(), key=lambda x: -x[1])
+            top_score = sorted_terms[0][1]
+            selected = [t for t, s in sorted_terms if s >= top_score * 0.5][:3]
+            sel["morphology"] = ", ".join(selected)
 
     def _fulltext_fallback_extract(self, record, doc, selected_name):
         all_text = "\n".join(doc.chunks) if doc.chunks else ""
@@ -3124,21 +3170,39 @@ class RuleExtractor:
                     break
 
         if sel.get("morphology") is None:
-            found_terms = []
+            term_scores = {}
             tl = all_text.lower()
-            for term in self._MORPHOLOGY_TERMS:
-                if term in tl and term not in found_terms:
-                    found_terms.append(term)
-            if found_terms:
-                sel["morphology"] = ", ".join(found_terms[:3])
+            for chunk in (doc.chunks or []):
+                cl = chunk.lower()
+                has_name = selected_name and selected_name.lower() in cl
+                is_caption = "figure" in cl or "fig." in cl or "tem " in cl or "sem " in cl or "hrtem" in cl
+                weight = 3 if (has_name and is_caption) else (2 if has_name else (2 if is_caption else 1))
+                for term in self._MORPHOLOGY_TERMS:
+                    if term in cl:
+                        term_scores[term] = term_scores.get(term, 0) + weight
+            if term_scores:
+                sorted_terms = sorted(term_scores.items(), key=lambda x: -x[1])
+                top_score = sorted_terms[0][1]
+                selected = [t for t, s in sorted_terms if s >= top_score * 0.5][:3]
+                sel["morphology"] = ", ".join(selected)
                 logger.info(f"[SMN] Fulltext fallback: morphology={sel['morphology']}")
 
         if sel.get("crystal_structure") is None:
             for pat in _CRYSTAL_STRUCTURE_PATTERNS:
                 m = pat.search(all_text)
                 if m:
-                    if m.lastindex and m.group(1):
-                        sel["crystal_structure"] = m.group(1).lower()
+                    groups = m.groups()
+                    all_digits = [g for g in groups if g and re.match(r'^\d{3}$', g)]
+                    if all_digits:
+                        sel["crystal_structure"] = ", ".join(f"({p})" for p in all_digits)
+                    elif m.lastindex and m.group(1):
+                        raw = m.group(1).strip()
+                        if re.match(r'^[\d\s,]+$', raw):
+                            planes = re.findall(r'\d{3}', raw)
+                            if planes:
+                                sel["crystal_structure"] = ", ".join(f"({p})" for p in planes)
+                        else:
+                            sel["crystal_structure"] = raw.lower()
                     else:
                         match_text = m.group(0).lower()
                         for struct_name in ("spinel", "perovskite", "fluorite", "cubic",
@@ -3148,6 +3212,10 @@ class RuleExtractor:
                             if struct_name in match_text:
                                 sel["crystal_structure"] = struct_name
                                 break
+                        if sel.get("crystal_structure") is None:
+                            planes = re.findall(r'\((\d{3})\)', m.group(0))
+                            if planes:
+                                sel["crystal_structure"] = ", ".join(f"({p})" for p in planes)
                     logger.info(f"[SMN] Fulltext fallback: crystal_structure={sel.get('crystal_structure')}")
                     break
 
