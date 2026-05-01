@@ -28,14 +28,38 @@ def find_mid_tasks(directory: Path) -> List[Path]:
 
 
 def preprocess_pdf(pdf_path: Path, output_dir: Path, extraction_mode: str) -> Optional[Path]:
+    json_path = output_dir / f"{pdf_path.stem}.json"
+    images_root = output_dir / f"{pdf_path.stem}_images"
+
+    if not json_path.exists():
+        logger.info(f"PDF 尚未解析，正在解析: {pdf_path.name}")
+        try:
+            from opendataloader_pdf import convert
+            result = convert(str(pdf_path), output_dir=str(output_dir))
+            if isinstance(result, dict) and result.get("json_path"):
+                json_path = Path(result["json_path"])
+            elif isinstance(result, str) and Path(result).exists():
+                json_path = Path(result)
+            else:
+                candidate = output_dir / f"{pdf_path.stem}.json"
+                if candidate.exists():
+                    json_path = candidate
+                else:
+                    logger.error(f"PDF 解析未生成 JSON: {pdf_path.name}")
+                    return None
+            logger.info(f"PDF 解析完成: {json_path.name}")
+        except ImportError:
+            logger.error("opendataloader_pdf 不可用，无法解析 PDF")
+            return None
+        except Exception as e:
+            logger.error(f"PDF 解析异常: {e}")
+            return None
+
     try:
         from nanozyme_preprocessor_midjson import NanozymePreprocessor
     except ImportError:
         logger.error("NanozymePreprocessor 不可用，无法预处理 PDF")
         return None
-
-    json_path = output_dir / f"{pdf_path.stem}.json"
-    images_root = output_dir / f"{pdf_path.stem}_images"
 
     pre = NanozymePreprocessor(
         json_path=str(json_path),

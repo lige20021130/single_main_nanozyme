@@ -11,6 +11,7 @@ from single_main_nanozyme_extractor import (
     _PH_PATTERNS, _TEMPERATURE_PATTERNS,
     _ENZYME_TYPE_PATTERNS, _SUBSTRATE_KEYWORDS,
     _normalize_ocr_scientific, _parse_scientific_notation, _extract_vmax_fallback,
+    _RATE_UNITS,
 )
 
 logger = logging.getLogger(__name__)
@@ -107,7 +108,6 @@ class KineticsAgent:
                     groups = m.groups()
                     if len(groups) == 2:
                         g0, g1 = groups
-                        _RATE_UNITS = ("M s⁻¹", "M s-1", "M s–1", "M s^-1", "M/s", "mM/s", "μM/s", "M S⁻¹", "M S-1", "mM·s⁻¹", "mM\u00b7s\u207b\u00b9")
                         g0_is_unit = g0 in _RATE_UNITS or bool(re.match(r'10[−\-–]?\d*\s*M\s*[sS]', g0)) or bool(re.match(r'[mμunp]?M[·\s]*s[⁻\-–]1', g0))
                         g1_is_unit = g1 in _RATE_UNITS or bool(re.match(r'10[−\-–]?\d*\s*M\s*[sS]', g1)) or bool(re.match(r'[mμunp]?M[·\s]*s[⁻\-–]1', g1))
                         if g1_is_unit and not g0_is_unit:
@@ -230,7 +230,6 @@ class KineticsAgent:
                         vmax_parsed = _parse_scientific_notation(raw_vmax)
                         if isinstance(vmax_parsed, (int, float)):
                             record["main_activity"]["kinetics"]["Vmax"] = vmax_parsed
-                            print(f'[TRACE] Vmax set to {vmax_parsed} at line 223 (flattened table)')
                             nu = _norm_unit(vmax_unit_raw)
                             record["main_activity"]["kinetics"]["Vmax_unit"] = nu if nu else vmax_unit_raw
                             record["main_activity"]["kinetics"]["source"] = "text"
@@ -484,14 +483,36 @@ class MorphologyAgent:
                 for pat in _CRYSTAL_STRUCTURE_PATTERNS:
                     m = pat.search(text)
                     if m:
-                        if m.lastindex and m.group(1):
-                            sel["crystal_structure"] = m.group(1).lower()
+                        groups = m.groups()
+                        all_digits = [g for g in groups if g and re.match(r'^\d{3}$', g)]
+                        if all_digits:
+                            sel["crystal_structure"] = ", ".join(f"({p})" for p in all_digits)
+                        elif m.lastindex and m.group(1):
+                            raw = m.group(1).strip()
+                            if re.match(r'^[\d\s,.\u00c5]+$', raw):
+                                continue
+                            elif re.match(r'^[\d\s,]+$', raw):
+                                planes = re.findall(r'\d{3}', raw)
+                                if planes:
+                                    sel["crystal_structure"] = ", ".join(f"({p})" for p in planes)
+                            else:
+                                sel["crystal_structure"] = raw.lower()
                         else:
                             match_text = m.group(0).lower()
-                            for struct_name in ("spinel", "perovskite", "fluorite", "cubic", "tetragonal", "hexagonal", "orthorhombic", "monoclinic", "amorphous", "crystalline", "anatase", "rutile", "brookite"):
+                            for struct_name in ("spinel", "perovskite", "fluorite", "cubic",
+                                               "tetragonal", "hexagonal", "orthorhombic",
+                                               "monoclinic", "amorphous", "crystalline",
+                                               "anatase", "rutile", "brookite",
+                                               "rock salt", "zinc blende", "wurtzite",
+                                               "graphitic", "face-centered cubic",
+                                               "body-centered cubic"):
                                 if struct_name in match_text:
                                     sel["crystal_structure"] = struct_name
                                     break
+                            if sel.get("crystal_structure") is None:
+                                planes = re.findall(r'\((\d{3})\)', m.group(0))
+                                if planes:
+                                    sel["crystal_structure"] = ", ".join(f"({p})" for p in planes)
                         break
                 if sel.get("crystal_structure"):
                     break
@@ -1038,17 +1059,36 @@ class RuleExtractorAdapter:
             for pat in _CRYSTAL_STRUCTURE_PATTERNS:
                 m = pat.search(all_text)
                 if m:
-                    if m.lastindex and m.group(1):
-                        sel["crystal_structure"] = m.group(1).lower()
+                    groups = m.groups()
+                    all_digits = [g for g in groups if g and re.match(r'^\d{3}$', g)]
+                    if all_digits:
+                        sel["crystal_structure"] = ", ".join(f"({p})" for p in all_digits)
+                    elif m.lastindex and m.group(1):
+                        raw = m.group(1).strip()
+                        if re.match(r'^[\d\s,.\u00c5]+$', raw):
+                            pass
+                        elif re.match(r'^[\d\s,]+$', raw):
+                            planes = re.findall(r'\d{3}', raw)
+                            if planes:
+                                sel["crystal_structure"] = ", ".join(f"({p})" for p in planes)
+                        else:
+                            sel["crystal_structure"] = raw.lower()
                     else:
                         match_text = m.group(0).lower()
                         for struct_name in ("spinel", "perovskite", "fluorite", "cubic",
                                            "tetragonal", "hexagonal", "orthorhombic",
                                            "monoclinic", "amorphous", "crystalline",
-                                           "anatase", "rutile", "brookite"):
+                                           "anatase", "rutile", "brookite",
+                                           "rock salt", "zinc blende", "wurtzite",
+                                           "graphitic", "face-centered cubic",
+                                           "body-centered cubic"):
                             if struct_name in match_text:
                                 sel["crystal_structure"] = struct_name
                                 break
+                        if sel.get("crystal_structure") is None:
+                            planes = re.findall(r'\((\d{3})\)', m.group(0))
+                            if planes:
+                                sel["crystal_structure"] = ", ".join(f"({p})" for p in planes)
                     logger.info(f"[SMN] Fulltext fallback: crystal_structure={sel.get('crystal_structure')}")
                     break
 

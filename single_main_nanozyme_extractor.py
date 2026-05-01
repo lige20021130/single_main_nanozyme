@@ -463,26 +463,40 @@ _VMAX_RATE_UNIT_RE = re.compile(
     re.I
 )
 
+_RATE_UNITS = frozenset({
+    "M s⁻¹", "M s-1", "M s–1", "M s^-1", "M/s", "mM/s", "μM/s", "nM/s",
+    "M S⁻¹", "M S-1", "mM·s⁻¹", "mM\u00b7s\u207b\u00b9",
+    "M·s⁻¹", "μM·s⁻¹", "nM·s⁻¹", "M\u00b7s\u207b\u00b9",
+    "M s⁻¹", "mM s⁻¹", "μM s⁻¹", "nM s⁻¹",
+})
+
+
+_SUPERSCRIPT_TO_ASCII = str.maketrans('⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾', '0123456789+-=()')
+
 
 def _extract_vmax_fallback(text: str) -> Optional[Dict[str, Any]]:
     if not text:
         return None
     norm = _normalize_ocr_scientific(text)
+    norm = norm.translate(_SUPERSCRIPT_TO_ASCII)
     for pat in _VMAX_OCR_PATTERNS:
         m = pat.search(norm)
         if m:
             groups = m.groups()
+            full_match = m.group(0)
+            match_has_minus = bool(re.search(r'10[\s]*[\-\u207b\u2212\u2013]', full_match))
             if len(groups) == 2:
                 base_str, exp_str = groups
                 try:
                     base = float(base_str)
-                    exp_val = _parse_scientific_notation(exp_str)
-                    if isinstance(exp_val, (int, float)):
-                        vmax_val = base * (10 ** -exp_val) if exp_val > 0 else base * (10 ** exp_val)
-                    else:
-                        exp_clean = re.sub(r'[^\d\-]', '', exp_str)
-                        exp_int = int(exp_clean) if exp_clean else 0
+                    exp_clean = re.sub(r'[^\d\-\u207b\u2212\u2013]', '', exp_str)
+                    has_minus = match_has_minus or any(c in exp_clean for c in ('-', '\u207b', '\u2212', '\u2013', '⁻'))
+                    exp_digits = re.sub(r'[^\d]', '', exp_clean)
+                    exp_int = int(exp_digits) if exp_digits else 0
+                    if has_minus:
                         vmax_val = base * (10 ** -exp_int)
+                    else:
+                        vmax_val = base * (10 ** exp_int)
                     unit_m = _VMAX_RATE_UNIT_RE.search(norm[m.end():m.end() + 30])
                     unit = unit_m.group(0).strip() if unit_m else None
                     return {"value": vmax_val, "unit": unit, "source": "text_ocr_fallback"}
@@ -492,9 +506,14 @@ def _extract_vmax_fallback(text: str) -> Optional[Dict[str, Any]]:
                 base_str, exp_str, unit = groups
                 try:
                     base = float(base_str)
-                    exp_clean = re.sub(r'[^\d\-]', '', exp_str)
-                    exp_int = int(exp_clean) if exp_clean else 0
-                    vmax_val = base * (10 ** -exp_int)
+                    exp_clean = re.sub(r'[^\d\-\u207b\u2212\u2013]', '', exp_str)
+                    has_minus = match_has_minus or any(c in exp_clean for c in ('-', '\u207b', '\u2212', '\u2013', '⁻'))
+                    exp_digits = re.sub(r'[^\d]', '', exp_clean)
+                    exp_int = int(exp_digits) if exp_digits else 0
+                    if has_minus:
+                        vmax_val = base * (10 ** -exp_int)
+                    else:
+                        vmax_val = base * (10 ** exp_int)
                     return {"value": vmax_val, "unit": unit, "source": "text_ocr_fallback"}
                 except (ValueError, TypeError):
                     continue
@@ -589,7 +608,10 @@ _BUCKET_KEYWORDS = {
         r"pH\s+range|pH\s+stability|thermal\s+stability)", re.I),
     "kinetics": re.compile(
         r"(?:Km|K\s*m|Vmax|V\s*m|Michaelis|Lineweaver|"
-        r"mM|M\s*s[−\-]1|×10|kinetic|kcat|specificity\s+constant)", re.I),
+        r"mM|M\s*s[−\-–]1|Ms[⁻\-–]1|M[·\s]s[⁻\-–]1|M/?s|"
+        r"[mμunp]?M/?s[⁻\-–]?1|[mμunp]?M[·\s]s[⁻\-–]¹|"
+        r"×10|kinetic|kcat|specificity\s+constant|"
+        r"steady\s+state|catalytic\s+efficiency)", re.I),
     "application": re.compile(
         r"(?:detection|sensing|sensor|LOD|linear\s+range|recovery|"
         r"sample|serum|water|food|limit\s+of\s+detection|calibrat|"
@@ -2118,7 +2140,6 @@ class TableProcessor:
                                    "substrate": groups[0], "source": "table"})
                 elif len(groups) == 2:
                     g0, g1 = groups
-                    _RATE_UNITS = ("M s⁻¹", "M s-1", "M s–1", "M s^-1", "M/s", "mM/s", "μM/s", "M S⁻¹", "M S-1", "mM·s⁻¹", "mM\u00b7s\u207b\u00b9")
                     g0_is_unit = g0 in _RATE_UNITS or bool(re.match(r'10[−\-–]?\d*\s*M\s*[sS]', g0)) or bool(re.match(r'[mμunp]?M[·\s]*s[⁻\-–]1', g0))
                     g1_is_unit = g1 in _RATE_UNITS or bool(re.match(r'10[−\-–]?\d*\s*M\s*[sS]', g1)) or bool(re.match(r'[mμunp]?M[·\s]*s[⁻\-–]1', g1))
                     if g1_is_unit and not g0_is_unit:
@@ -2321,7 +2342,6 @@ class RuleExtractor:
                     groups = m.groups()
                     if len(groups) == 2:
                         g0, g1 = groups
-                        _RATE_UNITS = ("M s⁻¹", "M s-1", "M s–1", "M s^-1", "M/s", "mM/s", "μM/s", "M S⁻¹", "M S-1", "mM·s⁻¹", "mM\u00b7s\u207b\u00b9")
                         g0_is_unit = g0 in _RATE_UNITS or bool(re.match(r'10[−\-–]?\d*\s*M\s*[sS]', g0)) or bool(re.match(r'[mμunp]?M[·\s]*s[⁻\-–]1', g0))
                         g1_is_unit = g1 in _RATE_UNITS or bool(re.match(r'10[−\-–]?\d*\s*M\s*[sS]', g1)) or bool(re.match(r'[mμunp]?M[·\s]*s[⁻\-–]1', g1))
                         if g1_is_unit and not g0_is_unit:
@@ -3007,7 +3027,9 @@ class RuleExtractor:
                             sel["crystal_structure"] = ", ".join(f"({p})" for p in all_digits)
                         elif m.lastindex and m.group(1):
                             raw = m.group(1).strip()
-                            if re.match(r'^[\d\s,]+$', raw):
+                            if re.match(r'^[\d\s,.\u00c5]+$', raw):
+                                continue
+                            elif re.match(r'^[\d\s,]+$', raw):
                                 planes = re.findall(r'\d{3}', raw)
                                 if planes:
                                     sel["crystal_structure"] = ", ".join(f"({p})" for p in planes)
@@ -3018,7 +3040,10 @@ class RuleExtractor:
                             for struct_name in ("spinel", "perovskite", "fluorite", "cubic",
                                                "tetragonal", "hexagonal", "orthorhombic",
                                                "monoclinic", "amorphous", "crystalline",
-                                               "anatase", "rutile", "brookite"):
+                                               "anatase", "rutile", "brookite",
+                                               "rock salt", "zinc blende", "wurtzite",
+                                               "graphitic", "face-centered cubic",
+                                               "body-centered cubic"):
                                 if struct_name in match_text:
                                     sel["crystal_structure"] = struct_name
                                     break
