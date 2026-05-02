@@ -258,21 +258,29 @@ _SECTION_SCORE_MAP = {
 _GENERIC_PENALTY = -20
 
 _ENZYME_TYPE_PATTERNS = [
+    (re.compile(r'\bglutathione\s+peroxidase[-\s]?like\b', re.I), "glutathione-peroxidase-like"),
+    (re.compile(r'\bglutathione\s+oxidase[-\s]?like\b', re.I), "glutathione-oxidase-like"),
+    (re.compile(r'\bglucose\s+oxidase[-\s]?like\b', re.I), "glucose-oxidase-like"),
+    (re.compile(r'\bNADH\s+oxidase[-\s]?like\b', re.I), "NADH-oxidase-like"),
+    (re.compile(r'\bsuperoxide\s+dismutase[-\s]?like\b', re.I), "superoxide-dismutase-like"),
     (re.compile(r'\bperoxidase[-\s]?like\b', re.I), "peroxidase-like"),
     (re.compile(r'\bPOD[-\s]?like\b', re.I), "peroxidase-like"),
     (re.compile(r'\boxidase[-\s]?like\b', re.I), "oxidase-like"),
     (re.compile(r'\bOXD[-\s]?like\b', re.I), "oxidase-like"),
     (re.compile(r'\bcatalase[-\s]?like\b', re.I), "catalase-like"),
     (re.compile(r'\bCAT[-\s]?like\b', re.I), "catalase-like"),
-    (re.compile(r'\bsuperoxide\s+dismutase[-\s]?like\b', re.I), "superoxide-dismutase-like"),
     (re.compile(r'\bSOD[-\s]?like\b', re.I), "superoxide-dismutase-like"),
-    (re.compile(r'\bglutathione\s+peroxidase[-\s]?like\b', re.I), "glutathione-peroxidase-like"),
     (re.compile(r'\bGPx[-\s]?like\b', re.I), "glutathione-peroxidase-like"),
-    (re.compile(r'\besterase[-\s]?like\b', re.I), "esterase-like"),
-    (re.compile(r'\bcascade\s+enzym\w+\s+activ', re.I), "cascade-enzymatic"),
-    (re.compile(r'\bglutathione\s+oxidase[-\s]?like\b', re.I), "glutathione-oxidase-like"),
     (re.compile(r'\bGOx[-\s]?like\b', re.I), "glucose-oxidase-like"),
-    (re.compile(r'\bglucose\s+oxidase[-\s]?like\b', re.I), "glucose-oxidase-like"),
+    (re.compile(r'\besterase[-\s]?like\b', re.I), "esterase-like"),
+    (re.compile(r'\bphosphatase[-\s]?like\b', re.I), "phosphatase-like"),
+    (re.compile(r'\bALP[-\s]?like\b', re.I), "phosphatase-like"),
+    (re.compile(r'\bnitroreductase[-\s]?like\b', re.I), "nitroreductase-like"),
+    (re.compile(r'\bNTR[-\s]?like\b', re.I), "nitroreductase-like"),
+    (re.compile(r'\bhydrolase[-\s]?like\b', re.I), "hydrolase-like"),
+    (re.compile(r'\blaccase[-\s]?like\b', re.I), "laccase-like"),
+    (re.compile(r'\bhaloperoxidase[-\s]?like\b', re.I), "haloperoxidase-like"),
+    (re.compile(r'\bcascade\s+enzym\w+\s+activ', re.I), "cascade-enzymatic"),
 ]
 
 _SUBSTRATE_KEYWORDS = {
@@ -281,19 +289,23 @@ _SUBSTRATE_KEYWORDS = {
 }
 
 _KM_PATTERNS = [
-    re.compile(r'\bKm\s*[\(（]\s*(\w[\w\d\-]*)\s*[\)）]\s*(?:was|=|:|≈|~)\s*([\d.]+)\s*(?:±\s*[\d.]+\s*)?(mM|μM|uM|M|mmol|umol|nmol)', re.I),
-    re.compile(r'\bKm\s+for\s+(\w[\w\d\-]*)\s+(?:\w+\s+){0,2}(?:was|=|:|≈|~)\s*([\d.]+)\s*(?:±\s*[\d.]+\s*)?(mM|μM|uM|M|mmol|umol|nmol)', re.I),
-    re.compile(r'\bapparent\s+Km\s+(?:\w+\s+){0,2}(?:was|=|:|≈|~)\s*([\d.]+)\s*(?:±\s*[\d.]+\s*)?(mM|μM|uM|M|mmol|umol|nmol)', re.I),
-    re.compile(r'\bKm\s+value\s+(?:toward|for|of)\s+(\w[\w\d\-]*)\s+.*?(?:was|is|=|:|≈|~|calculated\s+to\s+be)\s*([\d.]+)\s*(?:±\s*[\d.]+\s*)?(mM|μM|uM|M|mmol|umol|nmol)', re.I),
-    re.compile(r'\bKm\s*[\(（]\s*(mM|μM|uM|M|mmol|umol|nmol)\s*[\)）]\s+([\d.]+)', re.I),
-    re.compile(r'\bKm\s*(?:was|is|=|:|≈|~)\s*([\d.]+)\s*(?:±\s*[\d.]+\s*)?(mM|μM|uM|M|mmol|umol|nmol)', re.I),
-    re.compile(r'\bKm\s+of\s+(\w[\w\d\-]*)\s+(?:was|is|=|:|≈|~)\s*([\d.]+)\s*(?:±\s*[\d.]+\s*)?(mM|μM|uM|M|mmol|umol|nmol)', re.I),
+    re.compile(r'\bKm\s*[\(（]\s*(\w[\w\d\-]*)\s*[\)）]\s*(?:was|=|:|≈|~)\s*([\d.]+)\s*(?:±\s*[\d.]+\s*)?(mM|μM|uM|M|mmol|umol|nmol|mmol/L|umol/L|nmol/L)', re.I),
+    re.compile(r'\bKm\s+for\s+(\w[\w\d\-]*)\s+(?:\w+\s+){0,2}(?:was|=|:|≈|~)\s*([\d.]+)\s*(?:±\s*[\d.]+\s*)?(mM|μM|uM|M|mmol|umol|nmol|mmol/L|umol/L|nmol/L)', re.I),
+    re.compile(r'\bapparent\s+Km\s+(?:\w+\s+){0,2}(?:was|=|:|≈|~)\s*([\d.]+)\s*(?:±\s*[\d.]+\s*)?(mM|μM|uM|M|mmol|umol|nmol|mmol/L|umol/L|nmol/L)', re.I),
+    re.compile(r'\bKm\s+value\s+(?:toward|for|of)\s+(\w[\w\d\-]*)\s+.*?(?:was|is|=|:|≈|~|calculated\s+to\s+be)\s*([\d.]+)\s*(?:±\s*[\d.]+\s*)?(mM|μM|uM|M|mmol|umol|nmol|mmol/L|umol/L|nmol/L)', re.I),
+    re.compile(r'\bKm\s*[\(（]\s*(mM|μM|uM|M|mmol|umol|nmol|mmol/L|umol/L|nmol/L)\s*[\)）]\s+([\d.]+)', re.I),
+    re.compile(r'\bKm\s*(?:was|is|=|:|≈|~|determined\s+to\s+be|found\s+to\s+be)\s*([\d.]+)\s*(?:±\s*[\d.]+\s*)?(mM|μM|uM|M|mmol|umol|nmol|mmol/L|umol/L|nmol/L)', re.I),
+    re.compile(r'\bKm\s+value\s+(?:was|is|=|:|≈|~)\s*([\d.]+)\s*(?:±\s*[\d.]+\s*)?(mM|μM|uM|M|mmol|umol|nmol|mmol/L|umol/L|nmol/L)', re.I),
+    re.compile(r'\bKm\s+of\s+(\w[\w\d\-]*)\s+(?:was|is|=|:|≈|~)\s*([\d.]+)\s*(?:±\s*[\d.]+\s*)?(mM|μM|uM|M|mmol|umol|nmol|mmol/L|umol/L|nmol/L)', re.I),
+    re.compile(r'\bKm\s+of\s+([\d.]+)\s*(mM|μM|uM|M|mmol|umol|nmol|mmol/L|umol/L|nmol/L)', re.I),
     re.compile(r'\bKm\s*[\(（]\s*(\w[\w\d\-]*)\s*[\)）]\s*=\s*([\d.]+)\s*[×x]\s*10[\^⁻\-–]?\s*[-]?(\d+)\s*(mM|μM|uM|M)', re.I),
-    re.compile(r'\bMichaelis\s+constant\s*(?:for\s+)?(\w[\w\d\-]*)?\s*(?:was|=|:|≈|~)\s*([\d.]+)\s*(mM|μM|uM|M)', re.I),
+    re.compile(r'\bKm\s*=\s*([\d.]+)\s*[×x]\s*10[\^⁻\-–]?\s*[-]?(\d+)\s*(mM|μM|uM|M)', re.I),
+    re.compile(r'\bKm\s*=\s*([\d.]+[eE][\-−]?\d+)\s*(mM|μM|uM|M)', re.I),
+    re.compile(r'\bMichaelis\s+constant\s*(?:for\s+)?(\w[\w\d\-]*)?\s*(?:was|=|:|≈|~)\s*([\d.]+)\s*(mM|μM|uM|M|mmol/L)', re.I),
     re.compile(r'\bMichaelis[\s-]*Menten\s+constant\s*\)?\s*[^.]{0,60}?(?:was\s+)?(?:calculated\s+to\s+be|found\s+to\s+be)\s*([\d.]+)\s*(?:±\s*[\d.]+\s*|\s+[\d.]+\s+)?(mM|μM|uM|M)', re.I),
-    re.compile(r'\bKm\s*\)?\s*[^.]{0,60}?(?:was\s+)?(?:calculated\s+to\s+be|found\s+to\s+be)\s*([\d.]+)\s*(?:±\s*[\d.]+\s*|\s+[\d.]+\s+)?(mM|μM|uM|M)', re.I),
+    re.compile(r'\bKm\s*\)?\s*[^.]{0,60}?(?:was\s+)?(?:calculated\s+to\s+be|found\s+to\s+be|determined\s+to\s+be)\s*([\d.]+)\s*(?:±\s*[\d.]+\s*|\s+[\d.]+\s+)?(mM|μM|uM|M|mmol/L)', re.I),
     re.compile(r'\bKm\s+(?:values?\s+)?(?:to|toward|for)\s+(\S+)\s+(?:and|&)\s+\S+\s+(?:are|were|is|was)\s*([\d.]+)\s+(?:and|&)\s*[\d.]+\s*(mM|μM|uM|M)', re.I),
-    re.compile(r'\bKm\s+(?:was|is|were|are)\s*(?:calculated\s+(?:to\s+be|as)\s+)?(?:approximately\s+)?([\d.]+)\s*(?:±\s*[\d.]+\s*)?(mM|μM|uM|M)', re.I),
+    re.compile(r'\bKm\s+(?:was|is|were|are)\s*(?:calculated\s+(?:to\s+be|as)\s+)?(?:approximately\s+)?([\d.]+)\s*(?:±\s*[\d.]+\s*)?(mM|μM|uM|M|mmol/L)', re.I),
     re.compile(r'\bKm\b[^.]{0,40}?\(([\d.]+)\s*(mM|μM|uM|M)\)', re.I),
     re.compile(r'\bKm\s*(?:of|for)\s+\S+\s+(?:toward|to)\s+\w[\w\d\-]*\s+(?:was|is|=|:)\s*([\d.]+)\s*(mM|μM|uM|M)', re.I),
     re.compile(r'\bKm\s+values?\s+(?:of|for)\s+\S+\s+(?:for\s+)?(?:and|&)?\s*\S*\s+(?:are|were|is|was)\s*([\d.]+)\s*(?:and|&|,)\s*[\d.]+\s*(mM|μM|uM|M)', re.I),
@@ -302,6 +314,7 @@ _KM_PATTERNS = [
     re.compile(r'\bKm\b[^.]{0,30}?\bare\s*([\d.]+)\s*(?:and|&)\s*[\d.]+\s*(mM|μM|uM|M)', re.I),
     re.compile(r'\bKm\s+values?\s+of\s+[^.]{0,80}?\b(?:are|were|is|was)\s+([\d.]+)\s*(?:and|&|,)\s*[\d.]+\s*(mM|μM|uM|M)', re.I),
     re.compile(r'\bKm\s+values?\s+of\s+\S+\s+(?:and|&)\s+\S+\s+(?:are|were)\s+([\d.]+)\s+(?:and|&|,)\s*[\d.]+\s*(mM|μM|uM|M)', re.I),
+    re.compile(r'\bKm\s+(?:toward|to)\s+(\w[\w\d\-]*)\s+(?:was|is|=|:|≈|~)\s*([\d.]+)\s*(?:±\s*[\d.]+\s*)?(mM|μM|uM|M)', re.I),
 ]
 
 _KM_VMAX_JOINT_PATTERNS = [
@@ -319,19 +332,19 @@ _KM_VMAX_JOINT_PATTERNS = [
 ]
 
 _KCAT_PATTERNS = [
-    re.compile(r'\bkcat\s*[\(（]\s*(\w[\w\d\-]*)\s*[\)）]\s*(?:was|=|:|≈|~)\s*([\d.]+(?:\s*[×x\u00d7]\s*10(?:\u207b|\u2212|\u2013|-)?\s*[-]?\d+)?)\s*(s(?:\u207b|\u2212|\u2013|-)?1|s-1|min(?:\u207b|\u2212|\u2013|-)?1|min-1)', re.I),
-    re.compile(r'\bkcat(?!\s*/\s*Km)\s+(?:for\s+)?(\w[\w\d\-]*)?\s*(?:was|=|:|≈|~)\s*([\d.]+(?:\s*[×x\u00d7]\s*10(?:\u207b|\u2212|\u2013|-)?\s*[-]?\d+)?)\s*(s(?:\u207b|\u2212|\u2013|-)?1|s-1|min(?:\u207b|\u2212|\u2013|-)?1|min-1)', re.I),
-    re.compile(r'\bkcat(?!\s*/\s*Km)\s*(?:was|=|:|≈|~)\s*([\d.]+(?:\s*[×x\u00d7]\s*10(?:\u207b|\u2212|\u2013|-)?\s*[-]?\d+)?)\s*(s(?:\u207b|\u2212|\u2013|-)?1|s-1|min(?:\u207b|\u2212|\u2013|-)?1|min-1)', re.I),
-    re.compile(r'\bturnover\s+(?:number|frequency)\s*(?:was|=|:|≈|~)\s*([\d.]+(?:\s*[×x\u00d7]\s*10(?:\u207b|\u2212|\u2013|-)?\s*[-]?\d+)?)\s*(s(?:\u207b|\u2212|\u2013|-)?1|s-1|min(?:\u207b|\u2212|\u2013|-)?1|min-1)', re.I),
-    re.compile(r'\bkcat(?!\s*/\s*Km)\s*(?:was|=|:|≈|~|\u2248)\s*([\d.]+)\s*[eE]\s*([\-−\u2212]?\d+)\s*(s(?:\u207b|\u2212|\u2013|-)?1|s-1|min(?:\u207b|\u2212|\u2013|-)?1|min-1)', re.I),
-    re.compile(r'\bkcat(?!\s*/\s*Km)\b[^.=]{0,20}?(?:was|=|:|≈|~|\u2248)\s*([\d.]+)\s*[×x\u00d7]?\s*10(?:\u207b|\u2212|\u2013|-)\s*(\d+)\s*(s(?:\u207b|\u2212|\u2013|-)?1|s-1|min(?:\u207b|\u2212|\u2013|-)?1|min-1)', re.I),
-    re.compile(r'\bcatalytic\s+(?:rate\s+)?constant\s*(?:was|=|:|≈|~|\u2248)\s*([\d.]+(?:\s*[×x\u00d7]\s*10(?:\u207b|\u2212|\u2013|-)?\s*[-]?\d+)?)\s*(s(?:\u207b|\u2212|\u2013|-)?1|s-1|min(?:\u207b|\u2212|\u2013|-)?1|min-1)', re.I),
-    re.compile(r'\bkcat\s*=\s*([\d.]+)\s*(s(?:\u207b|\u2212|\u2013|-)?1|s-1|min(?:\u207b|\u2212|\u2013|-)?1|min-1)', re.I),
-    re.compile(r'\bkcat(?!\s*/\s*Km)\b[^.=]{0,30}?(?:was|=|:|≈|~|\u2248)\s*([\d.]+(?:\s*[×x\u00d7]\s*10(?:\u207b|\u2212|\u2013|-)?\s*[-]?\d+)?)\s*(s(?:\u207b|\u2212|\u2013|-)?1|s-1|min(?:\u207b|\u2212|\u2013|-)?1|min-1)', re.I),
-    re.compile(r'\bkcat(?!\s*/\s*Km)\b[^.=]{0,15}?([\d.]+)\s*[×x\u00d7]\s*10(?:\u207b|\u2212|\u2013|-)\s*(\d+)\s*(s(?:\u207b|\u2212|\u2013|-)?1|s-1|min(?:\u207b|\u2212|\u2013|-)?1|min-1)', re.I),
-    re.compile(r'\bkcat(?!\s*/\s*Km)\b[^.=]{0,15}?([\d.]+)\s*[eE][\-−\u2212]?(\d+)\s*(s(?:\u207b|\u2212|\u2013|-)?1|s-1|min(?:\u207b|\u2212|\u2013|-)?1|min-1)', re.I),
-    re.compile(r'\bKcat(?!\s*/\s*Km)\b[^.=]{0,20}?(?:was|=|:|≈|~|\u2248)\s*([\d.]+(?:\s*[×x\u00d7]\s*10(?:\u207b|\u2212|\u2013|-)?\s*[-]?\d+)?)\s*(s(?:\u207b|\u2212|\u2013|-)?1|s-1|min(?:\u207b|\u2212|\u2013|-)?1|min-1)', re.I),
-    re.compile(r'\bkcat\s*[\(（]\s*(\w[\w\d\-]*)\s*[\)）]\s*=\s*([\d.]+)\s*(s(?:\u207b|\u2212|\u2013|-)?1|s-1|min(?:\u207b|\u2212|\u2013|-)?1|min-1)', re.I),
+    re.compile(r'\bkcat\s*[\(（]\s*(\w[\w\d\-]*)\s*[\)）]\s*(?:was|=|:|≈|~)\s*([\d.]+(?:\s*[×x\u00d7]\s*10(?:\u207b|\u2212|\u2013|-|\^)?\s*[-]?\d+)?)\s*(s\^-1|s(?:\u207b|\u2212|\u2013|-)?1|s-1|min\^-1|min(?:\u207b|\u2212|\u2013|-)?1|min-1)', re.I),
+    re.compile(r'\bkcat(?!\s*/\s*Km)\s+(?:for\s+)?(\w[\w\d\-]*)?\s*(?:was|=|:|≈|~)\s*([\d.]+(?:\s*[×x\u00d7]\s*10(?:\u207b|\u2212|\u2013|-|\^)?\s*[-]?\d+)?)\s*(s\^-1|s(?:\u207b|\u2212|\u2013|-)?1|s-1|min\^-1|min(?:\u207b|\u2212|\u2013|-)?1|min-1)', re.I),
+    re.compile(r'\bkcat(?!\s*/\s*Km)\s*(?:was|=|:|≈|~)\s*([\d.]+(?:\s*[×x\u00d7]\s*10(?:\u207b|\u2212|\u2013|-|\^)?\s*[-]?\d+)?)\s*(s\^-1|s(?:\u207b|\u2212|\u2013|-)?1|s-1|min\^-1|min(?:\u207b|\u2212|\u2013|-)?1|min-1)', re.I),
+    re.compile(r'\bturnover\s+(?:number|frequency)\s*(?:was|=|:|≈|~)\s*([\d.]+(?:\s*[×x\u00d7]\s*10(?:\u207b|\u2212|\u2013|-|\^)?\s*[-]?\d+)?)\s*(s\^-1|s(?:\u207b|\u2212|\u2013|-)?1|s-1|min\^-1|min(?:\u207b|\u2212|\u2013|-)?1|min-1)', re.I),
+    re.compile(r'\bkcat(?!\s*/\s*Km)\s*(?:was|=|:|≈|~|\u2248)\s*([\d.]+)\s*[eE]\s*([\-−\u2212]?\d+)\s*(s\^-1|s(?:\u207b|\u2212|\u2013|-)?1|s-1|min\^-1|min(?:\u207b|\u2212|\u2013|-)?1|min-1)', re.I),
+    re.compile(r'\bkcat(?!\s*/\s*Km)\b[^.=]{0,20}?(?:was|=|:|≈|~|\u2248)\s*([\d.]+)\s*[×x\u00d7]?\s*10(?:\u207b|\u2212|\u2013|-|\^)\s*(\d+)\s*(s\^-1|s(?:\u207b|\u2212|\u2013|-)?1|s-1|min\^-1|min(?:\u207b|\u2212|\u2013|-)?1|min-1)', re.I),
+    re.compile(r'\bcatalytic\s+(?:rate\s+)?constant\s*(?:was|=|:|≈|~|\u2248)\s*([\d.]+(?:\s*[×x\u00d7]\s*10(?:\u207b|\u2212|\u2013|-|\^)?\s*[-]?\d+)?)\s*(s\^-1|s(?:\u207b|\u2212|\u2013|-)?1|s-1|min\^-1|min(?:\u207b|\u2212|\u2013|-)?1|min-1)', re.I),
+    re.compile(r'\bkcat\s*=\s*([\d.]+)\s*(s\^-1|s(?:\u207b|\u2212|\u2013|-)?1|s-1|min\^-1|min(?:\u207b|\u2212|\u2013|-)?1|min-1)', re.I),
+    re.compile(r'\bkcat(?!\s*/\s*Km)\b[^.=]{0,30}?(?:was|=|:|≈|~|\u2248)\s*([\d.]+(?:\s*[×x\u00d7]\s*10(?:\u207b|\u2212|\u2013|-|\^)?\s*[-]?\d+)?)\s*(s\^-1|s(?:\u207b|\u2212|\u2013|-)?1|s-1|min\^-1|min(?:\u207b|\u2212|\u2013|-)?1|min-1)', re.I),
+    re.compile(r'\bkcat(?!\s*/\s*Km)\b[^.=]{0,15}?([\d.]+)\s*[×x\u00d7]\s*10(?:\u207b|\u2212|\u2013|-|\^)\s*(\d+)\s*(s\^-1|s(?:\u207b|\u2212|\u2013|-)?1|s-1|min\^-1|min(?:\u207b|\u2212|\u2013|-)?1|min-1)', re.I),
+    re.compile(r'\bkcat(?!\s*/\s*Km)\b[^.=]{0,15}?([\d.]+)\s*[eE][\-−\u2212]?(\d+)\s*(s\^-1|s(?:\u207b|\u2212|\u2013|-)?1|s-1|min\^-1|min(?:\u207b|\u2212|\u2013|-)?1|min-1)', re.I),
+    re.compile(r'\bKcat(?!\s*/\s*Km)\b[^.=]{0,20}?(?:was|=|:|≈|~|\u2248)\s*([\d.]+(?:\s*[×x\u00d7]\s*10(?:\u207b|\u2212|\u2013|-|\^)?\s*[-]?\d+)?)\s*(s\^-1|s(?:\u207b|\u2212|\u2013|-)?1|s-1|min\^-1|min(?:\u207b|\u2212|\u2013|-)?1|min-1)', re.I),
+    re.compile(r'\bkcat\s*[\(（]\s*(\w[\w\d\-]*)\s*[\)）]\s*=\s*([\d.]+)\s*(s\^-1|s(?:\u207b|\u2212|\u2013|-)?1|s-1|min\^-1|min(?:\u207b|\u2212|\u2013|-)?1|min-1)', re.I),
 ]
 
 _KCAT_KM_PATTERNS = [
@@ -445,6 +458,9 @@ _VMAX_PATTERNS = [
     re.compile(r'\bV\s*max\s+values?\s+of\s+[^.]{0,80}?\b(?:are|were|is|was)\s+([\d.]+(?:[eE][\-]?\d+)?)\s*(?:and|&|,)\s*[\d.]+(?:[eE][\-]?\d+)?\s*(M\s*[sS][\^⁻\-–]?[\-]?1|M/?s|mM/?s|μM/?s|M\s+s-1|M\u00b7s\u207b\u00b9)', re.I),
     re.compile(r'\bV\s*max\s+values?\s+of\s+\S+\s+(?:and|&)\s+\S+\s+(?:are|were)\s+([\d.]+(?:[eE][\-]?\d+)?)\s+(?:and|&|,)\s*[\d.]+(?:[eE][\-]?\d+)?\s*(M\s*[sS][\^⁻\-–]?[\-]?1|M/?s|mM/?s|μM/?s|M\s+s-1|M\u00b7s\u207b\u00b9)', re.I),
     re.compile(r'\bare\s+([\d.]+(?:[eE][\-]?\d+)?)\s+(?:and|&|,)\s*[\d.]+(?:[eE][\-]?\d+)?\s*(M\u00b7s\u207b\u00b9|M\s*s\s*[\-–]\s*1|M/?s|mM/?s|μM/?s)', re.I),
+    re.compile(r'\bV\s*max\s+(?:was|is)\s+(?:calculated\s+to\s+be|found\s+to\s+be|determined\s+to\s+be)\s*([\d.]+(?:\s*[×x]\s*10[\^⁻\-–]?\s*[-]?\d+)?)\s*(?:±\s*[\d.]+\s*)?(M\s*[sS][\^⁻\-–]?[\-]?1|M/?s|mM/?s|μM/?s|M\s+s-1|mM\s+min-1)', re.I),
+    re.compile(r'\bV\s*max\s+of\s+([\d.]+(?:\s*[×x]\s*10[\^⁻\-–]?\s*[-]?\d+)?)\s*(M\s*[sS][\^⁻\-–]?[\-]?1|M/?s|mM/?s|μM/?s|M\s+s-1|mM\s+min-1)', re.I),
+    re.compile(r'\bV\s*max\s*=\s*([\d.]+)\s*(mM\s+min-1|mM/min|M\s+s-1)', re.I),
 ]
 
 _VMAX_OCR_PATTERNS = [
@@ -641,13 +657,17 @@ _SYNTHESIS_METHODS = {
     "solvothermal": re.compile(r'\bsolvothermal\b', re.I),
     "co-precipitation": re.compile(r'\bco-?precipitat', re.I),
     "sol-gel": re.compile(r'\bsol-?gel\b', re.I),
-    "calcination": re.compile(r'\bcalcina', re.I),
+    "calcination": re.compile(r'\bcalcina|calcined\b', re.I),
     "annealing": re.compile(r'\banneal', re.I),
+    "spray_pyrolysis": re.compile(r'\bspray\s+pyrolys', re.I),
     "pyrolysis": re.compile(r'\bpyrolys', re.I),
     "chemical_vapor_deposition": re.compile(r'\bchemical\s+vapor\s+deposition\b|\bCVD\b', re.I),
+    "atomic_layer_deposition": re.compile(r'\batomic\s+layer\s+deposition\b|\bALD\b', re.I),
+    "pulsed_laser_deposition": re.compile(r'\bpulsed\s+laser\s+deposition\b|\bPLD\b', re.I),
     "electrospinning": re.compile(r'\belectrospinn', re.I),
     "microwave": re.compile(r'\bmicrowave', re.I),
     "ultrasonic": re.compile(r'\bultrasoni', re.I),
+    "sacrificial_template": re.compile(r'\bsacrificial\s+template', re.I),
     "template_method": re.compile(r'\btemplate[-\s]?assist|\btemplate\s+method', re.I),
     "self-assembly": re.compile(r'\bself[-\s]?assembl', re.I),
     "wet_chemical": re.compile(r'\bwet\s+chemical', re.I),
@@ -656,15 +676,14 @@ _SYNTHESIS_METHODS = {
     "dealloying": re.compile(r'\bdealloy', re.I),
     "laser_ablation": re.compile(r'\blaser\s+ablat', re.I),
     "green_synthesis": re.compile(r'\bgreen\s+synthesis', re.I),
-    "microemulsion": re.compile(r'\bmicroemuls', re.I),
     "reverse_microemulsion": re.compile(r'\breverse\s+microemuls', re.I),
+    "microemulsion": re.compile(r'\bmicroemuls', re.I),
     "polyol_method": re.compile(r'\bpolyol\s+method', re.I),
     "thermal_decomposition": re.compile(r'\bthermal\s+decompos', re.I),
     "carbonization": re.compile(r'\bcarbonizat', re.I),
     "dopamine_polymerization": re.compile(r'\bdopamine\s+polymeriz|\bpolydopamine', re.I),
     "impregnation": re.compile(r'\bimpregnat', re.I),
     "copolymerization": re.compile(r'\bcopolymeriz', re.I),
-    "sacrificial_template": re.compile(r'\bsacrificial\s+template', re.I),
     "ion_exchange": re.compile(r'\bion\s+exchange', re.I),
     "etching": re.compile(r'\betch', re.I),
     "sintering": re.compile(r'\bsinter', re.I),
@@ -681,6 +700,10 @@ _SYNTHESIS_METHODS = {
     "encapsulation": re.compile(r'\bencapsulat', re.I),
     "deposition": re.compile(r'\bdeposit', re.I),
     "reduction": re.compile(r'\breduc(?:ed|tion)\s+(?:by|with|using|via|through)\b', re.I),
+    "freeze_drying": re.compile(r'\bfreeze[-\s]?dry', re.I),
+    "ball_milling": re.compile(r'\bball[-\s]?mill', re.I),
+    "3d_printing": re.compile(r'\b3D\s+print', re.I),
+    "supercritical_drying": re.compile(r'\bsupercritical\s+dry', re.I),
 }
 
 _PH_PATTERNS = {
@@ -991,6 +1014,9 @@ _VALID_ENZYME_TYPES = frozenset({
     "glutathione-peroxidase-like", "glutathione peroxidase-like", "GPx-like",
     "haloperoxidase-like", "nitric-oxide-synthase-like",
     "laccase-like", "tyrosinase-like",
+    "phosphatase-like", "nitroreductase-like", "hydrolase-like",
+    "esterase-like", "glucose-oxidase-like", "nuclease-like",
+    "glutathione-oxidase-like", "cascade-enzymatic",
 })
 
 
@@ -3344,18 +3370,22 @@ class RuleExtractor:
 
     _APP_TYPE_KEYWORDS = {
         "sensing": ["detection", "sensing", "sensor", "biosensor", "assay", "monitoring", "determin",
-                    "biosensing", "imaging", "point-of-care", "poc", "diagnos", "theranost", "biomarker"],
+                    "biosensing", "imaging", "point-of-care", "poc", "diagnos", "theranost", "biomarker",
+                    "elisa", "immunoassay", "lateral flow", "paper-based"],
         "therapeutic": ["therapeutic", "antitumor", "wound heal", "cytoprotect",
                         "neuroprotect", "anti-inflammator", "antiinflammator", "therapy",
-                        "catalytic therapy", "tumor therapy"],
+                        "catalytic therapy", "tumor therapy", "tumor ablation",
+                        "photothermal therapy", "sonodynamic therapy", "chemodynamic therapy",
+                        "photodynamic therapy", "immunotherapy", "gene therapy"],
         "antibacterial": ["antibacterial", "disinfect", "steriliz", "bactericid", "antimicrobial",
-                          "anti-bacterial"],
+                          "anti-bacterial", "antiviral", "antifungal"],
         "environmental": ["pollutant", "heavy metal", "pesticide", "organophosph", "endocrine",
                           "degrad", "environmental", "drinking water", "waste water", "river",
-                          "lake", "tap water", "sea water", "environmental remediation"],
+                          "lake", "tap water", "sea water", "environmental remediation",
+                          "water purification", "soil remediation", "air purification"],
         "antioxidant": ["antioxidant", "ros scaveng", "radical scaveng", "cytoprotect",
-                        "oxidative stress", "anti-oxid"],
-        "biofilm_inhibition": ["biofilm", "anti-biofilm", "antibiofilm", "quorum sensing"],
+                        "oxidative stress", "anti-oxid", "radioprotect"],
+        "biofilm_inhibition": ["biofilm", "anti-biofilm", "antibiofilm", "quorum sensing inhibition"],
     }
 
     _ANALYTE_PATTERNS = [
@@ -3370,10 +3400,16 @@ class RuleExtractor:
         "serum": "serum", "plasma": "plasma", "urine": "urine", "blood": "blood",
         "saliva": "saliva", "tear": "tear", "water": "water", "food": "food",
         "milk": "food", "juice": "food", "wine": "food", "beer": "food",
-        "cell": "cell_culture", "tissue": "tissue", "river": "environmental_water",
-        "lake": "environmental_water", "tap water": "environmental_water",
+        "cell": "cell_culture", "tissue": "tissue",
+        "river water": "environmental_water", "lake water": "environmental_water",
+        "tap water": "environmental_water",
         "sea water": "environmental_water", "waste water": "environmental_water",
         "drinking water": "environmental_water",
+        "river": "environmental_water", "lake": "environmental_water",
+        "cerebrospinal fluid": "cerebrospinal_fluid", "csf": "cerebrospinal_fluid",
+        "sweat": "sweat", "interstitial fluid": "interstitial_fluid",
+        "soil": "soil", "sediment": "sediment",
+        "industrial effluent": "industrial_effluent",
     }
 
     def _extract_applications_from_text(self, record: Dict[str, Any], app_texts: List[str]):
@@ -3405,7 +3441,7 @@ class RuleExtractor:
                     if len(analyte) > 2 and analyte.lower() not in ("the", "this", "that"):
                         app["target_analyte"] = analyte
                     break
-            for sample_kw, sample_type in self._SAMPLE_TYPE_MAP.items():
+            for sample_kw, sample_type in sorted(self._SAMPLE_TYPE_MAP.items(), key=lambda x: -len(x[0])):
                 if sample_kw in text_lower:
                     app["sample_type"] = sample_type
                     break
@@ -3440,13 +3476,23 @@ class RuleExtractor:
         (re.compile(r'\babsorbance\b', re.I), "UV-vis"),
         (re.compile(r'\bfluorescen', re.I), "fluorescence"),
         (re.compile(r'\bfluoromet', re.I), "fluorometric"),
+        (re.compile(r'\belectrochemilumin', re.I), "electrochemiluminescent"),
         (re.compile(r'\belectrochem', re.I), "electrochemical"),
+        (re.compile(r'\bcyclic\s+voltammet', re.I), "electrochemical"),
+        (re.compile(r'\bdifferential\s+pulse\s+voltammet', re.I), "electrochemical"),
+        (re.compile(r'\bsquare\s+wave\s+voltammet', re.I), "electrochemical"),
+        (re.compile(r'\bimpedance\s+spectroscop', re.I), "electrochemical"),
+        (re.compile(r'\bEIS\b', re.I), "electrochemical"),
+        (re.compile(r'\bDPV\b', re.I), "electrochemical"),
+        (re.compile(r'\bSWV\b', re.I), "electrochemical"),
+        (re.compile(r'\bCV\b', re.I), "electrochemical"),
         (re.compile(r'\bamperomet', re.I), "amperometric"),
         (re.compile(r'\bSERS\b', re.I), "SERS"),
         (re.compile(r'\bsurface.enhanced\s+Raman', re.I), "SERS"),
         (re.compile(r'\bcolorimet', re.I), "colorimetric"),
         (re.compile(r'\bchemilumin', re.I), "chemiluminescent"),
         (re.compile(r'\bRaman\s+spect', re.I), "Raman"),
+        (re.compile(r'\bphotoelectrochem', re.I), "photoelectrochemical"),
     ]
 
     def _extract_assay_method(self, record: Dict[str, Any], texts: List[str]):
@@ -3481,19 +3527,33 @@ class RuleExtractor:
 
     _BUFFER_PATTERNS = [
         (re.compile(r'\bNaAc[-\s]HAc\b', re.I), "NaAc-HAc"),
-        (re.compile(r'\bNaAc\b', re.I), "NaAc-HAc"),
-        (re.compile(r'\bHAc\b', re.I), "NaAc-HAc"),
-        (re.compile(r'\bsodium\s+acetate\b', re.I), "NaAc-HAc"),
+        (re.compile(r'\bsodium\s+acetate\s+buffer\b', re.I), "NaAc-HAc"),
+        (re.compile(r'\bammonium\s+acetate\s+buffer\b', re.I), "ammonium-acetate"),
+        (re.compile(r'\bTris[-\s]acetate\s+buffer\b', re.I), "Tris-acetate"),
         (re.compile(r'\bacetate\s+buffer\b', re.I), "NaAc-HAc"),
+        (re.compile(r'\bacetate-buffered\b', re.I), "NaAc-HAc"),
+        (re.compile(r'\bNaAc\b(?![-\s]HAc)', re.I), "NaAc-HAc"),
+        (re.compile(r'\bHAc\b', re.I), "NaAc-HAc"),
         (re.compile(r'\bPBS\b', re.I), "PBS"),
-        (re.compile(r'\bphosphate\s+buffer', re.I), "PBS"),
+        (re.compile(r'\bphosphate[-\s]buffer', re.I), "PBS"),
         (re.compile(r'\bcitrate\s+buffer', re.I), "citrate"),
         (re.compile(r'\bTris[-\s]HCl\b', re.I), "Tris-HCl"),
-        (re.compile(r'\bTris\b', re.I), "Tris-HCl"),
-        (re.compile(r'\bHEPES\b', re.I), "HEPES"),
+        (re.compile(r'\bTris[-\s]EDTA\b', re.I), "Tris-EDTA"),
+        (re.compile(r'\bTris[-\s]acetate\b', re.I), "Tris-acetate"),
+        (re.compile(r'\bTris\b(?![-\s](?:HCl|EDTA|acetate))', re.I), "Tris-HCl"),
+        (re.compile(r'\bHEPES[-\s]NaOH\b', re.I), "HEPES-NaOH"),
+        (re.compile(r'\bHEPES\b(?![-\s]NaOH)', re.I), "HEPES"),
         (re.compile(r'\bMES\b', re.I), "MES"),
         (re.compile(r'\bMOPS\b', re.I), "MOPS"),
         (re.compile(r'\bBR\b\s+buffer', re.I), "Britton-Robinson"),
+        (re.compile(r'\bBritton[-\s]Robinson\b', re.I), "Britton-Robinson"),
+        (re.compile(r'\bborate\s+buffer', re.I), "borate"),
+        (re.compile(r'\bcarbonate[-\s]bicarbonate\s+buffer', re.I), "carbonate-bicarbonate"),
+        (re.compile(r'\bglycine[-\s]NaOH\s+buffer', re.I), "glycine-NaOH"),
+        (re.compile(r'\bammonium\s+acetate\s+buffer', re.I), "ammonium-acetate"),
+        (re.compile(r'\bPIPES\s+buffer', re.I), "PIPES"),
+        (re.compile(r'\bCHES\s+buffer', re.I), "CHES"),
+        (re.compile(r'\bCAPS\s+buffer', re.I), "CAPS"),
     ]
 
     def _extract_buffer(self, record: Dict[str, Any], texts: List[str]):
@@ -3517,7 +3577,13 @@ class RuleExtractor:
         (re.compile(r'\belectron\s+transfer', re.I), "electron transfer"),
         (re.compile(r'\bcharge\s+transfer', re.I), "charge transfer"),
         (re.compile(r'\boxygen\s+vacanc', re.I), "oxygen vacancy mediated"),
+        (re.compile(r'(?:Fe|Co|Ni|Mn|Cu|Zn|Ru|Rh|Ir|Pt|Pd|Mo|W|V|Cr|Ti)-N[xc\d]', re.I), "M-Nx site catalysis"),
         (re.compile(r'\bmetal[-\s]N\d\b', re.I), "M-Nx site catalysis"),
+        (re.compile(r'\bM[-\s]N[xc]\d?\b', re.I), "M-Nx site catalysis"),
+        (re.compile(r'\bphoto[-\s]?Fenton\b', re.I), "photo-Fenton"),
+        (re.compile(r'\bphotocatalyt', re.I), "photocatalytic"),
+        (re.compile(r'\bsonocatalyt', re.I), "sonocatalytic"),
+        (re.compile(r'\bpiezocatalyt', re.I), "piezocatalytic"),
     ]
 
     def _extract_mechanism(self, record: Dict[str, Any], texts: List[str]):
@@ -3842,6 +3908,8 @@ class SingleMainNanozymePipeline:
         "MOF", "ZIF-8", "ZIF-67", "UiO-66", "MIL-101", "HKUST-1",
         "SiO2", "silica", "mesoporous silica",
         "N-C", "P-C", "S-C", "B-C",
+        "carbon cloth", "carbon fiber", "activated carbon", "mesoporous carbon",
+        "biochar", "COF",
     })
     _DOPANT_PATTERN = re.compile(
         r'\b(N|P|S|B|F|Cl|Br|I|Se|Te)\s*(?:doped|doping|dopant)',
@@ -3863,7 +3931,7 @@ class SingleMainNanozymePipeline:
             for m in metals[1:]:
                 if m not in result["dopants"]:
                     result["dopants"].append(m)
-        for sup in self._SUPPORT_MATERIALS:
+        for sup in sorted(self._SUPPORT_MATERIALS, key=lambda x: -len(x)):
             sup_pattern = re.compile(r'(?:^|[\s\-/(])' + re.escape(sup) + r'(?:[\s\-/,).]|$)',
                                      re.I)
             if sup_pattern.search(text):
@@ -4500,6 +4568,19 @@ class SingleMainNanozymePipeline:
         "gox": "glucose-oxidase-like",
         "gox-like": "glucose-oxidase-like",
         "esterase": "esterase-like",
+        "phosphatase": "phosphatase-like",
+        "alp": "phosphatase-like",
+        "alp-like": "phosphatase-like",
+        "nitroreductase": "nitroreductase-like",
+        "ntr": "nitroreductase-like",
+        "ntr-like": "nitroreductase-like",
+        "hydrolase": "hydrolase-like",
+        "laccase": "laccase-like",
+        "haloperoxidase": "haloperoxidase-like",
+        "tyrosinase": "tyrosinase-like",
+        "nuclease": "nuclease-like",
+        "cascade enzymatic": "cascade-enzymatic",
+        "cascade enzyme": "cascade-enzymatic",
     }
 
     _APP_TYPE_NORMALIZE = {
@@ -4514,11 +4595,14 @@ class SingleMainNanozymePipeline:
         "diagnostic": "sensing",
         "diagnosis": "sensing",
         "imaging": "sensing",
+        "photoacoustic imaging": "sensing",
         "therapeutic": "therapeutic",
         "therapy": "therapeutic",
         "catalytic therapy": "therapeutic",
         "antitumor": "therapeutic",
         "tumor therapy": "therapeutic",
+        "immunotherapy": "therapeutic",
+        "gene therapy": "therapeutic",
         "antibacterial": "antibacterial",
         "environmental": "environmental",
         "environmental monitoring": "environmental",

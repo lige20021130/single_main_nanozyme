@@ -14,6 +14,14 @@ _ENZYME_ALIAS_MAP: Dict[str, str] = {
     "sod-like": "superoxide-dismutase-like",
     "glutathione peroxidase (gpx)-like": "glutathione-peroxidase-like",
     "gpx-like": "glutathione-peroxidase-like",
+    "glucose oxidase (gox)-like": "glucose-oxidase-like",
+    "gox-like": "glucose-oxidase-like",
+    "phosphatase (alp)-like": "phosphatase-like",
+    "alp-like": "phosphatase-like",
+    "nitroreductase (ntr)-like": "nitroreductase-like",
+    "ntr-like": "nitroreductase-like",
+    "glutathione oxidase (gshox)-like": "glutathione-oxidase-like",
+    "gshox-like": "glutathione-oxidase-like",
 }
 
 
@@ -29,6 +37,11 @@ class EnzymeType(Enum):
     PHOSPHATASE = "phosphatase-like"
     LACCASE = "laccase-like"
     HALOPEROXIDASE = "haloperoxidase-like"
+    GLUCOSE_OXIDASE = "glucose-oxidase-like"
+    GLUTATHIONE_OXIDASE = "glutathione-oxidase-like"
+    NUCLEASE = "nuclease-like"
+    TYROSINASE = "tyrosinase-like"
+    CASCADE_ENZYMATIC = "cascade-enzymatic"
 
     @classmethod
     def normalize_canonical(cls, value: str) -> str:
@@ -103,6 +116,31 @@ ENZYME_REGISTRY: Dict[EnzymeType, Dict[str, Any]] = {
         "keywords": ["haloperoxidase-like", "haloperoxidase mimetic", "VHPO-like", "haloperoxidase activity"],
         "substrates": ["Br-", "I-", "Cl-"],
         "assay_keywords": ["haloperoxidase assay", "halogenation"],
+    },
+    EnzymeType.GLUCOSE_OXIDASE: {
+        "keywords": ["glucose oxidase-like", "GOx-like", "glucose oxidase mimetic", "GOx activity"],
+        "substrates": ["glucose", "O2"],
+        "assay_keywords": ["glucose oxidase assay", "glucose detection"],
+    },
+    EnzymeType.GLUTATHIONE_OXIDASE: {
+        "keywords": ["glutathione oxidase-like", "GSHOx-like", "glutathione oxidase mimetic"],
+        "substrates": ["GSH", "O2"],
+        "assay_keywords": ["glutathione oxidase assay", "GSH oxidation"],
+    },
+    EnzymeType.NUCLEASE: {
+        "keywords": ["nuclease-like", "nuclease mimetic", "DNA cleavage", "RNA cleavage"],
+        "substrates": ["DNA", "RNA", "oligonucleotides"],
+        "assay_keywords": ["nuclease assay", "DNA cleavage assay"],
+    },
+    EnzymeType.TYROSINASE: {
+        "keywords": ["tyrosinase-like", "tyrosinase mimetic", "polyphenol oxidase-like"],
+        "substrates": ["L-DOPA", "tyrosine", "phenol", "catechol"],
+        "assay_keywords": ["tyrosinase assay", "L-DOPA oxidation"],
+    },
+    EnzymeType.CASCADE_ENZYMATIC: {
+        "keywords": ["cascade enzymatic", "cascade enzyme activity", "multi-enzyme cascade", "enzyme cascade"],
+        "substrates": [],
+        "assay_keywords": ["cascade assay", "sequential reaction"],
     },
 }
 
