@@ -8,6 +8,7 @@ temp_*.py
 
 new_lit_output/
 validation_output/
+extraction_results/
 
 venv/
 .env
@@ -18,3 +19,5 @@ config.yaml
 
 test_output_*/
 e2e_results/
+test/
+deprecated/
