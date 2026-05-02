@@ -44,6 +44,9 @@ EMPTY_RECORD = {
         "crystal_structure": None, "surface_area": None,
         "zeta_potential": None, "pore_size": None,
         "characterization": [], "stability": None,
+        "composition_structured": {
+            "core": None, "dopants": [], "support": None, "organic_component": None,
+        },
     },
     "main_activity": {
         "enzyme_like_type": None, "substrates": [], "assay_method": None,
@@ -64,6 +67,7 @@ EMPTY_RECORD = {
             "kcat_Km": None, "kcat_Km_unit": None,
             "substrate": None, "source": None, "needs_review": False,
         },
+        "kinetics_list": [],
         "mechanism": None,
     },
     "applications": [],
@@ -862,7 +866,7 @@ HARD RULES:
 6. morphology = physical shape (nanoparticle, nanosheet, nanorod, nanosphere, cubic, spherical, core-shell, etc.), NOT figure descriptions.
 7. Keep the material name as given in "Selected main nanozyme" — do NOT rename or simplify it.
 8. Extract ALL applications mentioned — do not merge or reduce them.
-9. For kinetics, extract BOTH Km AND Vmax if both appear. Look carefully for Vmax — it often appears near Km.
+9. For kinetics, extract BOTH Km AND Vmax if both appear. Look carefully for Vmax — it often appears near Km. If multiple substrates have Km/Vmax pairs, list each in kinetics_list.
 10. size = numeric value only (e.g. 50), size_unit = unit only (e.g. "nm"). Do NOT combine them.
 
 OUTPUT STRUCTURE:
@@ -887,6 +891,9 @@ OUTPUT STRUCTURE:
       "kcat": null, "kcat_unit": null, "kcat_Km": null, "kcat_Km_unit": null,
       "substrate": null, "source": null, "needs_review": false
     },
+    "kinetics_list": [
+      {"Km": null, "Km_unit": null, "Vmax": null, "Vmax_unit": null, "substrate": null, "source": null}
+    ],
     "mechanism": null
   },
   "applications": [
@@ -946,6 +953,7 @@ Based on the selected material and evidence above, fill the JSON schema. Remembe
 - Do not guess missing fields — use null
 - Distinguish substrate from analyte
 - VLM figure values go to important_values only, NOT kinetics
+- application_type must be one of: "sensing", "therapeutic", "antibacterial", "environmental", "antioxidant", "biofilm_inhibition", "other"
 - Output only JSON, no markdown"""
 
 
@@ -975,6 +983,15 @@ class SMNConfig:
 
 def make_empty_record() -> Dict[str, Any]:
     return deepcopy(EMPTY_RECORD)
+
+
+_VALID_ENZYME_TYPES = frozenset({
+    "peroxidase-like", "oxidase-like", "catalase-like",
+    "superoxide-dismutase-like", "superoxide dismutase-like", "SOD-like",
+    "glutathione-peroxidase-like", "glutathione peroxidase-like", "GPx-like",
+    "haloperoxidase-like", "nitric-oxide-synthase-like",
+    "laccase-like", "tyrosinase-like",
+})
 
 
 def validate_schema(record: Dict[str, Any]) -> Dict[str, Any]:
@@ -1059,6 +1076,17 @@ def validate_schema(record: Dict[str, Any]) -> Dict[str, Any]:
         if new_key not in sel_nano:
             sel_nano[new_key] = None
             auto_fixed = True
+    if "composition_structured" not in sel_nano:
+        sel_nano["composition_structured"] = {"core": None, "dopants": [], "support": None, "organic_component": None}
+        auto_fixed = True
+    elif not isinstance(sel_nano["composition_structured"], dict):
+        sel_nano["composition_structured"] = {"core": None, "dopants": [], "support": None, "organic_component": None}
+        auto_fixed = True
+    else:
+        for ck in ("core", "dopants", "support", "organic_component"):
+            if ck not in sel_nano["composition_structured"]:
+                sel_nano["composition_structured"][ck] = [] if ck == "dopants" else None
+                auto_fixed = True
 
     rst = record.get("raw_supporting_text", {})
     for k in _RST_KEYS:
@@ -1081,6 +1109,11 @@ def validate_schema(record: Dict[str, Any]) -> Dict[str, Any]:
         auto_fixed = True
     if not isinstance(record.get("important_values"), list):
         record["important_values"] = []
+        auto_fixed = True
+
+    act = record.get("main_activity", {})
+    if not isinstance(act.get("kinetics_list"), list):
+        act["kinetics_list"] = []
         auto_fixed = True
 
     if auto_fixed and "schema_auto_fixed" not in warnings:
@@ -1130,6 +1163,63 @@ def validate_schema(record: Dict[str, Any]) -> Dict[str, Any]:
                             exp = int(exp_m.group(0).replace('−', '-').replace('–', '-'))
                             kinetics[ukey.replace("_unit", "")] = val * (10 ** exp)
                             kinetics[ukey] = None
+
+    etype = record.get("main_activity", {}).get("enzyme_like_type")
+    if etype and isinstance(etype, str):
+        etype_lower = etype.lower().strip()
+        matched = False
+        for valid in _VALID_ENZYME_TYPES:
+            if valid.lower() == etype_lower or etype_lower in valid.lower():
+                matched = True
+                break
+        if not matched:
+            warnings.append(f"unknown_enzyme_type: {etype}")
+
+    for app in record.get("applications", []):
+        if not isinstance(app, dict):
+            continue
+        if not app.get("application_type"):
+            warnings.append("application_missing_type")
+            app["application_type"] = "other"
+
+    valid_apps = []
+    for app in record.get("applications", []):
+        if isinstance(app, dict) and app.get("application_type"):
+            valid_apps.append(app)
+    record["applications"] = valid_apps
+
+    for iv in record.get("important_values", []):
+        if not isinstance(iv, dict):
+            continue
+        if not iv.get("name") or iv.get("value") is None:
+            warnings.append("important_value_missing_name_or_value")
+
+    _NUMERIC_SCHEMA_FIELDS = [
+        ("main_activity", "kinetics", "Km"),
+        ("main_activity", "kinetics", "Vmax"),
+        ("main_activity", "kinetics", "kcat"),
+        ("main_activity", "kinetics", "kcat_Km"),
+        ("main_activity", "conditions", "pH"),
+        ("main_activity", "conditions", "temperature"),
+        ("main_activity", "pH_profile", "optimal_pH"),
+        ("main_activity", "temperature_profile", "optimal_temperature"),
+        ("selected_nanozyme", "size"),
+    ]
+    for path in _NUMERIC_SCHEMA_FIELDS:
+        if len(path) == 3:
+            val = record.get(path[0], {}).get(path[1], {}).get(path[2])
+        else:
+            val = record.get(path[0], {}).get(path[1])
+        if val is not None and isinstance(val, str):
+            try:
+                float_val = float(val)
+                if len(path) == 3:
+                    record[path[0]][path[1]][path[2]] = float_val
+                else:
+                    record[path[0]][path[1]] = float_val
+                auto_fixed = True
+            except ValueError:
+                pass
 
     return record
 
@@ -2260,6 +2350,11 @@ class RuleExtractor:
 
         self._extract_applications_from_text(record, buckets.get("application", []))
 
+        self._extract_assay_method(record, buckets.get("activity", []) + buckets.get("kinetics", []))
+        self._extract_signal(record, buckets.get("activity", []) + buckets.get("kinetics", []))
+        self._extract_buffer(record, buckets.get("activity", []) + buckets.get("kinetics", []))
+        self._extract_mechanism(record, buckets.get("mechanism", []) + buckets.get("activity", []))
+
         if doc:
             self._fulltext_fallback_extract(record, doc, selected_name)
 
@@ -3248,13 +3343,19 @@ class RuleExtractor:
         act["temperature_profile"] = temp_prof
 
     _APP_TYPE_KEYWORDS = {
-        "detection": ["detection", "sensing", "sensor", "biosensor", "assay", "monitoring", "determin"],
-        "therapeutic": ["therapeutic", "antitumor", "antibacterial", "wound heal", "cytoprotect",
-                        "neuroprotect", "anti-inflammator", "antiinflammator", "disinfect", "steriliz"],
+        "sensing": ["detection", "sensing", "sensor", "biosensor", "assay", "monitoring", "determin",
+                    "biosensing", "imaging", "point-of-care", "poc", "diagnos", "theranost", "biomarker"],
+        "therapeutic": ["therapeutic", "antitumor", "wound heal", "cytoprotect",
+                        "neuroprotect", "anti-inflammator", "antiinflammator", "therapy",
+                        "catalytic therapy", "tumor therapy"],
+        "antibacterial": ["antibacterial", "disinfect", "steriliz", "bactericid", "antimicrobial",
+                          "anti-bacterial"],
         "environmental": ["pollutant", "heavy metal", "pesticide", "organophosph", "endocrine",
                           "degrad", "environmental", "drinking water", "waste water", "river",
-                          "lake", "tap water", "sea water"],
-        "diagnostic": ["diagnos", "theranost", "biomarker", "point-of-care", "poc"],
+                          "lake", "tap water", "sea water", "environmental remediation"],
+        "antioxidant": ["antioxidant", "ros scaveng", "radical scaveng", "cytoprotect",
+                        "oxidative stress", "anti-oxid"],
+        "biofilm_inhibition": ["biofilm", "anti-biofilm", "antibiofilm", "quorum sensing"],
     }
 
     _ANALYTE_PATTERNS = [
@@ -3330,6 +3431,103 @@ class RuleExtractor:
                         "detection_limit", "sample_type", "notes"):
                 app.setdefault(key, None)
             record["applications"].append(app)
+
+    _ASSAY_METHOD_PATTERNS = [
+        (re.compile(r'\bUV-vis\b', re.I), "UV-vis"),
+        (re.compile(r'\bUV/vis\b', re.I), "UV-vis"),
+        (re.compile(r'\bUV\s*vis\b', re.I), "UV-vis"),
+        (re.compile(r'\bspectrophotomet', re.I), "spectrophotometric"),
+        (re.compile(r'\babsorbance\b', re.I), "UV-vis"),
+        (re.compile(r'\bfluorescen', re.I), "fluorescence"),
+        (re.compile(r'\bfluoromet', re.I), "fluorometric"),
+        (re.compile(r'\belectrochem', re.I), "electrochemical"),
+        (re.compile(r'\bamperomet', re.I), "amperometric"),
+        (re.compile(r'\bSERS\b', re.I), "SERS"),
+        (re.compile(r'\bsurface.enhanced\s+Raman', re.I), "SERS"),
+        (re.compile(r'\bcolorimet', re.I), "colorimetric"),
+        (re.compile(r'\bchemilumin', re.I), "chemiluminescent"),
+        (re.compile(r'\bRaman\s+spect', re.I), "Raman"),
+    ]
+
+    def _extract_assay_method(self, record: Dict[str, Any], texts: List[str]):
+        if record["main_activity"].get("assay_method"):
+            return
+        for text in texts:
+            for pat, method in self._ASSAY_METHOD_PATTERNS:
+                if pat.search(text):
+                    record["main_activity"]["assay_method"] = method
+                    return
+
+    _SIGNAL_PATTERNS = [
+        (re.compile(r'\babsorbance\b', re.I), "absorbance"),
+        (re.compile(r'\babsorption\b', re.I), "absorbance"),
+        (re.compile(r'\bfluorescen', re.I), "fluorescence"),
+        (re.compile(r'\bcurrent\b', re.I), "current"),
+        (re.compile(r'\bcolor\s*change\b', re.I), "color change"),
+        (re.compile(r'\bcolorimetric\b', re.I), "absorbance"),
+        (re.compile(r'\bluminescen', re.I), "luminescence"),
+        (re.compile(r'\bphotolumin', re.I), "photoluminescence"),
+        (re.compile(r'\belectrochemilumin', re.I), "electrochemiluminescence"),
+    ]
+
+    def _extract_signal(self, record: Dict[str, Any], texts: List[str]):
+        if record["main_activity"].get("signal"):
+            return
+        for text in texts:
+            for pat, signal in self._SIGNAL_PATTERNS:
+                if pat.search(text):
+                    record["main_activity"]["signal"] = signal
+                    return
+
+    _BUFFER_PATTERNS = [
+        (re.compile(r'\bNaAc[-\s]HAc\b', re.I), "NaAc-HAc"),
+        (re.compile(r'\bNaAc\b', re.I), "NaAc-HAc"),
+        (re.compile(r'\bHAc\b', re.I), "NaAc-HAc"),
+        (re.compile(r'\bsodium\s+acetate\b', re.I), "NaAc-HAc"),
+        (re.compile(r'\bacetate\s+buffer\b', re.I), "NaAc-HAc"),
+        (re.compile(r'\bPBS\b', re.I), "PBS"),
+        (re.compile(r'\bphosphate\s+buffer', re.I), "PBS"),
+        (re.compile(r'\bcitrate\s+buffer', re.I), "citrate"),
+        (re.compile(r'\bTris[-\s]HCl\b', re.I), "Tris-HCl"),
+        (re.compile(r'\bTris\b', re.I), "Tris-HCl"),
+        (re.compile(r'\bHEPES\b', re.I), "HEPES"),
+        (re.compile(r'\bMES\b', re.I), "MES"),
+        (re.compile(r'\bMOPS\b', re.I), "MOPS"),
+        (re.compile(r'\bBR\b\s+buffer', re.I), "Britton-Robinson"),
+    ]
+
+    def _extract_buffer(self, record: Dict[str, Any], texts: List[str]):
+        if record["main_activity"]["conditions"].get("buffer"):
+            return
+        for text in texts:
+            for pat, buf in self._BUFFER_PATTERNS:
+                if pat.search(text):
+                    record["main_activity"]["conditions"]["buffer"] = buf
+                    return
+
+    _MECHANISM_PATTERNS = [
+        (re.compile(r'\bFenton[-\s]like\b', re.I), "Fenton-like"),
+        (re.compile(r'\bFenton\s+reaction\b', re.I), "Fenton-like"),
+        (re.compile(r'\bHaber[-\s]Weiss\b', re.I), "Haber-Weiss"),
+        (re.compile(r'\bROS\s+generat', re.I), "ROS generation"),
+        (re.compile(r'\b\*OH\b|hydroxyl\s+radical', re.I), "hydroxyl radical generation"),
+        (re.compile(r'\bO2[-\*]?\b.*\bgenerat', re.I), "superoxide generation"),
+        (re.compile(r'\bsuperoxide\s+anion', re.I), "superoxide generation"),
+        (re.compile(r'\bsinglet\s+oxygen', re.I), "singlet oxygen generation"),
+        (re.compile(r'\belectron\s+transfer', re.I), "electron transfer"),
+        (re.compile(r'\bcharge\s+transfer', re.I), "charge transfer"),
+        (re.compile(r'\boxygen\s+vacanc', re.I), "oxygen vacancy mediated"),
+        (re.compile(r'\bmetal[-\s]N\d\b', re.I), "M-Nx site catalysis"),
+    ]
+
+    def _extract_mechanism(self, record: Dict[str, Any], texts: List[str]):
+        if record["main_activity"].get("mechanism"):
+            return
+        for text in texts:
+            for pat, mech in self._MECHANISM_PATTERNS:
+                if pat.search(text):
+                    record["main_activity"]["mechanism"] = mech
+                    return
 
 
 class NumericValidator:
@@ -3471,11 +3669,14 @@ class SingleMainNanozymePipeline:
             variants.update(p.strip() for p in name_lower.split("/") if p.strip())
 
         filtered_tasks = []
+        task_priorities = []
         for task in vlm_tasks:
             caption = task.get("caption", "")
             description = task.get("description", "")
             body_context = task.get("body_context", "")
             combined = f"{caption} {description} {body_context}".lower()
+            image_path = task.get("image_path", "")
+            page_num = task.get("page_num", 0)
 
             mentions_selected = any(v in combined for v in variants if len(v) >= 2)
             has_kinetics = any(kw in combined for kw in ("km", "vmax", "michaelis", "kinetic", "kcat"))
@@ -3484,14 +3685,41 @@ class SingleMainNanozymePipeline:
             has_ph_temp = any(kw in combined for kw in ("ph", "temperature", "thermal", "stability", "optimal", "optimum"))
             has_activity = any(kw in combined for kw in ("activity", "catalytic", "peroxidase", "oxidase", "enzyme"))
 
-            if mentions_selected or has_kinetics or has_morphology or has_sensing or has_ph_temp or has_activity:
+            priority = 0
+            if has_kinetics:
+                priority += 10
+            if has_sensing:
+                priority += 8
+            if has_ph_temp:
+                priority += 6
+            if has_activity:
+                priority += 5
+            if has_morphology:
+                priority += 4
+            if mentions_selected:
+                priority += 3
+            if not caption and not description:
+                fn_lower = image_path.lower() if image_path else ""
+                if any(kw in fn_lower for kw in ("kinetic", "km", "vmax", "ph", "temp")):
+                    priority += 5
+                elif any(kw in fn_lower for kw in ("sem", "tem", "xrd", "morph")):
+                    priority += 3
+            if priority > 0:
                 filtered_tasks.append(task)
+                task_priorities.append(priority)
             else:
                 logger.debug(f"[SMN] VLM skip: caption not related to selected material: {caption[:60]}")
 
         if not filtered_tasks:
             logger.info(f"[SMN] No relevant VLM tasks after filtering (was {len(vlm_tasks)}, now 0)")
             return None
+
+        max_vlm_tasks = 8
+        if len(filtered_tasks) > max_vlm_tasks:
+            paired = list(zip(task_priorities, filtered_tasks))
+            paired.sort(key=lambda x: x[0], reverse=True)
+            filtered_tasks = [t for _, t in paired[:max_vlm_tasks]]
+            logger.info(f"[SMN] VLM tasks limited from {len(paired)} to {max_vlm_tasks} by priority")
 
         logger.info(f"[SMN] VLM tasks: {len(vlm_tasks)} total, {len(filtered_tasks)} relevant")
 
@@ -3605,6 +3833,97 @@ class SingleMainNanozymePipeline:
                 cleaned[key] = cv
         return cleaned
 
+    _METAL_ELEMENTS_RE = re.compile(
+        r'\b(Fe|Co|Ni|Cu|Mn|Cr|Zn|Ce|Au|Ag|Pt|Pd|Ru|Rh|Ir|Ti|V|Mo|W|La|Zr|Al|Sn|Bi|In|Mg|Ca|Ba|Sr|Hf|Nb|Ta|Re|Os)\b'
+    )
+    _SUPPORT_MATERIALS = frozenset({
+        "C", "carbon", "graphene", "rGO", "GO", "CNT", "MWCNT", "SWCNT",
+        "g-C3N4", "C3N4", "graphitic carbon nitride",
+        "MOF", "ZIF-8", "ZIF-67", "UiO-66", "MIL-101", "HKUST-1",
+        "SiO2", "silica", "mesoporous silica",
+        "Al2O3", "TiO2", "ZnO", "SnO2", "CeO2", "ZrO2",
+        "N-C", "P-C", "S-C", "B-C",
+    })
+    _DOPANT_PATTERN = re.compile(
+        r'(?:N|P|S|B|F|Cl|Br|I|Se|Te)\s*(?:doped|doping|dopant)?',
+        re.I
+    )
+    _ORGANIC_COMPONENTS = frozenset({
+        "PVP", "PEG", "PVA", "PEI", "PDA", "PANI", "PPy", "chitosan",
+        "cellulose", "starch", "alginate", "gelatin", "BSA", "HSA",
+    })
+
+    def _parse_composition_structured(self, name: str, composition: str = None) -> Dict[str, Any]:
+        result = {"core": None, "dopants": [], "support": None, "organic_component": None}
+        if not name and not composition:
+            return result
+        text = f"{name or ''} {composition or ''}"
+        metals = self._METAL_ELEMENTS_RE.findall(text)
+        if metals:
+            result["core"] = metals[0]
+            for m in metals[1:]:
+                if m not in result["dopants"]:
+                    result["dopants"].append(m)
+        for sup in self._SUPPORT_MATERIALS:
+            if sup.lower() in text.lower():
+                result["support"] = sup
+                break
+        dopant_matches = self._DOPANT_PATTERN.findall(text)
+        for d in dopant_matches:
+            d_clean = d.strip().split()[0].upper()
+            if d_clean not in result["dopants"] and d_clean not in (result["core"],):
+                result["dopants"].append(d_clean)
+        for org in self._ORGANIC_COMPONENTS:
+            if org.lower() in text.lower():
+                result["organic_component"] = org
+                break
+        return result
+
+    def _sync_kinetics_list(self, record: Dict[str, Any]) -> Dict[str, Any]:
+        kin = record.get("main_activity", {}).get("kinetics", {})
+        kin_list = record.get("main_activity", {}).get("kinetics_list", [])
+        if not isinstance(kin_list, list):
+            kin_list = []
+        has_kinetics_data = any(
+            kin.get(k) is not None for k in ("Km", "Vmax", "kcat", "kcat_Km")
+        )
+        if kin_list:
+            for entry in kin_list:
+                if not isinstance(entry, dict):
+                    continue
+                for ukey in ("Km_unit", "Vmax_unit"):
+                    u = entry.get(ukey)
+                    if u and isinstance(u, str):
+                        try:
+                            from numeric_validator import normalize_unit
+                            entry[ukey] = normalize_unit(u)
+                        except ImportError:
+                            pass
+            if has_kinetics_data:
+                primary = {k: kin.get(k) for k in ("Km", "Km_unit", "Vmax", "Vmax_unit",
+                                                      "kcat", "kcat_unit", "kcat_Km", "kcat_Km_unit",
+                                                      "substrate", "source", "needs_review")}
+                if primary not in kin_list:
+                    kin_list.insert(0, primary)
+            else:
+                first = kin_list[0] if kin_list else {}
+                for k in ("Km", "Km_unit", "Vmax", "Vmax_unit", "kcat", "kcat_unit",
+                          "kcat_Km", "kcat_Km_unit", "substrate", "source", "needs_review"):
+                    if first.get(k) is not None:
+                        kin[k] = first[k]
+        elif has_kinetics_data:
+            entry = {k: kin.get(k) for k in ("Km", "Km_unit", "Vmax", "Vmax_unit",
+                                               "substrate", "source")}
+            if kin.get("kcat") is not None:
+                entry["kcat"] = kin["kcat"]
+                entry["kcat_unit"] = kin.get("kcat_unit")
+            if kin.get("kcat_Km") is not None:
+                entry["kcat_Km"] = kin["kcat_Km"]
+                entry["kcat_Km_unit"] = kin.get("kcat_Km_unit")
+            kin_list = [entry]
+        record["main_activity"]["kinetics_list"] = kin_list
+        return record
+
     def _merge_vlm(self, record: Dict[str, Any], vlm_results: List[Dict]) -> Dict[str, Any]:
         for vr in vlm_results:
             ev = vr.get("extracted_values", {})
@@ -3634,24 +3953,27 @@ class SingleMainNanozymePipeline:
                             "needs_review": True,
                         }
                         record["important_values"].append(iv)
-                        if record["main_activity"]["kinetics"]["Km"] is None:
-                            try:
-                                val = float(km_item["value"])
-                                record["main_activity"]["kinetics"]["Km"] = val
-                                record["main_activity"]["kinetics"]["Km_unit"] = km_item.get("unit")
-                                record["main_activity"]["kinetics"]["source"] = "VLM"
-                            except (ValueError, TypeError):
-                                pass
-                        elif isinstance(record["main_activity"]["kinetics"]["Km"], (int, float)):
-                            try:
-                                val = float(km_item["value"])
-                                if abs(val - record["main_activity"]["kinetics"]["Km"]) / max(abs(record["main_activity"]["kinetics"]["Km"]), 1e-10) > 0.5:
-                                    logger.warning(
-                                        f"[SMN] VLM Km={val} differs from rule Km={record['main_activity']['kinetics']['Km']}. "
-                                        f"Keeping rule-based value."
-                                    )
-                            except (ValueError, TypeError):
-                                pass
+                        try:
+                            vlm_val = float(km_item["value"])
+                        except (ValueError, TypeError):
+                            continue
+                        rule_km = record["main_activity"]["kinetics"].get("Km")
+                        if rule_km is None:
+                            record["main_activity"]["kinetics"]["Km"] = vlm_val
+                            record["main_activity"]["kinetics"]["Km_unit"] = km_item.get("unit")
+                            record["main_activity"]["kinetics"]["source"] = "VLM"
+                            logger.info(f"[SMN] VLM Km={vlm_val} fills empty kinetics (source=VLM)")
+                        elif isinstance(rule_km, (int, float)):
+                            rel_diff = abs(vlm_val - rule_km) / max(abs(rule_km), 1e-10)
+                            if rel_diff < 0.2:
+                                logger.info(f"[SMN] VLM Km={vlm_val} confirms rule Km={rule_km} (diff={rel_diff:.1%})")
+                            elif rel_diff > 0.5:
+                                logger.warning(
+                                    f"[SMN] VLM Km={vlm_val} differs >50% from rule Km={rule_km}. "
+                                    f"Keeping rule value, VLM in important_values."
+                                )
+                            else:
+                                logger.info(f"[SMN] VLM Km={vlm_val} differs {rel_diff:.1%} from rule Km={rule_km}")
 
                 for vmax_item in ev.get("Vmax", []):
                     if isinstance(vmax_item, dict) and vmax_item.get("value") is not None:
@@ -3664,24 +3986,27 @@ class SingleMainNanozymePipeline:
                             "needs_review": True,
                         }
                         record["important_values"].append(iv)
-                        if record["main_activity"]["kinetics"]["Vmax"] is None:
-                            try:
-                                val = float(vmax_item["value"])
-                                record["main_activity"]["kinetics"]["Vmax"] = val
-                                record["main_activity"]["kinetics"]["Vmax_unit"] = vmax_item.get("unit")
-                                record["main_activity"]["kinetics"]["source"] = "VLM"
-                            except (ValueError, TypeError):
-                                pass
-                        elif isinstance(record["main_activity"]["kinetics"]["Vmax"], (int, float)):
-                            try:
-                                val = float(vmax_item["value"])
-                                if abs(val - record["main_activity"]["kinetics"]["Vmax"]) / max(abs(record["main_activity"]["kinetics"]["Vmax"]), 1e-10) > 0.5:
-                                    logger.warning(
-                                        f"[SMN] VLM Vmax={val} differs from rule Vmax={record['main_activity']['kinetics']['Vmax']}. "
-                                        f"Keeping rule-based value."
-                                    )
-                            except (ValueError, TypeError):
-                                pass
+                        try:
+                            vlm_val = float(vmax_item["value"])
+                        except (ValueError, TypeError):
+                            continue
+                        rule_vmax = record["main_activity"]["kinetics"].get("Vmax")
+                        if rule_vmax is None:
+                            record["main_activity"]["kinetics"]["Vmax"] = vlm_val
+                            record["main_activity"]["kinetics"]["Vmax_unit"] = vmax_item.get("unit")
+                            record["main_activity"]["kinetics"]["source"] = "VLM"
+                            logger.info(f"[SMN] VLM Vmax={vlm_val} fills empty kinetics (source=VLM)")
+                        elif isinstance(rule_vmax, (int, float)):
+                            rel_diff = abs(vlm_val - rule_vmax) / max(abs(rule_vmax), 1e-10)
+                            if rel_diff < 0.2:
+                                logger.info(f"[SMN] VLM Vmax={vlm_val} confirms rule Vmax={rule_vmax} (diff={rel_diff:.1%})")
+                            elif rel_diff > 0.5:
+                                logger.warning(
+                                    f"[SMN] VLM Vmax={vlm_val} differs >50% from rule Vmax={rule_vmax}. "
+                                    f"Keeping rule value, VLM in important_values."
+                                )
+                            else:
+                                logger.info(f"[SMN] VLM Vmax={vlm_val} differs {rel_diff:.1%} from rule Vmax={rule_vmax}")
 
                 ps = ev.get("particle_size")
                 if isinstance(ps, dict) and ps.get("value") is not None:
@@ -3730,7 +4055,45 @@ class SingleMainNanozymePipeline:
                 if obs_text:
                     record["selected_nanozyme"]["morphology"] = obs_text[:200]
 
+        self._check_multi_figure_consistency(record)
+
         return record
+
+    def _check_multi_figure_consistency(self, record: Dict[str, Any]):
+        vlm_kms = []
+        vlm_vmaxs = []
+        for iv in record.get("important_values", []):
+            if not isinstance(iv, dict):
+                continue
+            name = iv.get("name", "")
+            try:
+                val = float(iv["value"]) if iv.get("value") else None
+            except (ValueError, TypeError):
+                continue
+            if val is None:
+                continue
+            if name == "VLM_Km":
+                vlm_kms.append(val)
+            elif name == "VLM_Vmax":
+                vlm_vmaxs.append(val)
+        for param_name, values in [("Km", vlm_kms), ("Vmax", vlm_vmaxs)]:
+            if len(values) < 2:
+                continue
+            max_val = max(values)
+            min_val = min(values)
+            if max_val == 0 and min_val == 0:
+                continue
+            rel_diff = (max_val - min_val) / max(abs(max_val), abs(min_val), 1e-10)
+            if rel_diff > 0.3:
+                import statistics
+                median_val = statistics.median(values)
+                logger.warning(
+                    f"[SMN] Multi-figure {param_name} inconsistency: values={values}, "
+                    f"max_diff={rel_diff:.1%}. Using median={median_val}."
+                )
+                record["diagnostics"].setdefault("warnings", []).append(
+                    f"multi_figure_{param_name}_inconsistent: {values}"
+                )
 
     async def extract(self, mid_json: Dict[str, Any]) -> Dict[str, Any]:
         record = make_empty_record()
@@ -3921,7 +4284,7 @@ class SingleMainNanozymePipeline:
 
         if table_sensing_values and not record.get("applications"):
             for sv in table_sensing_values:
-                app = {"application_type": "detection", "target_analyte": None, "method": None,
+                app = {"application_type": "sensing", "target_analyte": None, "method": None,
                        "linear_range": None, "detection_limit": None, "sample_type": None, "notes": None}
                 if sv["parameter"] == "LOD":
                     app["detection_limit"] = f"{sv['value']} {sv['unit']}"
@@ -3946,6 +4309,16 @@ class SingleMainNanozymePipeline:
                 logger.info(f"[SMN] ConsistencyAgent warnings: {consistency_warnings}")
 
         record = validate_schema(record)
+
+        sel_name = record.get("selected_nanozyme", {}).get("name")
+        sel_comp = record.get("selected_nanozyme", {}).get("composition")
+        cs = record.get("selected_nanozyme", {}).get("composition_structured", {})
+        if isinstance(cs, dict) and cs.get("core") is None and (sel_name or sel_comp):
+            parsed = self._parse_composition_structured(sel_name, sel_comp)
+            if parsed.get("core"):
+                record["selected_nanozyme"]["composition_structured"] = parsed
+
+        record = self._sync_kinetics_list(record)
 
         logger.info(f"[SMN] Final: status={record['diagnostics']['status']}, "
                      f"confidence={record['diagnostics']['confidence']}, "
@@ -4127,24 +4500,30 @@ class SingleMainNanozymePipeline:
     }
 
     _APP_TYPE_NORMALIZE = {
-        "sensing": "detection",
-        "colorimetric detection": "detection",
-        "colorimetric sensing": "detection",
-        "biosensing": "detection",
-        "determination": "detection",
-        "monitoring": "detection",
-        "assay": "detection",
+        "sensing": "sensing",
+        "detection": "sensing",
+        "colorimetric detection": "sensing",
+        "colorimetric sensing": "sensing",
+        "biosensing": "sensing",
+        "determination": "sensing",
+        "monitoring": "sensing",
+        "assay": "sensing",
+        "diagnostic": "sensing",
+        "diagnosis": "sensing",
+        "imaging": "sensing",
         "therapeutic": "therapeutic",
         "therapy": "therapeutic",
         "catalytic therapy": "therapeutic",
         "antitumor": "therapeutic",
-        "antibacterial": "therapeutic",
         "tumor therapy": "therapeutic",
-        "diagnostic": "diagnostic",
-        "diagnosis": "diagnostic",
+        "antibacterial": "antibacterial",
         "environmental": "environmental",
         "environmental monitoring": "environmental",
         "degradation": "environmental",
+        "environmental remediation": "environmental",
+        "antioxidant": "antioxidant",
+        "biofilm_inhibition": "biofilm_inhibition",
+        "anti-biofilm": "biofilm_inhibition",
     }
 
     def _normalize_enzyme_type(self, raw) -> str:
@@ -4686,6 +5065,16 @@ class SingleMainNanozymePipeline:
                         record["main_activity"]["enzyme_like_type"] = llm_type
                 elif key in llm_act and llm_act[key] is not None:
                     record["main_activity"][key] = llm_act[key]
+
+        if "main_activity" in llm:
+            llm_act = llm["main_activity"]
+            if "kinetics_list" in llm_act and isinstance(llm_act["kinetics_list"], list):
+                valid_kin_list = []
+                for entry in llm_act["kinetics_list"]:
+                    if isinstance(entry, dict) and any(v is not None for v in entry.values()):
+                        valid_kin_list.append(entry)
+                if valid_kin_list:
+                    record["main_activity"]["kinetics_list"] = valid_kin_list
 
         if "applications" in llm and isinstance(llm["applications"], list):
             valid = []

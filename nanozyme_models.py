@@ -130,7 +130,7 @@ def get_assay_type_enum_string() -> str:
 
 
 def get_application_type_enum_string() -> str:
-    return '"detection" | "sensing" | "biosensing" | "imaging" | "therapeutic" | "antibacterial" | "wound_healing" | "environmental_remediation" | "other"'
+    return '"sensing" | "therapeutic" | "antibacterial" | "environmental" | "antioxidant" | "biofilm_inhibition" | "other"'
 
 
 def get_figure_type_enum_string() -> str:

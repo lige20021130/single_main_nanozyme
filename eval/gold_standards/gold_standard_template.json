@@ -1,0 +1,70 @@
+{
+  "_comment": "Gold Standard annotation template, aligned with EMPTY_RECORD (single_main_nanozyme.v2). All null values indicate fields to fill. Delete this _comment when done.",
+  "paper": {
+    "title": null,
+    "authors": null,
+    "journal": null,
+    "year": null,
+    "doi": null
+  },
+  "selected_nanozyme": {
+    "name": null,
+    "composition": null,
+    "metal_elements": [],
+    "dopants_or_defects": [],
+    "morphology": null,
+    "size": null,
+    "size_unit": null,
+    "synthesis_method": null,
+    "crystal_structure": null,
+    "characterization": [],
+    "stability": null
+  },
+  "main_activity": {
+    "enzyme_like_type": null,
+    "substrates": [],
+    "assay_method": null,
+    "signal": null,
+    "conditions": {
+      "buffer": null,
+      "pH": null,
+      "temperature": null,
+      "reaction_time": null
+    },
+    "pH_profile": {
+      "optimal_pH": null,
+      "pH_range": null,
+      "pH_stability_range": null
+    },
+    "temperature_profile": {
+      "optimal_temperature": null,
+      "temperature_range": null,
+      "thermal_stability": null
+    },
+    "kinetics": {
+      "Km": null,
+      "Km_unit": null,
+      "Vmax": null,
+      "Vmax_unit": null,
+      "kcat": null,
+      "kcat_unit": null,
+      "kcat_Km": null,
+      "kcat_Km_unit": null,
+      "substrate": null,
+      "source": null
+    },
+    "mechanism": null
+  },
+  "applications": [
+    {
+      "application_type": null,
+      "target_analyte": null,
+      "method": null,
+      "linear_range": null,
+      "detection_limit": null,
+      "detection_limit_unit": null,
+      "sample_type": null,
+      "notes": null
+    }
+  ]
+}

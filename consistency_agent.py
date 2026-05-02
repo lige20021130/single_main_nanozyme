@@ -91,6 +91,10 @@ class ConsistencyAgent:
         warnings.extend(w4)
         record, w5 = self.check_cross_field_consistency(record)
         warnings.extend(w5)
+        record, w6 = self.check_kinetics_substrate_consistency(record)
+        warnings.extend(w6)
+        record, w7 = self.check_application_enzyme_consistency(record)
+        warnings.extend(w7)
         return record, warnings
 
     def normalize_enzyme_types(self, record: Dict) -> Tuple[Dict, List[str]]:
@@ -248,4 +252,51 @@ class ConsistencyAgent:
                 except (ValueError, TypeError, AttributeError):
                     pass
 
+        return record, warnings
+
+    def check_kinetics_substrate_consistency(self, record: Dict) -> Tuple[Dict, List[str]]:
+        warnings = []
+        act = record.get("main_activity", {})
+        kin = act.get("kinetics", {})
+        if not isinstance(kin, dict):
+            return record, warnings
+        km_sub = (kin.get("substrate") or "").strip().lower()
+        kin_list = act.get("kinetics_list", [])
+        if isinstance(kin_list, list) and len(kin_list) > 1:
+            substrates = set()
+            for entry in kin_list:
+                if isinstance(entry, dict):
+                    s = (entry.get("substrate") or "").strip().lower()
+                    if s:
+                        substrates.add(s)
+            if len(substrates) > 1:
+                warnings.append(f"multiple_kinetics_substrates: {substrates}")
+                kin["needs_review"] = True
+        return record, warnings
+
+    _ENZYME_APP_COMPATIBILITY = {
+        "peroxidase-like": {"sensing", "therapeutic", "antibacterial", "antioxidant", "environmental", "biofilm_inhibition", "other"},
+        "oxidase-like": {"sensing", "therapeutic", "antibacterial", "antioxidant", "environmental", "other"},
+        "catalase-like": {"therapeutic", "antioxidant", "environmental", "other"},
+        "superoxide-dismutase-like": {"therapeutic", "antioxidant", "other"},
+        "glutathione-peroxidase-like": {"therapeutic", "antioxidant", "other"},
+    }
+
+    def check_application_enzyme_consistency(self, record: Dict) -> Tuple[Dict, List[str]]:
+        warnings = []
+        etype = (record.get("main_activity", {}).get("enzyme_like_type") or "").lower().strip()
+        if not etype:
+            return record, warnings
+        compatible = self._ENZYME_APP_COMPATIBILITY.get(etype)
+        if not compatible:
+            return record, warnings
+        for app in record.get("applications", []):
+            if not isinstance(app, dict):
+                continue
+            app_type = (app.get("application_type") or "").lower().strip()
+            if not app_type:
+                continue
+            if app_type not in compatible:
+                warnings.append(f"app_type_incompatible_with_enzyme: {app_type} vs {etype}")
+                app["needs_review"] = True
         return record, warnings
