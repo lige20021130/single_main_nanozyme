@@ -126,7 +126,7 @@ class PDFBasicGUI:
         self.recursive = tk.BooleanVar(value=False)
         self.mid_json_output_dir = tk.StringVar()
         self.extracted_json_output_dir = tk.StringVar()
-        self._extraction_mode = "canonical_multi_system"
+        self._extraction_mode = "single_main_nanozyme"
 
         self.mid_json_path = None
         self.extracted_json_path = None
@@ -252,11 +252,7 @@ class PDFBasicGUI:
 
         mode_row = ttk.Frame(mode_frame)
         mode_row.pack(fill="x", pady=2)
-        ttk.Label(mode_row, text="提取模式:").pack(side="left", padx=5)
-        self.extraction_mode_var = tk.StringVar(value="canonical_multi_system")
-        for text, mode in [("多系统全量", "canonical_multi_system"), ("单主纳米酶", "single_main_nanozyme")]:
-            ttk.Radiobutton(mode_row, text=text, variable=self.extraction_mode_var,
-                            value=mode, command=self._on_extraction_mode_change).pack(side="left", padx=5)
+        ttk.Label(mode_row, text="提取模式: 单主纳米酶").pack(side="left", padx=5)
 
         output_row = ttk.Frame(mode_frame)
         output_row.pack(fill="x", pady=2)
@@ -568,10 +564,6 @@ class PDFBasicGUI:
             self.mid_json_output_dir.set(folder)
             self.log(f"[配置] 中间 JSON 输出目录: {folder}")
 
-    def _on_extraction_mode_change(self):
-        self._extraction_mode = self.extraction_mode_var.get()
-        self.log(f"[配置] 提取模式切换为: {self._extraction_mode}")
-    
     def select_extracted_json_output(self):
         """选择大模型提取 JSON 输出目录"""
         folder = filedialog.askdirectory(title="选择提取结果输出目录")
@@ -1151,7 +1143,7 @@ class PDFBasicGUI:
                 rulebook_path="rulebook.json",
                 runtime_overrides=overrides,
                 pdf_stem=pdf.stem,
-                extraction_mode=getattr(self, '_extraction_mode', 'canonical_multi_system'),
+                extraction_mode="single_main_nanozyme",
             )
             pre_buf = io.StringIO()
             with contextlib.redirect_stdout(pre_buf):

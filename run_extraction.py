@@ -99,19 +99,19 @@ def main():
         epilog="""
 示例:
   # 从已有 mid_task.json 提取
-  python run_extraction.py --mode single_main_nanozyme --mid-task paper_mid_task.json --output results
+  python run_extraction.py --mid-task paper_mid_task.json --output results
 
   # 从 PDF 直接提取（需要预处理器）
-  python run_extraction.py --mode single_main_nanozyme --input paper.pdf --output results
+  python run_extraction.py --input paper.pdf --output results
 
   # 批量提取
-  python run_extraction.py --mode single_main_nanozyme --input-dir ./pdfs --output results
+  python run_extraction.py --input-dir ./pdfs --output results
 
   # 仅规则模式（不调用 LLM/VLM）
-  python run_extraction.py --mode single_main_nanozyme --mid-task paper_mid_task.json --output results --no-llm --no-vlm
+  python run_extraction.py --mid-task paper_mid_task.json --output results --no-llm --no-vlm
 
   # 禁用缓存
-  python run_extraction.py --mode single_main_nanozyme --mid-task paper_mid_task.json --output results --no-cache
+  python run_extraction.py --mid-task paper_mid_task.json --output results --no-cache
         """,
     )
 
@@ -121,9 +121,6 @@ def main():
     input_group.add_argument("--input-dir", type=str, help="批量输入目录（PDF 或 mid_task.json）")
 
     parser.add_argument("--output", type=str, default="./extraction_results", help="输出目录")
-    parser.add_argument("--mode", type=str, default="single_main_nanozyme",
-                        choices=["single_main_nanozyme", "canonical_multi_system"],
-                        help="提取模式")
     parser.add_argument("--no-llm", action="store_true", help="禁用 LLM，仅用规则提取")
     parser.add_argument("--no-vlm", action="store_true", help="禁用 VLM 图像提取")
     parser.add_argument("--no-cache", action="store_true", help="禁用缓存")
@@ -145,10 +142,6 @@ def main():
             "max_evidence_sentences_per_bucket": args.max_evidence,
         }
     }
-
-    if args.mode != "single_main_nanozyme":
-        logger.error("此脚本仅支持 single_main_nanozyme 模式")
-        sys.exit(1)
 
     mid_tasks: List[Path] = []
 

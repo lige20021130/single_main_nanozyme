@@ -334,7 +334,7 @@ class NanozymePreprocessor:
         self.high_value_dir = self.output_root / "high_value_images" / self.pdf_stem
         self.high_value_dir.mkdir(parents=True, exist_ok=True)
 
-        self.extraction_mode = extraction_mode or "canonical_multi_system"
+        self.extraction_mode = extraction_mode or "single_main_nanozyme"
 
         # 加载规则库
         self.rulebook_path = Path(rulebook_path)
