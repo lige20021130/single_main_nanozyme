@@ -3834,18 +3834,17 @@ class SingleMainNanozymePipeline:
         return cleaned
 
     _METAL_ELEMENTS_RE = re.compile(
-        r'\b(Fe|Co|Ni|Cu|Mn|Cr|Zn|Ce|Au|Ag|Pt|Pd|Ru|Rh|Ir|Ti|V|Mo|W|La|Zr|Al|Sn|Bi|In|Mg|Ca|Ba|Sr|Hf|Nb|Ta|Re|Os)\b'
+        r'(?:^|[\s\-/(])(Fe|Co|Ni|Cu|Mn|Cr|Zn|Ce|Au|Ag|Pt|Pd|Ru|Rh|Ir|Ti|V|Mo|W|La|Zr|Al|Sn|Bi|In|Mg|Ca|Ba|Sr|Hf|Nb|Ta|Re|Os)(?![a-z])'
     )
     _SUPPORT_MATERIALS = frozenset({
-        "C", "carbon", "graphene", "rGO", "GO", "CNT", "MWCNT", "SWCNT",
+        "carbon", "graphene", "rGO", "GO", "CNT", "MWCNT", "SWCNT",
         "g-C3N4", "C3N4", "graphitic carbon nitride",
         "MOF", "ZIF-8", "ZIF-67", "UiO-66", "MIL-101", "HKUST-1",
         "SiO2", "silica", "mesoporous silica",
-        "Al2O3", "TiO2", "ZnO", "SnO2", "CeO2", "ZrO2",
         "N-C", "P-C", "S-C", "B-C",
     })
     _DOPANT_PATTERN = re.compile(
-        r'(?:N|P|S|B|F|Cl|Br|I|Se|Te)\s*(?:doped|doping|dopant)?',
+        r'\b(N|P|S|B|F|Cl|Br|I|Se|Te)\s*(?:doped|doping|dopant)',
         re.I
     )
     _ORGANIC_COMPONENTS = frozenset({
@@ -3865,7 +3864,9 @@ class SingleMainNanozymePipeline:
                 if m not in result["dopants"]:
                     result["dopants"].append(m)
         for sup in self._SUPPORT_MATERIALS:
-            if sup.lower() in text.lower():
+            sup_pattern = re.compile(r'(?:^|[\s\-/(])' + re.escape(sup) + r'(?:[\s\-/,).]|$)',
+                                     re.I)
+            if sup_pattern.search(text):
                 result["support"] = sup
                 break
         dopant_matches = self._DOPANT_PATTERN.findall(text)
@@ -3874,7 +3875,9 @@ class SingleMainNanozymePipeline:
             if d_clean not in result["dopants"] and d_clean not in (result["core"],):
                 result["dopants"].append(d_clean)
         for org in self._ORGANIC_COMPONENTS:
-            if org.lower() in text.lower():
+            org_pattern = re.compile(r'(?:^|[\s\-/(])' + re.escape(org) + r'(?:[\s\-/,).]|$)',
+                                     re.I)
+            if org_pattern.search(text):
                 result["organic_component"] = org
                 break
         return result
