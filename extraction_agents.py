@@ -25,6 +25,22 @@ def _norm_unit(unit):
         return unit
 
 
+def _is_concentration_unit(unit):
+    try:
+        from numeric_validator import is_concentration_unit as _icu
+        return _icu(unit) if unit else False
+    except ImportError:
+        return bool(unit and re.match(r'^[mμunp]?M$|^[mμunp]?mol', unit, re.I))
+
+
+def _is_rate_unit(unit):
+    try:
+        from numeric_validator import is_rate_unit as _iru
+        return _iru(unit) if unit else False
+    except ImportError:
+        return bool(unit and re.search(r'M\s*[sS]|M/?s|mM/?s|s[\u207b\-]1', unit, re.I))
+
+
 class KineticsAgent:
     _METHOD_PRIORITY = {
         "uv-vis": 1, "uv/vis": 1, "uv vis": 1, "absorption": 1,
@@ -64,15 +80,14 @@ class KineticsAgent:
         return record
 
     def _validate_kinetics_units(self, record):
-        from numeric_validator import is_concentration_unit, is_rate_unit
         kin = record["main_activity"]["kinetics"]
         km_unit = kin.get("Km_unit")
-        if km_unit and is_rate_unit(km_unit) and not is_concentration_unit(km_unit):
+        if km_unit and _is_rate_unit(km_unit) and not _is_concentration_unit(km_unit):
             logger.warning(f"[KineticsAgent] Km_unit='{km_unit}' is a rate unit, clearing.")
             kin["Km_unit"] = None
             kin["needs_review"] = True
         vmax_unit = kin.get("Vmax_unit")
-        if vmax_unit and is_concentration_unit(vmax_unit) and not is_rate_unit(vmax_unit):
+        if vmax_unit and _is_concentration_unit(vmax_unit) and not _is_rate_unit(vmax_unit):
             logger.warning(f"[KineticsAgent] Vmax_unit='{vmax_unit}' is a concentration unit, clearing.")
             kin["Vmax_unit"] = None
             kin["needs_review"] = True
@@ -96,11 +111,10 @@ class KineticsAgent:
                     g2_unit = m.group(2)
                     g3_val = _parse_scientific_notation(m.group(3))
                     g4_unit = m.group(4)
-                    from numeric_validator import is_concentration_unit, is_rate_unit
-                    g1_is_conc = is_concentration_unit(g2_unit) if g2_unit else False
-                    g3_is_rate = is_rate_unit(g4_unit) if g4_unit else False
-                    g1_is_rate = is_rate_unit(g2_unit) if g2_unit else False
-                    g3_is_conc = is_concentration_unit(g4_unit) if g4_unit else False
+                    g1_is_conc = _is_concentration_unit(g2_unit)
+                    g3_is_rate = _is_rate_unit(g4_unit)
+                    g1_is_rate = _is_rate_unit(g2_unit)
+                    g3_is_conc = _is_concentration_unit(g4_unit)
                     if g1_is_conc and g3_is_rate:
                         km_val, km_unit = g1_val, g2_unit
                         vmax_val, vmax_unit = g3_val, g4_unit
@@ -173,8 +187,14 @@ class KineticsAgent:
             km_candidates.sort(key=lambda c: c[0])
             best = km_candidates[0]
             kin["Km"] = best[1]
-            nu = _norm_unit(best[2])
-            kin["Km_unit"] = nu if nu else best[2]
+            raw_km_unit = best[2]
+            if raw_km_unit and _is_concentration_unit(raw_km_unit):
+                kin["Km_unit"] = _norm_unit(raw_km_unit) or raw_km_unit
+            elif raw_km_unit and _is_rate_unit(raw_km_unit):
+                logger.warning(f"[KineticsAgent] Rule Km_unit='{raw_km_unit}' is a rate unit, not concentration. Clearing.")
+                kin["Km_unit"] = None
+            else:
+                kin["Km_unit"] = _norm_unit(raw_km_unit) if raw_km_unit else raw_km_unit
             kin["source"] = best[3]
             if len(km_candidates) > 1:
                 logger.info(f"[KineticsAgent] Km multi-method: picked {best[1]} {best[2]} (pri={best[0]}) from {len(km_candidates)} candidates")
@@ -183,8 +203,14 @@ class KineticsAgent:
             vmax_candidates.sort(key=lambda c: c[0])
             best = vmax_candidates[0]
             kin["Vmax"] = best[1]
-            nu = _norm_unit(best[2])
-            kin["Vmax_unit"] = nu if nu else best[2]
+            raw_vmax_unit = best[2]
+            if raw_vmax_unit and _is_rate_unit(raw_vmax_unit):
+                kin["Vmax_unit"] = _norm_unit(raw_vmax_unit) or raw_vmax_unit
+            elif raw_vmax_unit and _is_concentration_unit(raw_vmax_unit):
+                logger.warning(f"[KineticsAgent] Rule Vmax_unit='{raw_vmax_unit}' is a concentration unit, not rate. Clearing.")
+                kin["Vmax_unit"] = None
+            else:
+                kin["Vmax_unit"] = _norm_unit(raw_vmax_unit) if raw_vmax_unit else raw_vmax_unit
             kin["source"] = best[3]
             if len(vmax_candidates) > 1:
                 logger.info(f"[KineticsAgent] Vmax multi-method: picked {best[1]} {best[2]} (pri={best[0]}) from {len(vmax_candidates)} candidates")
@@ -899,6 +925,18 @@ class RuleExtractorAdapter:
                 if ph_profile.get("pH_stability_range") is not None:
                     break
 
+        if ph_profile.get("optimal_pH") is None:
+            cond_ph = record.get("main_activity", {}).get("conditions", {}).get("pH")
+            if cond_ph:
+                try:
+                    val = float(cond_ph)
+                    if 0 < val <= 14:
+                        ph_profile["optimal_pH"] = val
+                        if not record["main_activity"]["conditions"].get("pH"):
+                            record["main_activity"]["conditions"]["pH"] = str(val)
+                except (ValueError, TypeError):
+                    pass
+
     def _extract_temperature_profile(self, record, buckets):
         temp_profile = record["main_activity"].get("temperature_profile", {})
         if not isinstance(temp_profile, dict):
@@ -1033,6 +1071,18 @@ class RuleExtractorAdapter:
                         break
                 if temp_profile.get("thermal_stability") is not None:
                     break
+
+        if temp_profile.get("optimal_temperature") is None:
+            cond_temp = record.get("main_activity", {}).get("conditions", {}).get("temperature")
+            if cond_temp:
+                m = re.search(r'([\d.]+)', str(cond_temp))
+                if m:
+                    try:
+                        val = float(m.group(1))
+                        if 15 <= val <= 80:
+                            temp_profile["optimal_temperature"] = f"{m.group(1)} °C"
+                    except (ValueError, TypeError):
+                        pass
 
     _MORPHOLOGY_TERMS = [
         "nanoparticle", "nanoparticles", "nanosphere", "nanospheres",

@@ -1620,6 +1620,25 @@ class CandidateRecaller:
             if self._is_valid_candidate(name):
                 results.append(name)
         for m in re.finditer(
+            r'\b(?:Fe|Co|Ni|Mn|Cu|Zn|Ce|Au|Ag|Pt|Pd|Ti|V|Cr|Mo|W|Ru|Rh|Ir|La|Zr|Al|Sn|Bi|In|Ga|Ge|Sb|Te|Hf|Ta|Re|Os|Y|Sc|Cd|Hg|Tl|Pb|Nb)\d*\s+Single[-\s]?Atom\b',
+            title, re.I,
+        ):
+            raw = m.group(0).strip()
+            metal_m = re.match(r'([A-Z][a-z]?\d*)', raw)
+            if metal_m:
+                sa_name = f"{metal_m.group(1)}-SAN"
+                if self._is_valid_candidate(sa_name):
+                    results.append(sa_name)
+                if self._is_valid_candidate(raw):
+                    results.append(raw)
+        for m in re.finditer(
+            r'\b(?:Fe|Co|Ni|Mn|Cu|Zn|Ce|Au|Ag|Pt|Pd|Ti|V|Cr|Mo|W|Ru|Rh|Ir|La|Zr|Al|Sn|Bi|In|Ga|Ge|Sb|Te|Hf|Ta|Re|Os|Y|Sc|Cd|Hg|Tl|Pb|Nb)\d*/(?:LDH|LDHs|MOF|COF|ZIF)\b',
+            title, re.I,
+        ):
+            name = m.group(0).strip()
+            if self._is_valid_candidate(name):
+                results.append(name)
+        for m in re.finditer(
             r'\b\w+-doped\s+\w+\s+\w+\b',
             title, re.I,
         ):
@@ -1887,6 +1906,17 @@ class NanozymeScorer:
                 name_metals = set(_METAL_ELEMENTS_RE.findall(cand["name"]))
                 if title_metals and name_metals and name_metals & title_metals:
                     score += 8
+                supported_m = re.search(
+                    r'\b(\w[\w@/\-]*)\s+Supported\s+(\w[\w@/\-]*)\b',
+                    title, re.I,
+                )
+                if supported_m:
+                    supported_name = supported_m.group(2).strip()
+                    if name_lower in supported_name.lower() or supported_name.lower() in name_lower:
+                        score += 10
+                    carrier_name = supported_m.group(1).strip()
+                    if name_lower in carrier_name.lower() or carrier_name.lower() in name_lower:
+                        score -= 5
 
             score += self._score_data_richness(cand, doc)
             score += self._score_narrative_importance(cand, title, abstract_text)
