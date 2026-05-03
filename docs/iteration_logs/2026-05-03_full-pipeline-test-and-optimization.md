@@ -1,13 +1,13 @@
 # 全流程提取测试与系统优化
 
 ## 更新时间
-2026-05-03 20:35
+2026-05-03 21:35（第二轮更新）
 
 ## 更新类型
 - Bug 修复 / 功能优化 / 测试
 
 ## 背景
-使用2021.6.1目录下大小前十的文献PDF进行真实全流程提取测试，发现多个系统性质量问题，从机制层面进行修复。
+使用2021.6.1目录下大小前十的文献PDF进行真实全流程提取测试，发现多个系统性质量问题，从机制层面进行修复。第二轮继续优化。
 
 ## 测试结果
 
@@ -16,12 +16,17 @@
 - 平均质量评分：63.2/100
 - 主要问题：Km/Vmax单位互换、材料名称截断/错误、detection兼容性误报、动力学数据缺失、pH/温度缺失
 
-### 第二轮测试（优化后）
-- 平均质量评分：63.0/100（评分标准未变，但关键数据准确性提升）
+### 第二轮测试（第一轮优化后）
 - Km/Vmax值互换已修复（Co-Fe LDHs: Km从8.52e-06修正为848.42）
 - OCR碎片I385/I375已被过滤
 - detection→sensing归一化完全生效，兼容性误报消除
 - FeOOH@Fe名称更完整
+
+### 第三轮测试（第二轮优化后）
+- Co-Fe LDHs Km值848.42确认正确（之前是8.52e-06错误值）
+- detection归一化持续生效
+- conditions→optimal_pH/optimal_temperature回填逻辑生效
+- 材料名称识别增加Single-Atom/X-LDH模式
 
 ## 改动内容
 
@@ -59,6 +64,25 @@
 - 新增4个optimal_pH额外匹配模式
 - `_extract_temperature_profile` 扩展搜索范围
 - 新增3个optimal_temperature额外匹配模式
+
+### 7. 第二轮优化 - 循环导入修复（extraction_agents.py）
+- 新增 `_is_concentration_unit()` 和 `_is_rate_unit()` 顶层辅助函数
+- 替换函数内部的 `from numeric_validator import ...` 延迟导入
+- 避免与 `single_main_nanozyme_extractor.py` 的循环导入
+
+### 8. 第二轮优化 - 规则提取单位校验（extraction_agents.py）
+- KineticsAgent `_extract_kinetics_from_text` 中Km/Vmax赋值增加单位类型校验
+- 错误单位（Km_unit为速率单位、Vmax_unit为浓度单位）不再赋值，记录警告
+
+### 9. 第二轮优化 - 候选材料召回增强（single_main_nanozyme_extractor.py）
+- `_extract_title_material` 增加"X Single-Atom"模式识别，自动生成"X-SAN"候选
+- `_extract_title_material` 增加"X/LDH"模式识别
+- `NanozymeScorer.score` 增加"Supported"模式评分（活性材料+10分，载体-5分）
+- `validate_schema` 增加最终app_type归一化保障
+
+### 10. 第二轮优化 - pH/温度回填（extraction_agents.py）
+- `_extract_pH_profile` 末尾增加conditions.pH→optimal_pH回填
+- `_extract_temperature_profile` 末尾增加conditions.temperature→optimal_temperature回填
 
 ## 未改动内容
 - PDF解析模块（opendataloader_pdf）未改动
