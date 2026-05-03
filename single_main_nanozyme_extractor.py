@@ -2290,6 +2290,76 @@ class TableProcessor:
         return values
 
 
+_KM_RANGES = (1e-9, 0.5)
+
+_PARAM_KEYWORDS = {
+    "Km": ["km", "Km", "michaelis constant", "michaelis-menten constant", "apparent km", "km value"],
+    "Vmax": ["vmax", "Vmax", "maximum velocity", "maximal velocity", "vmax value"],
+    "kcat": ["kcat", "turnover", "catalytic constant", "turnover number", "turnover frequency"],
+    "kcat_Km": ["kcat/km", "catalytic efficiency", "specificity constant", "kcat_km"],
+}
+
+_UNIT_HINTS = {
+    "Km": frozenset({"mM", "μM", "uM", "M", "nM", "µM", "mmol", "umol"}),
+    "Vmax": frozenset({"M/s", "mM/s", "μM/s", "uM/s", "nM/s", "M/min", "M h", "nM min", "M·s"}),
+    "kcat": frozenset({"s⁻¹", "s-1", "min⁻¹", "min-1", "/s", "/min", "s^−1", "s−1"}),
+    "kcat_Km": frozenset({"M⁻¹s⁻¹", "M-1s-1", "M⁻¹min⁻¹", "M-1min-1", "mM⁻¹s⁻¹"}),
+}
+
+
+def _extract_all_numbers_from_source(full_text: str):
+    results = []
+    chunks = re.split(r'(?<=[.!?])\s+', full_text)
+    for chunk in chunks:
+        if len(chunk) < 20:
+            continue
+        for m in re.finditer(r'([\d.]+)\s*[×x\u00d7]\s*10[\u207b\u2212\u2013\-]?\s*(\d+)', chunk):
+            try:
+                base = float(m.group(1))
+                exp = int(m.group(2))
+                neg = bool(re.search(r'10[\u207b\u2212\u2013\-]', m.group(0)))
+                val = base * (10 ** -exp) if neg else base * (10 ** exp)
+                results.append((val, chunk[:300]))
+            except (ValueError, IndexError):
+                pass
+        for m in re.finditer(r'([\d.]+)\s*[eE]\s*([\-−\u2212]?\d+)', chunk):
+            try:
+                base = float(m.group(1))
+                exp = int(m.group(2).replace('−', '-').replace('\u2212', '-'))
+                val = base * (10 ** exp)
+                results.append((val, chunk[:300]))
+            except (ValueError, IndexError):
+                pass
+        for m in re.finditer(r'(?<!\d)(\d+\.?\d*)(?!\d)', chunk):
+            try:
+                val = float(m.group(1))
+                results.append((val, chunk[:300]))
+            except ValueError:
+                pass
+    return results
+
+
+def _guess_unit_from_snippet(snippet: str, param: str) -> Optional[str]:
+    hints = _UNIT_HINTS.get(param, set())
+    sl = snippet.lower()
+    for hint in sorted(hints, key=len, reverse=True):
+        if hint.lower() in sl:
+            return hint
+    if param == "Km":
+        m = re.search(r'(mM|μM|uM|M|nM|µM)', snippet)
+        if m:
+            return m.group(1)
+    elif param == "Vmax":
+        m = re.search(r'(M/s|mM/s|μM/s|uM/s|nM/s|M·s)', snippet, re.I)
+        if m:
+            return m.group(1)
+    elif param in ("kcat", "kcat_Km"):
+        m = re.search(r'(s⁻¹|s-1|min⁻¹|min-1|M⁻¹s⁻¹|M-1s-1)', snippet)
+        if m:
+            return m.group(1)
+    return None
+
+
 class FigureProcessor:
     def summarize(self, vlm_tasks: List[Dict], selected_name: str) -> Dict[str, Any]:
         summaries = []
@@ -2319,6 +2389,32 @@ class FigureProcessor:
         if any(kw in cl for kw in ["detection", "sensing", "sensor", "lod", "calibration"]):
             return "application"
         return "other"
+
+
+class LanguageRuleAdapter:
+    def __init__(self, language: str = "en"):
+        self.language = language
+
+    def get_patterns(self, category: str):
+        if self.language == "zh":
+            return self._zh_patterns().get(category, [])
+        return []
+
+    def _zh_patterns(self):
+        return {
+            "enzyme_type": [
+                ("类过氧化物酶", "peroxidase-like"),
+                ("类氧化酶", "oxidase-like"),
+                ("类过氧化氢酶", "catalase-like"),
+                ("类超氧化物歧化酶", "superoxide-dismutase-like"),
+            ],
+            "kinetics": [
+                ("Km", "Km", "mM"),
+                ("米氏常数", "Km", "mM"),
+                ("Vmax", "Vmax", "M/s"),
+                ("最大反应速率", "Vmax", "M/s"),
+            ],
+        }
 
 
 class RuleExtractor:
@@ -2386,7 +2482,59 @@ class RuleExtractor:
         if doc:
             self._fulltext_fallback_extract(record, doc, selected_name)
 
+        self._verifier_assisted_extract(record, doc, selected_name)
+
         return record
+
+    def _verifier_assisted_extract(self, record, doc, selected_name):
+        kin = record["main_activity"]["kinetics"]
+        missing_params = []
+        if kin.get("Km") is None:
+            missing_params.append(("Km", "Km_unit"))
+        if kin.get("Vmax") is None:
+            missing_params.append(("Vmax", "Vmax_unit"))
+        if kin.get("kcat") is None:
+            missing_params.append(("kcat", "kcat_unit"))
+        if kin.get("kcat_Km") is None:
+            missing_params.append(("kcat_Km", "kcat_Km_unit"))
+
+        if not missing_params or not doc:
+            return
+
+        full_text = " ".join(doc.chunks)
+        all_numbers = _extract_all_numbers_from_source(full_text)
+
+        for param, unit_field in missing_params:
+            candidates = []
+            title_lower = (doc.metadata.get("title", "") or "").lower()
+            for num_val, snippet in all_numbers:
+                has_unit = _guess_unit_from_snippet(snippet, param)
+                if has_unit:
+                    ratio = 0
+                    if _KM_RANGES[0] <= num_val <= _KM_RANGES[1]:
+                        ratio += 1
+                    if selected_name.lower() in snippet.lower():
+                        ratio += 2
+                    for pkw in _PARAM_KEYWORDS.get(param, []):
+                        if pkw.lower() in snippet.lower():
+                            ratio += 3
+                    if param == "Km" and title_lower and "kinetic" not in title_lower:
+                        if "activity" in title_lower or "substrate" in title_lower:
+                            ratio += 1
+                    candidates.append((ratio, num_val, has_unit, snippet))
+
+            if candidates:
+                candidates.sort(key=lambda c: c[0], reverse=True)
+                best = candidates[0]
+                if best[0] >= 1:
+                    kin[param] = best[1]
+                    kin[f"{param}_unit"] = best[2]
+                    kin[f"_evidence_{param}"] = best[3][:300]
+                    kin["source"] = "verifier_fallback"
+                    logger.info(
+                        f"[SMN] Verifier fallback: {param}={best[1]} {best[2]} "
+                        f"(regex missed, found via numeric search, score={best[0]})"
+                    )
 
     _METHOD_PRIORITY = {
         "uv-vis": 1, "uv/vis": 1, "uv vis": 1, "absorption": 1,
@@ -3769,6 +3917,55 @@ class SingleMainNanozymePipeline:
             self._verifier_class = None
             logger.warning("[SMN] ExtractionVerifier not available")
 
+    def _deduplicate_vlm_tasks(self, tasks, priorities):
+        if len(tasks) <= 1:
+            return tasks, priorities
+
+        def _caption_words(task):
+            c = (task.get("caption", "") + " " + task.get("description", "")).lower()
+            return set(re.findall(r'[a-z0-9]{3,}', c))
+
+        keep = list(range(len(tasks)))
+        for i in range(len(tasks)):
+            if i not in keep:
+                continue
+            wi = _caption_words(tasks[i])
+            if not wi:
+                continue
+            for j in range(i + 1, len(tasks)):
+                if j not in keep:
+                    continue
+                wj = _caption_words(tasks[j])
+                if not wj:
+                    continue
+                intersection = wi & wj
+                if len(intersection) >= 3:
+                    union = wi | wj
+                    jaccard = len(intersection) / max(len(union), 1)
+                    if jaccard > 0.7:
+                        pi = priorities[i] if i < len(priorities) else 0
+                        pj = priorities[j] if j < len(priorities) else 0
+                        if pi >= pj:
+                            keep.remove(j)
+                            logger.info(
+                                f"[SMN] VLM dedup: task[{j}] removed (similar to task[{i}], "
+                                f"jaccard={jaccard:.1%}, caption='{list(wi & wj)[:3]}')"
+                            )
+                        else:
+                            keep.remove(i)
+                            logger.info(
+                                f"[SMN] VLM dedup: task[{i}] removed (similar to task[{j}], "
+                                f"jaccard={jaccard:.1%}, caption='{list(wi & wj)[:3]}')"
+                            )
+                            break
+
+        if len(keep) < len(tasks):
+            new_tasks = [tasks[k] for k in keep]
+            new_pri = [priorities[k] if k < len(priorities) else 0 for k in keep]
+            logger.info(f"[SMN] VLM dedup: {len(tasks)}→{len(new_tasks)} tasks after dedup")
+            return new_tasks, new_pri
+        return tasks, priorities
+
     async def _call_vlm(self, vlm_tasks: List[Dict], selected_name: str) -> Optional[List[Dict]]:
         if not self.client:
             return None
@@ -3836,7 +4033,12 @@ class SingleMainNanozymePipeline:
             paired = list(zip(task_priorities, filtered_tasks))
             paired.sort(key=lambda x: x[0], reverse=True)
             filtered_tasks = [t for _, t in paired[:max_vlm_tasks]]
+            task_priorities = [p for p, _ in paired[:max_vlm_tasks]]
             logger.info(f"[SMN] VLM tasks limited from {len(paired)} to {max_vlm_tasks} by priority")
+
+        filtered_tasks, task_priorities = self._deduplicate_vlm_tasks(
+            filtered_tasks, task_priorities
+        )
 
         logger.info(f"[SMN] VLM tasks: {len(vlm_tasks)} total, {len(filtered_tasks)} relevant")
 
@@ -4259,8 +4461,79 @@ class SingleMainNanozymePipeline:
                 record["applications"] = apps
 
         self._check_multi_figure_consistency(record)
+        self._cross_verify_vlm_no_evidence(record)
 
         return record
+
+    def _cross_verify_vlm_no_evidence(self, record: Dict[str, Any]):
+        kin = record["main_activity"]["kinetics"]
+        if not kin.get("_vlm_no_evidence"):
+            return
+
+        for param in ("Km", "Vmax"):
+            vlm_val = kin.get(param)
+            if vlm_val is None:
+                continue
+
+            rule_val = kin.get(f"_rule_{param}")
+            if rule_val is None:
+                rule_val = kin.get(param)
+            try:
+                vlm_f = float(vlm_val)
+            except (ValueError, TypeError):
+                continue
+
+            llm_alt = kin.get(f"_llm_{param}_alternative")
+            llm_f = None
+            if llm_alt is not None:
+                try:
+                    llm_f = float(llm_alt)
+                except (ValueError, TypeError):
+                    pass
+
+            rule_f = None
+            if rule_val is not None:
+                try:
+                    rule_f = float(rule_val)
+                except (ValueError, TypeError):
+                    pass
+
+            agreements = 0
+            if rule_f is not None and abs(vlm_f - rule_f) / max(abs(rule_f), 1e-10) < 0.2:
+                agreements += 1
+            if llm_f is not None and abs(vlm_f - llm_f) / max(abs(llm_f), 1e-10) < 0.2:
+                agreements += 1
+
+            if agreements >= 1:
+                logger.info(
+                    f"[SMN] VLM no_evidence {param}={vlm_f}: "
+                    f"agrees with {'rule' if rule_f else ''}{' and LLM' if llm_f and rule_f else 'LLM' if llm_f else 'no other'}. "
+                    f"Confidence boosted."
+                )
+                record["important_values"].append({
+                    "name": f"VLM_{param}_confirmed",
+                    "value": str(vlm_val),
+                    "unit": kin.get(f"{param}_unit", ""),
+                    "source": "VLM_no_evidence_cross_verified",
+                    "context": "VLM value without caption evidence, confirmed by cross-check with other sources",
+                    "needs_review": False,
+                })
+            else:
+                logger.warning(
+                    f"[SMN] VLM no_evidence {param}={vlm_f} has no corroborating source. "
+                    f"Demoting to important_values."
+                )
+                record["important_values"].append({
+                    "name": f"VLM_{param}_demoted",
+                    "value": str(vlm_val),
+                    "unit": kin.get(f"{param}_unit", ""),
+                    "source": "VLM_no_evidence_unverified",
+                    "context": "VLM value without caption evidence, no corroboration from rule or LLM",
+                    "needs_review": True,
+                })
+                kin[param] = None
+                kin[f"{param}_unit"] = None
+                kin["needs_review"] = True
 
     def _check_multi_figure_consistency(self, record: Dict[str, Any]):
         vlm_kms = []
@@ -4503,6 +4776,13 @@ class SingleMainNanozymePipeline:
                 self._verification_data = None
         else:
             self._verification_data = None
+
+        try:
+            from numeric_validator import calibrate_magnitude_ranges
+            ctx = calibrate_magnitude_ranges(doc.chunks)
+            self.num_val.set_paper_context(ctx)
+        except Exception as e:
+            logger.debug(f"[SMN] Paper context calibration skipped: {e}")
 
         record, val_warnings = self.num_val.validate(record, strict=self.config.numeric_validation_strict)
         warnings.extend(val_warnings)

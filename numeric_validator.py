@@ -189,10 +189,65 @@ def is_lineweaver_burk_context(evidence_text: str) -> bool:
     return bool(_LINeweAVER_BURK_RE.search(evidence_text))
 
 
+def calibrate_magnitude_ranges(text_chunks: List[str]) -> Dict[str, Tuple[float, float]]:
+    full_text = " ".join(text_chunks)
+    all_conc = []
+    for m in re.finditer(r'([\d.]+)\s*(mM|μM|uM|M|nM|µM|nmol|umol|mmol)', full_text):
+        try:
+            val = float(m.group(1))
+            unit = m.group(2)
+            if unit in ("M",):
+                all_conc.append(val)
+            elif unit in ("mM", "mmol"):
+                all_conc.append(val * 1e-3)
+            elif unit in ("μM", "uM", "µM", "umol"):
+                all_conc.append(val * 1e-6)
+            elif unit in ("nM", "nmol"):
+                all_conc.append(val * 1e-9)
+        except ValueError:
+            pass
+
+    adjusted = {
+        "Km_review": (1e-9, 1.0),
+        "Vmax_review": (1e-12, 1e6),
+    }
+
+    if not all_conc:
+        return adjusted
+
+    typical = sorted(all_conc)[len(all_conc) // 2] if all_conc else 1e-6
+    high = max(all_conc)
+
+    if typical < 1e-6:
+        adjusted["Km_review"] = (1e-9, max(0.01, typical * 10000))
+        adjusted["Vmax_review"] = (1e-12, max(1e-4, typical * 100))
+    elif typical < 1e-3:
+        adjusted["Km_review"] = (1e-9, max(0.1, typical * 10000))
+    else:
+        adjusted["Km_review"] = (1e-9, max(1.0, high * 5))
+
+    return adjusted
+
+
 class NumericValidator:
     def __init__(self):
         self.warnings: List[str] = []
         self.important_values: List[Dict[str, Any]] = []
+        self._paper_context: Optional[Dict[str, Tuple[float, float]]] = None
+
+    def set_paper_context(self, context: Dict[str, Tuple[float, float]]):
+        self._paper_context = context
+
+    def _get_adjusted_review_range(self, param: str) -> Tuple[float, float]:
+        if self._paper_context and param == "Km":
+            return self._paper_context.get("Km_review", (1e-9, 1.0))
+        if self._paper_context and param == "Vmax":
+            return self._paper_context.get("Vmax_review", (1e-12, 1e6))
+        if param == "Km":
+            return (1e-9, 1.0)
+        if param == "Vmax":
+            return (1e-12, 1e6)
+        return (0, float("inf"))
 
     def validate_kinetics_entry(
         self,
@@ -291,6 +346,20 @@ class NumericValidator:
             return None, demoted
         if review:
             needs_review_flag = True
+
+        if not review and not reject and self._paper_context:
+            rlo, rhi = self._get_adjusted_review_range(param)
+            if numeric_val < rlo or numeric_val > rhi:
+                typical = sorted(
+                    [v for v in [c * 1e-3 if u == "mM" else c * 1e-6 if u in ("μM", "uM") else c
+                     for c, u in zip([numeric_val], [unit or "M"])] if v > 0]
+                ) if False else [abs(numeric_val)]
+                needs_review_flag = True
+                logger.warning(
+                    f"[NumericValidator] {param}={numeric_val} {unit} "
+                    f"outside paper-specific review range ({rlo:.2e}–{rhi:.2e}). "
+                    f"Paper context suggests different concentration scale."
+                )
 
         if source == "figure_candidate":
             needs_review_flag = True
