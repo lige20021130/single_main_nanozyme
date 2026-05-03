@@ -71,6 +71,63 @@ VISION_PROMPT = """请分析这张来自纳米酶论文的图像。
 图注如下：
 {{caption}}"""
 
+TABLE_VLM_PROMPT = """请分析这张来自纳米酶论文的表格截图。
+
+你需要完成：
+1. 仔细读取表格中每一行每一列的数据
+2. 重点关注动力学参数（Km、Vmax、kcat、kcat/Km）和传感性能（LOD、线性范围）
+3. 区分"this work"行和对比文献行，优先提取"this work"行的数据
+4. 如果表格中有多个材料的数据，分别提取
+
+输出要求：
+- 只能输出一个 JSON 对象
+- 不要输出 Markdown
+- 不要输出解释
+- 不要臆测数值
+- 数值必须精确，保留原始有效数字
+
+输出格式：
+{
+  "figure_type": "kinetics_table",
+  "linked_material_mentions": [],
+  "linked_activity_type": null,
+  "extracted_values": {
+    "Km": [{"value": null, "unit": "mM", "material": null}],
+    "Vmax": [{"value": null, "unit": "M/s", "material": null}],
+    "kcat": [{"value": null, "unit": "s^-1", "material": null}],
+    "kcat_Km": [{"value": null, "unit": "M^-1 s^-1", "material": null}],
+    "particle_size": {"value": null, "unit": "nm"},
+    "peak_positions": [],
+    "other_values": [],
+    "sensing_performance": {"LOD": null, "linear_range": null, "sensitivity": null},
+    "application_hints": []
+  },
+  "observations": [],
+  "evidence_refs": [],
+  "reliability_note": null
+}
+
+注意：
+- Km 单位通常是 mM、μM、nM 等浓度单位
+- Vmax 单位通常是 M/s、μg/s、μM/s 等速率单位
+- kcat 单位通常是 s^-1
+- kcat/Km 单位通常是 M^-1 s^-1
+- 如果数值使用科学计数法（如 1.93 × 10⁴），请完整提取
+- 如果表格中标注了"this work"或"our work"或"present work"，优先提取该行
+- 如果某单元格为空或不可读，对应值填 null
+
+规则：
+- linked_activity_type 只能使用以下枚举之一：
+  {{enzyme_type_enum}},
+  null
+
+- 只有当表格中数值明确可读时，才填写参数值
+- 不要根据行标签猜测数值
+{{additional_context}}
+
+表注如下：
+{{caption}}"""
+
 class VLMExtractor:
     _CAPTION_TYPE_HINTS = {
         "kinetics_caption": "此图很可能是动力学曲线（如 Michaelis-Menten / Lineweaver-Burk），请重点提取 Km、Vmax、kcat 等参数值和对应材料标签。",
@@ -108,9 +165,6 @@ class VLMExtractor:
         if caption_type and caption_type in self._CAPTION_TYPE_HINTS:
             context_parts.append(self._CAPTION_TYPE_HINTS[caption_type])
 
-        # Inject body_context: sentences from paper body that reference or co-occur with this figure.
-        # This helps VLM distinguish activity types (e.g. oxidase-like vs peroxidase-like) from
-        # experimental descriptions rather than visual appearance alone.
         if body_context:
             context_parts.append(f"正文相关句（辅助判断图表类型，不作为数值来源）：{body_context[:400]}")
 
@@ -121,8 +175,18 @@ class VLMExtractor:
             ]
             additional_context = "\n".join(lines)
 
+        use_table_prompt = (
+            elem_type == "table"
+            or "table_vlm_fallback" in vlm_reason
+            or caption_type == "kinetics_caption"
+        )
 
-        prompt = VISION_PROMPT.replace("{{caption}}", caption or "无图注")
+        if use_table_prompt:
+            base_prompt = TABLE_VLM_PROMPT
+        else:
+            base_prompt = VISION_PROMPT
+
+        prompt = base_prompt.replace("{{caption}}", caption or "无图注")
         prompt = prompt.replace("{{additional_context}}", additional_context)
         prompt = prompt.replace("{{figure_type_enum}}", get_figure_type_enum_string())
         prompt = prompt.replace("{{enzyme_type_enum}}", get_enzyme_type_enum_string())

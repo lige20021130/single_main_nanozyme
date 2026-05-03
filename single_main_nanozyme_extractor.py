@@ -1245,6 +1245,28 @@ def validate_schema(record: Dict[str, Any]) -> Dict[str, Any]:
         if not matched:
             warnings.append(f"unknown_enzyme_type: {etype}")
 
+    sel_name = record.get("selected_nanozyme", {}).get("name")
+    if sel_name and isinstance(sel_name, str):
+        _NAME_SUBSTRATE_PATTERN = re.compile(
+            r'\s*/\s*(?:H2O2|H₂O₂|TMB|ABTS|OPD|L-ascorbic|glucose|DA|H2O|NADH)',
+            re.I
+        )
+        _NAME_SYSTEM_SUFFIX = re.compile(
+            r'\s+(?:system|solution|mixture|reaction|catalyst|composite\s+system)$',
+            re.I
+        )
+        cleaned = sel_name
+        sub_match = _NAME_SUBSTRATE_PATTERN.search(cleaned)
+        if sub_match:
+            cleaned = cleaned[:sub_match.start()].strip()
+            warnings.append(f"name_cleaned_substrate_removed: '{sel_name}' -> '{cleaned}'")
+        sys_match = _NAME_SYSTEM_SUFFIX.search(cleaned)
+        if sys_match:
+            cleaned = cleaned[:sys_match.start()].strip()
+            warnings.append(f"name_cleaned_system_suffix_removed: '{sel_name}' -> '{cleaned}'")
+        if cleaned != sel_name and cleaned:
+            record["selected_nanozyme"]["name"] = cleaned
+
     for app in record.get("applications", []):
         if not isinstance(app, dict):
             continue
@@ -4246,6 +4268,77 @@ class SingleMainNanozymePipeline:
                 await asyncio.sleep(2)
         return results if results else None
 
+    async def _call_table_vlm_fallback(
+        self, fallback_tasks: List[Dict], selected_name: str
+    ) -> Optional[List[Dict]]:
+        if not self.client or not fallback_tasks:
+            return None
+        try:
+            from vlm_extractor import VLMExtractor
+        except ImportError:
+            logger.warning("[SMN] VLMExtractor not available for table fallback")
+            return None
+
+        extractor = VLMExtractor(self.client, batch_size=1)
+        results = []
+
+        for task in fallback_tasks:
+            table_id = task.get("table_id", "unknown")
+            caption = task.get("caption", "")
+            table_type = task.get("table_type", "")
+            bbox = task.get("bbox")
+            page = task.get("page", 0)
+
+            image_path = None
+            for tbl in self._doc.table_task.get("tables", []):
+                if tbl.get("table_id") == table_id and tbl.get("image_path"):
+                    image_path = tbl["image_path"]
+                    break
+
+            if not image_path or not Path(image_path).exists():
+                logger.debug(f"[SMN] Table VLM fallback: no image for {table_id}")
+                continue
+
+            is_kinetics = table_type == "kinetics_parameters"
+            is_sensing = table_type == "sensing_performance"
+
+            if is_kinetics:
+                caption_type = "kinetics_caption"
+            elif is_sensing:
+                caption_type = "application_caption"
+            else:
+                caption_type = ""
+
+            vlm_reason = f"table_vlm_fallback({table_type})"
+
+            try:
+                result = await asyncio.wait_for(
+                    extractor._extract_from_image(
+                        image_path=image_path,
+                        caption=caption or f"Table: {table_id}",
+                        description="",
+                        elem_type="table",
+                        vlm_reason=vlm_reason,
+                        caption_type=caption_type,
+                        body_context="",
+                    ),
+                    timeout=60,
+                )
+                if result and "error" not in result:
+                    result["_source_task"] = table_id
+                    result["_source_caption"] = caption
+                    result["_is_table_fallback"] = True
+                    results.append(result)
+                    logger.info(f"[SMN] Table VLM fallback success: {table_id}")
+            except asyncio.TimeoutError:
+                logger.warning(f"[SMN] Table VLM fallback timed out for {table_id}")
+            except Exception as e:
+                logger.warning(f"[SMN] Table VLM fallback failed for {table_id}: {e}")
+
+            await asyncio.sleep(2)
+
+        return results if results else None
+
     _VLM_INVALID_VALUES = frozenset({
         "unknown", "not visible", "not clear", "unclear", "n/a", "na",
         "none", "null", "-", "--", "---", "not specified", "not provided",
@@ -4572,13 +4665,39 @@ class SingleMainNanozymePipeline:
             if observations:
                 obs_text = "; ".join(str(o) for o in observations if o)
                 if obs_text:
+                    _MORPH_FIGURE_DESC_RE = re.compile(
+                        r'(?:Panel\s+[A-Z]|Figure\s+\d|illustrates?|plots?\s|shows?\s|displays?\s|depicts?\s|presents?\s|demonstrates?\s|As\s+(?:can\s+be\s+)?seen|It\s+is\s+clear|The\s+(?:above|following)\s+figure|diagram|schematic|pathway|mechanism\s+links|catalyzes?\s+the\s+oxid)',
+                        re.I
+                    )
+                    _MORPH_VALID_TERMS = re.compile(
+                        r'(?:nanoparticle|nanosheet|nanotube|nanocluster|nanorod|nanowire|nanofiber|'
+                        r'nanozyme|sphere|spherical|rod|wire|fiber|sheet|layer|layered|'
+                        r'porous|hollow|core[- ]shell|dendritic|flower|cube|cubic|'
+                        r'prism|belt|plate|flake|aggregate|amorphous|crystalline|'
+                        r'octahedr|tetrahedr|icosahedr|ellip|spindle|worm)',
+                        re.I
+                    )
+                    _clean_parts = []
+                    for part in obs_text.split(";"):
+                        part = part.strip()
+                        if not part:
+                            continue
+                        if _MORPH_FIGURE_DESC_RE.search(part):
+                            continue
+                        if len(part) > 80 and part.count(',') > 3:
+                            continue
+                        if not _MORPH_VALID_TERMS.search(part):
+                            continue
+                        _clean_parts.append(part)
+                    cleaned_morph = "; ".join(_clean_parts) if _clean_parts else ""
+
                     if not record["selected_nanozyme"].get("morphology"):
-                        record["selected_nanozyme"]["morphology"] = obs_text[:200]
+                        record["selected_nanozyme"]["morphology"] = cleaned_morph[:200]
                     else:
-                        record["selected_nanozyme"]["_vlm_morphology_rejected"] = obs_text[:200]
+                        record["selected_nanozyme"]["_vlm_morphology_rejected"] = cleaned_morph[:200]
                         record["important_values"].append({
                             "name": "VLM_observations",
-                            "value": obs_text[:200],
+                            "value": cleaned_morph[:200],
                             "unit": "",
                             "context": f"VLM {figure_type} figure observations (morphology already set)",
                             "source": "VLM",
@@ -4879,13 +4998,28 @@ class SingleMainNanozymePipeline:
 
         if self.config.enable_vlm and self.client and doc.vlm_tasks:
             vlm_results = await self._call_vlm(doc.vlm_tasks, selected_name)
+
+            table_fallback_tasks = doc.table_task.get("vlm_fallback_tasks", [])
+            table_vlm_results = None
+            if table_fallback_tasks and self.client:
+                logger.info(f"[SMN] Processing {len(table_fallback_tasks)} table VLM fallback tasks")
+                table_vlm_results = await self._call_table_vlm_fallback(
+                    table_fallback_tasks, selected_name
+                )
+
+            all_vlm_results = []
             if vlm_results:
+                all_vlm_results.extend(vlm_results)
+            if table_vlm_results:
+                all_vlm_results.extend(table_vlm_results)
+
+            if all_vlm_results:
                 if self.cross_validator:
-                    record = self.cross_validator.merge_results(record, {}, vlm_results)
+                    record = self.cross_validator.merge_results(record, {}, all_vlm_results)
                     logger.info("[SMN] VLM merged via CrossValidationAgent")
                 else:
-                    record = self._merge_vlm(record, vlm_results)
-                logger.info(f"[SMN] VLM extraction succeeded, {len(vlm_results)} figures processed")
+                    record = self._merge_vlm(record, all_vlm_results)
+                logger.info(f"[SMN] VLM extraction succeeded, {len(all_vlm_results)} figures/tables processed")
             else:
                 warnings.append("vlm_failed_or_no_results")
                 logger.warning("[SMN] VLM failed or no results")
