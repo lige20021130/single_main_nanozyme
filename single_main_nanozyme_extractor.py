@@ -4121,10 +4121,21 @@ class SingleMainNanozymePipeline:
                         record["important_values"].append(iv)
 
             observations = vr.get("observations", [])
-            if observations and not record["selected_nanozyme"].get("morphology"):
+            if observations:
                 obs_text = "; ".join(str(o) for o in observations if o)
                 if obs_text:
-                    record["selected_nanozyme"]["morphology"] = obs_text[:200]
+                    if not record["selected_nanozyme"].get("morphology"):
+                        record["selected_nanozyme"]["morphology"] = obs_text[:200]
+                    else:
+                        record["selected_nanozyme"]["_vlm_morphology_rejected"] = obs_text[:200]
+                        record["important_values"].append({
+                            "name": "VLM_observations",
+                            "value": obs_text[:200],
+                            "unit": "",
+                            "context": f"VLM {figure_type} figure observations (morphology already set)",
+                            "source": "VLM",
+                            "needs_review": True,
+                        })
 
         self._check_multi_figure_consistency(record)
 
@@ -4889,12 +4900,16 @@ class SingleMainNanozymePipeline:
 
         if "selected_nanozyme" in llm:
             llm_sel = llm["selected_nanozyme"]
-            for key in record["selected_nanozyme"]:
+            for key in list(record["selected_nanozyme"].keys()):
                 if key == "synthesis_conditions" and "synthesis_conditions" in llm_sel:
                     if isinstance(llm_sel["synthesis_conditions"], dict):
-                        for sk in record["selected_nanozyme"]["synthesis_conditions"]:
+                        for sk in list(record["selected_nanozyme"]["synthesis_conditions"].keys()):
                             if sk in llm_sel["synthesis_conditions"] and llm_sel["synthesis_conditions"][sk] is not None:
-                                record["selected_nanozyme"]["synthesis_conditions"][sk] = llm_sel["synthesis_conditions"][sk]
+                                rule_val = record["selected_nanozyme"]["synthesis_conditions"].get(sk)
+                                if rule_val is None:
+                                    record["selected_nanozyme"]["synthesis_conditions"][sk] = llm_sel["synthesis_conditions"][sk]
+                                else:
+                                    record["selected_nanozyme"]["synthesis_conditions"][f"_llm_{sk}"] = llm_sel["synthesis_conditions"][sk]
                 elif key == "name" and "name" in llm_sel and llm_sel["name"] is not None:
                     val = self._clean_llm_name(llm_sel["name"])
                     if self._guard:
@@ -4926,25 +4941,41 @@ class SingleMainNanozymePipeline:
                         val = self._clean_llm_morphology(val)
                         if val is None:
                             continue
-                    record["selected_nanozyme"][key] = val
+                    rule_val = record["selected_nanozyme"].get(key)
+                    if rule_val is None:
+                        record["selected_nanozyme"][key] = val
+                    else:
+                        record["selected_nanozyme"][f"_llm_{key}"] = val
 
         if "main_activity" in llm:
             llm_act = llm["main_activity"]
             for key in list(record["main_activity"].keys()):
                 if key == "conditions" and "conditions" in llm_act:
-                    for ck in record["main_activity"]["conditions"]:
+                    for ck in list(record["main_activity"]["conditions"].keys()):
                         if ck in llm_act["conditions"] and llm_act["conditions"][ck] is not None:
-                            record["main_activity"]["conditions"][ck] = llm_act["conditions"][ck]
+                            rule_val = record["main_activity"]["conditions"].get(ck)
+                            if rule_val is None:
+                                record["main_activity"]["conditions"][ck] = llm_act["conditions"][ck]
+                            else:
+                                record["main_activity"]["conditions"][f"_llm_{ck}"] = llm_act["conditions"][ck]
                 elif key == "pH_profile" and "pH_profile" in llm_act:
                     if isinstance(llm_act["pH_profile"], dict):
-                        for pk in record["main_activity"]["pH_profile"]:
+                        for pk in list(record["main_activity"]["pH_profile"].keys()):
                             if pk in llm_act["pH_profile"] and llm_act["pH_profile"][pk] is not None:
-                                record["main_activity"]["pH_profile"][pk] = llm_act["pH_profile"][pk]
+                                rule_val = record["main_activity"]["pH_profile"].get(pk)
+                                if rule_val is None:
+                                    record["main_activity"]["pH_profile"][pk] = llm_act["pH_profile"][pk]
+                                else:
+                                    record["main_activity"]["pH_profile"][f"_llm_{pk}"] = llm_act["pH_profile"][pk]
                 elif key == "temperature_profile" and "temperature_profile" in llm_act:
                     if isinstance(llm_act["temperature_profile"], dict):
-                        for tk in record["main_activity"]["temperature_profile"]:
+                        for tk in list(record["main_activity"]["temperature_profile"].keys()):
                             if tk in llm_act["temperature_profile"] and llm_act["temperature_profile"][tk] is not None:
-                                record["main_activity"]["temperature_profile"][tk] = llm_act["temperature_profile"][tk]
+                                rule_val = record["main_activity"]["temperature_profile"].get(tk)
+                                if rule_val is None:
+                                    record["main_activity"]["temperature_profile"][tk] = llm_act["temperature_profile"][tk]
+                                else:
+                                    record["main_activity"]["temperature_profile"][f"_llm_{tk}"] = llm_act["temperature_profile"][tk]
                 elif key == "kinetics" and "kinetics" in llm_act:
                     llm_kinetics = llm_act["kinetics"]
                     if isinstance(llm_kinetics, list):
@@ -4977,7 +5008,8 @@ class SingleMainNanozymePipeline:
                                     rule_val = record["main_activity"]["kinetics"].get(kk)
                                     if rule_val is not None and isinstance(rule_val, (int, float)):
                                         ratio = max(abs(val), abs(rule_val), 1e-10) / max(min(abs(val), abs(rule_val)), 1e-10)
-                                        if ratio > 100:
+                                        logger.debug(f"[SMN] kinetics merge: {kk} rule={rule_val} llm={val} ratio={ratio:.2f}")
+                                        if ratio >= 100:
                                             rule_str = str(rule_val)
                                             llm_str = f"{val:.6e}"
                                             llm_mantissa = f"{abs(val):.4f}"
@@ -5094,10 +5126,25 @@ class SingleMainNanozymePipeline:
                                                     f"Keeping rule-based value. LLM value saved as alternative."
                                                 )
                                                 record["main_activity"]["kinetics"][f"_llm_{kk}_alternative"] = val
+                                                record["important_values"].append({
+                                                    "name": f"LLM_{kk}_alternative",
+                                                    "value": str(val),
+                                                    "unit": record["main_activity"]["kinetics"].get(f"{kk}_unit", ""),
+                                                    "context": "LLM alternative value, differs from rule-based",
+                                                    "source": "LLM",
+                                                    "needs_review": True,
+                                                })
                                             continue
-                                    else:
-                                        record["main_activity"]["kinetics"][f"_{kk}_source"] = "llm_supplement"
-                                record["main_activity"]["kinetics"][kk] = val
+                                        else:
+                                            record["main_activity"]["kinetics"][f"_{kk}_source"] = "rule_primary"
+                                            record["main_activity"]["kinetics"][f"_llm_{kk}_alternative"] = val
+                                            logger.info(
+                                                f"[SMN] Rule {kk}={rule_val} kept over LLM {kk}={val} (within 10x). "
+                                                f"LLM value saved as alternative."
+                                            )
+                                            continue
+                                else:
+                                    record["main_activity"]["kinetics"][kk] = val
                         for kk in llm_kinetics:
                             if kk.startswith("_"):
                                 continue
@@ -5137,21 +5184,41 @@ class SingleMainNanozymePipeline:
                     if rule_type and rule_type != "unknown" and rule_type != llm_type:
                         if "+" in rule_type or "+" in llm_type:
                             record["main_activity"]["enzyme_like_type"] = llm_type
-                        elif rule_type in llm_type or llm_type in rule_type:
-                            if len(llm_type) >= len(rule_type):
-                                record["main_activity"]["enzyme_like_type"] = llm_type
-                            else:
-                                pass
                         else:
-                            logger.warning(
-                                f"[SMN] LLM enzyme_type='{llm_type}' conflicts with rule='{rule_type}'. "
-                                f"Keeping rule-based value."
-                            )
-                            record["main_activity"]["_llm_enzyme_type_rejected"] = llm_type
+                            _ENZYME_SUBTYPES = {
+                                "oxidase-like": {"glucose-oxidase-like", "glutathione-oxidase-like"},
+                                "peroxidase-like": {"glutathione-peroxidase-like", "haloperoxidase-like"},
+                                "dismutase-like": {"superoxide-dismutase-like"},
+                            }
+                            rule_core = rule_type.lower().replace("-like", "").strip()
+                            llm_core = llm_type.lower().replace("-like", "").strip()
+                            is_subtype = False
+                            for parent, children in _ENZYME_SUBTYPES.items():
+                                if rule_type == parent and llm_type in children:
+                                    is_subtype = True
+                                    break
+                                if llm_type == parent and rule_type in children:
+                                    is_subtype = True
+                                    break
+                            if is_subtype:
+                                if len(llm_type) >= len(rule_type):
+                                    record["main_activity"]["enzyme_like_type"] = llm_type
+                                else:
+                                    record["main_activity"]["_llm_enzyme_type_rejected"] = llm_type
+                            else:
+                                logger.warning(
+                                    f"[SMN] LLM enzyme_type='{llm_type}' conflicts with rule='{rule_type}'. "
+                                    f"Keeping rule-based value."
+                                )
+                                record["main_activity"]["_llm_enzyme_type_rejected"] = llm_type
                     else:
                         record["main_activity"]["enzyme_like_type"] = llm_type
                 elif key in llm_act and llm_act[key] is not None:
-                    record["main_activity"][key] = llm_act[key]
+                    rule_val = record["main_activity"].get(key)
+                    if rule_val is None:
+                        record["main_activity"][key] = llm_act[key]
+                    else:
+                        record["main_activity"][f"_llm_{key}"] = llm_act[key]
 
         if "main_activity" in llm:
             llm_act = llm["main_activity"]
@@ -5161,7 +5228,21 @@ class SingleMainNanozymePipeline:
                     if isinstance(entry, dict) and any(v is not None for v in entry.values()):
                         valid_kin_list.append(entry)
                 if valid_kin_list:
-                    record["main_activity"]["kinetics_list"] = valid_kin_list
+                    existing_kl = record["main_activity"].get("kinetics_list", [])
+                    existing_subs = {k.get("substrate") for k in existing_kl}
+                    for vk in valid_kin_list:
+                        sub = vk.get("substrate")
+                        if sub not in existing_subs:
+                            existing_kl.append(vk)
+                            existing_subs.add(sub)
+                        else:
+                            for ek in existing_kl:
+                                if ek.get("substrate") == sub:
+                                    for fk, fv in vk.items():
+                                        if fv is not None and ek.get(fk) is None:
+                                            ek[fk] = fv
+                                    break
+                    record["main_activity"]["kinetics_list"] = existing_kl
 
         if "applications" in llm and isinstance(llm["applications"], list):
             valid = []
@@ -5176,11 +5257,34 @@ class SingleMainNanozymePipeline:
                     a["target_analyte"] = self._clean_analyte_name(a["target_analyte"])
                 valid.append(a)
             if valid:
-                record["applications"] = valid
+                existing_apps = record.get("applications", [])
+                existing_keys = set()
+                for ea in existing_apps:
+                    key = (ea.get("application_type"), ea.get("target_analyte"))
+                    existing_keys.add(key)
+                for va in valid:
+                    key = (va.get("application_type"), va.get("target_analyte"))
+                    if key not in existing_keys:
+                        existing_apps.append(va)
+                        existing_keys.add(key)
+                    else:
+                        for ea in existing_apps:
+                            if (ea.get("application_type"), ea.get("target_analyte")) == key:
+                                for fk, fv in va.items():
+                                    if fv is not None and ea.get(fk) is None:
+                                        ea[fk] = fv
+                                break
+                record["applications"] = existing_apps
 
         if "important_values" in llm and isinstance(llm["important_values"], list):
             valid = [v for v in llm["important_values"] if isinstance(v, dict) and v.get("value") is not None]
             if valid:
-                record["important_values"] = valid
+                existing_iv = record.get("important_values", [])
+                existing_names = {iv.get("name") for iv in existing_iv}
+                for v in valid:
+                    if v.get("name") not in existing_names:
+                        existing_iv.append(v)
+                        existing_names.add(v.get("name"))
+                record["important_values"] = existing_iv
 
         return record
