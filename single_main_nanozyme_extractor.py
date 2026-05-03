@@ -4107,6 +4107,32 @@ class SingleMainNanozymePipeline:
                                 "needs_review": True,
                             }
                             record["important_values"].append(iv)
+                    vlm_lod = sp.get("LOD")
+                    vlm_lr = sp.get("linear_range")
+                    vlm_analyte = sp.get("target_analyte")
+                    if vlm_lod or vlm_lr:
+                        apps = record.get("applications", [])
+                        matched_app = None
+                        if vlm_analyte:
+                            for app in apps:
+                                if (app.get("target_analyte") or "").lower() == str(vlm_analyte).lower():
+                                    matched_app = app
+                                    break
+                        if matched_app:
+                            if vlm_lod and matched_app.get("detection_limit") is None:
+                                matched_app["detection_limit"] = str(vlm_lod)
+                            if vlm_lr and matched_app.get("linear_range") is None:
+                                matched_app["linear_range"] = str(vlm_lr)
+                        else:
+                            new_app = {
+                                "application_type": "sensing",
+                                "target_analyte": str(vlm_analyte) if vlm_analyte else None,
+                                "detection_limit": str(vlm_lod) if vlm_lod else None,
+                                "linear_range": str(vlm_lr) if vlm_lr else None,
+                                "notes": "from VLM sensing_performance",
+                            }
+                            apps.append(new_app)
+                            record["applications"] = apps
 
                 for ov in ev.get("other_values", []):
                     if isinstance(ov, dict) and ov.get("value") is not None:
@@ -4136,6 +4162,35 @@ class SingleMainNanozymePipeline:
                             "source": "VLM",
                             "needs_review": True,
                         })
+
+            linked_type = vr.get("linked_activity_type")
+            if linked_type and isinstance(linked_type, str):
+                norm_type = self._normalize_enzyme_type(linked_type)
+                rule_type = record["main_activity"].get("enzyme_like_type")
+                if not rule_type or rule_type == "unknown":
+                    record["main_activity"]["enzyme_like_type"] = norm_type
+                    record["main_activity"]["_enzyme_type_source"] = "VLM"
+                    logger.info(f"[SMN] VLM enzyme_type='{norm_type}' fills empty field")
+                elif rule_type != norm_type:
+                    record["main_activity"]["_vlm_enzyme_type_rejected"] = norm_type
+                    logger.info(f"[SMN] VLM enzyme_type='{norm_type}' conflicts with rule='{rule_type}', kept as rejected")
+
+            app_hints = vr.get("application_hints")
+            if isinstance(app_hints, list) and app_hints:
+                apps = record.get("applications", [])
+                existing_types = {a.get("application_type") for a in apps if a.get("application_type")}
+                for hint in app_hints:
+                    if not isinstance(hint, str) or not hint.strip():
+                        continue
+                    norm_app = self._normalize_app_type(hint.strip())
+                    if norm_app and norm_app not in existing_types:
+                        apps.append({
+                            "application_type": norm_app,
+                            "target_analyte": None,
+                            "notes": "from VLM application_hints",
+                        })
+                        existing_types.add(norm_app)
+                record["applications"] = apps
 
         self._check_multi_figure_consistency(record)
 
@@ -5138,6 +5193,14 @@ class SingleMainNanozymePipeline:
                                         else:
                                             record["main_activity"]["kinetics"][f"_{kk}_source"] = "rule_primary"
                                             record["main_activity"]["kinetics"][f"_llm_{kk}_alternative"] = val
+                                            record["important_values"].append({
+                                                "name": f"LLM_{kk}_alternative",
+                                                "value": str(val),
+                                                "unit": record["main_activity"]["kinetics"].get(f"{kk}_unit", ""),
+                                                "context": f"LLM alternative value (rule={rule_val}, within 10x)",
+                                                "source": "LLM",
+                                                "needs_review": True,
+                                            })
                                             logger.info(
                                                 f"[SMN] Rule {kk}={rule_val} kept over LLM {kk}={val} (within 10x). "
                                                 f"LLM value saved as alternative."
