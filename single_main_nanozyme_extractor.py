@@ -1674,11 +1674,15 @@ class CandidateRecaller:
             if cleaned == prev:
                 break
         m = _MATERIAL_PATTERN_RE.search(cleaned)
-        if m and len(cleaned) > 25:
-            core = m.group(0).strip()
-            if self._is_valid_candidate(core):
-                cleaned = core
-        if len(cleaned) > 40:
+        _SA_PATTERN = re.compile(r'(?:Single[-\s]?Atom|SA[NCE]?|SAzyme)', re.I)
+        if _SA_PATTERN.search(cleaned):
+            pass
+        elif len(cleaned) > 60:
+            if m:
+                core = m.group(0).strip()
+                if self._is_valid_candidate(core):
+                    cleaned = core
+        if len(cleaned) > 40 and not _SA_PATTERN.search(cleaned):
             if m:
                 cleaned = m.group(0).strip()
             else:
@@ -1942,6 +1946,30 @@ class NanozymeScorer:
                     carrier_name = supported_m.group(1).strip()
                     if name_lower in carrier_name.lower() or carrier_name.lower() in name_lower:
                         score -= 5
+                _nanozyme_name_match = re.search(
+                    r'\b' + re.escape(cand["name"]) + r'\s+nanozyme',
+                    title, re.I
+                )
+                if _nanozyme_name_match:
+                    score += 12
+                _sa_in_title = re.search(
+                    r'\b' + re.escape(cand["name"].split('-')[0] if '-' in cand["name"] else cand["name"]) + r'\s+Single[-\s]?Atom\s+Nanozyme',
+                    title, re.I
+                )
+                if _sa_in_title and re.search(r'(?:SA|SAN|SAC|SAzyme)$', cand["name"], re.I):
+                    score += 12
+                _based_match = re.search(
+                    re.escape(cand["name"]) + r'-based',
+                    title, re.I
+                )
+                if _based_match:
+                    score += 5
+                if '@' in cand["name"]:
+                    at_parts = cand["name"].split('@')
+                    if len(at_parts) >= 3:
+                        score += 4
+                    elif len(at_parts) >= 2:
+                        score += 2
 
             score += self._score_data_richness(cand, doc)
             score += self._score_narrative_importance(cand, title, abstract_text)

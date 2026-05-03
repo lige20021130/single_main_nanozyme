@@ -182,6 +182,30 @@ class KineticsAgent:
                 if fallback and isinstance(fallback.get("value"), (int, float)):
                     vmax_candidates.append((method_pri, fallback["value"], fallback.get("unit"), fallback.get("source", "text_ocr_fallback")))
 
+        _filtered_km = []
+        for c in km_candidates:
+            val, unit = c[1], c[2]
+            if isinstance(val, (int, float)):
+                if val > 100 and not (unit and _is_concentration_unit(unit) and unit.lower().startswith(('m', 'μ', 'u', 'n', 'p'))):
+                    logger.warning(f"[KineticsAgent] Km={val} {unit} seems too large (>100), likely not a valid Km. Skipping.")
+                    continue
+                if val <= 0:
+                    continue
+            _filtered_km.append(c)
+        km_candidates = _filtered_km if _filtered_km else km_candidates
+
+        _filtered_vmax = []
+        for c in vmax_candidates:
+            val, unit = c[1], c[2]
+            if isinstance(val, (int, float)):
+                if val > 1e6:
+                    logger.warning(f"[KineticsAgent] Vmax={val} {unit} seems too large, likely not a valid Vmax. Skipping.")
+                    continue
+                if val <= 0:
+                    continue
+            _filtered_vmax.append(c)
+        vmax_candidates = _filtered_vmax if _filtered_vmax else vmax_candidates
+
         kin = record["main_activity"]["kinetics"]
         if km_candidates and kin.get("Km") is None:
             km_candidates.sort(key=lambda c: c[0])
