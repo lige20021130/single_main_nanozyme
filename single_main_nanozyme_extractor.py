@@ -187,7 +187,7 @@ _SUBSTRATE_PLUS_RE = re.compile(
     re.I,
 )
 
-_SENTENCE_ID_RE = re.compile(r'^S\d{3,}$', re.I)
+_SENTENCE_ID_RE = re.compile(r'^[A-Z]\d{3,}(?:/[A-Z]\d{3,})*$', re.I)
 
 _LEADING_JUNK_RE = re.compile(
     r'^(?:of\s+|the\s+|a\s+|an\s+|uniform\s+dispersion\s+of\s+|'
@@ -494,6 +494,28 @@ _RATE_UNITS = frozenset({
 
 
 _SUPERSCRIPT_TO_ASCII = str.maketrans('⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾', '0123456789+-=()')
+
+
+def _validate_and_assign_kinetics_unit(record_kinetics: dict, param: str, raw_unit: str) -> None:
+    if not raw_unit:
+        return
+    from numeric_validator import is_concentration_unit, is_rate_unit, normalize_unit
+    if param == "Km":
+        if is_concentration_unit(raw_unit):
+            record_kinetics["Km_unit"] = normalize_unit(raw_unit)
+        elif is_rate_unit(raw_unit):
+            logger.warning(f"[SMN] Km_unit='{raw_unit}' is a rate unit, not concentration. Skipping.")
+        else:
+            record_kinetics["Km_unit"] = normalize_unit(raw_unit)
+    elif param == "Vmax":
+        if is_rate_unit(raw_unit):
+            record_kinetics["Vmax_unit"] = normalize_unit(raw_unit)
+        elif is_concentration_unit(raw_unit):
+            logger.warning(f"[SMN] Vmax_unit='{raw_unit}' is a concentration unit, not rate. Skipping.")
+        else:
+            record_kinetics["Vmax_unit"] = normalize_unit(raw_unit)
+    elif param in ("kcat", "kcat_Km"):
+        record_kinetics[f"{param}_unit"] = normalize_unit(raw_unit)
 
 
 def _extract_vmax_fallback(text: str) -> Optional[Dict[str, Any]]:
@@ -1193,6 +1215,26 @@ def validate_schema(record: Dict[str, Any]) -> Dict[str, Any]:
                             kinetics[ukey] = None
 
     etype = record.get("main_activity", {}).get("enzyme_like_type")
+    _FINAL_APP_TYPE_NORMALIZE = {
+        "detection": "sensing",
+        "colorimetric detection": "sensing",
+        "biosensing": "sensing",
+        "determination": "sensing",
+        "monitoring": "sensing",
+        "assay": "sensing",
+        "diagnostic": "sensing",
+        "diagnosis": "sensing",
+        "imaging": "sensing",
+        "therapy": "therapeutic",
+        "antitumor": "therapeutic",
+    }
+    for app in record.get("applications", []):
+        if isinstance(app, dict) and app.get("application_type"):
+            atype = app["application_type"].strip().lower()
+            canonical = _FINAL_APP_TYPE_NORMALIZE.get(atype)
+            if canonical:
+                app["application_type"] = canonical
+
     if etype and isinstance(etype, str):
         etype_lower = etype.lower().strip()
         matched = False
@@ -1571,6 +1613,13 @@ class CandidateRecaller:
             if self._is_valid_candidate(name):
                 results.append(name)
         for m in re.finditer(
+            r'\b(?:Fe|Co|Ni|Mn|Cu|Zn|Ce|Au|Ag|Pt|Pd|Ti|V|Cr|Mo|W|Ru|Rh|Ir|La|Zr|Al|Sn|Bi|In|Ga|Ge|Sb|Te|Hf|Ta|Re|Os|Y|Sc|Cd|Hg|Tl|Pb|Nb)\d*[-/]?(?:SA|SAN|SAC|SAzyme|SAEs)\b',
+            title, re.I,
+        ):
+            name = m.group(0).strip()
+            if self._is_valid_candidate(name):
+                results.append(name)
+        for m in re.finditer(
             r'\b\w+-doped\s+\w+\s+\w+\b',
             title, re.I,
         ):
@@ -1600,7 +1649,7 @@ class CandidateRecaller:
             if cleaned == prev:
                 break
         m = _MATERIAL_PATTERN_RE.search(cleaned)
-        if m:
+        if m and len(cleaned) > 25:
             core = m.group(0).strip()
             if self._is_valid_candidate(core):
                 cleaned = core
@@ -1828,6 +1877,16 @@ class NanozymeScorer:
                     score += 3
                 if _METAL_ELEMENTS_RE.search(cand["name"]):
                     score += 5
+                if "/" in cand["name"] or "@" in cand["name"]:
+                    score += 5
+                if re.search(r'\d', cand["name"]):
+                    score += 2
+                if re.search(r'(?:SA|SAN|SAC|SAzyme)$', cand["name"], re.I):
+                    score += 3
+                title_metals = set(_METAL_ELEMENTS_RE.findall(title))
+                name_metals = set(_METAL_ELEMENTS_RE.findall(cand["name"]))
+                if title_metals and name_metals and name_metals & title_metals:
+                    score += 8
 
             score += self._score_data_richness(cand, doc)
             score += self._score_narrative_importance(cand, title, abstract_text)
@@ -4282,9 +4341,17 @@ class SingleMainNanozymePipeline:
                         except (ValueError, TypeError):
                             continue
                         rule_km = record["main_activity"]["kinetics"].get("Km")
+                        raw_km_unit = km_item.get("unit", "")
+                        from numeric_validator import is_concentration_unit, is_rate_unit, normalize_unit
+                        km_unit_ok = is_concentration_unit(raw_km_unit) if raw_km_unit else False
                         if rule_km is None:
                             record["main_activity"]["kinetics"]["Km"] = vlm_val
-                            record["main_activity"]["kinetics"]["Km_unit"] = km_item.get("unit")
+                            if km_unit_ok:
+                                record["main_activity"]["kinetics"]["Km_unit"] = normalize_unit(raw_km_unit)
+                            elif is_rate_unit(raw_km_unit):
+                                logger.warning(f"[SMN] VLM Km_unit='{raw_km_unit}' is a rate unit (should be concentration). Skipping unit assignment.")
+                            else:
+                                record["main_activity"]["kinetics"]["Km_unit"] = normalize_unit(raw_km_unit) if raw_km_unit else None
                             record["main_activity"]["kinetics"]["source"] = "VLM"
                             if caption:
                                 record["main_activity"]["kinetics"]["_evidence_Km"] = str(caption)[:300]
@@ -4319,9 +4386,17 @@ class SingleMainNanozymePipeline:
                         except (ValueError, TypeError):
                             continue
                         rule_vmax = record["main_activity"]["kinetics"].get("Vmax")
+                        raw_vmax_unit = vmax_item.get("unit", "")
+                        from numeric_validator import is_concentration_unit, is_rate_unit, normalize_unit
+                        vmax_unit_ok = is_rate_unit(raw_vmax_unit) if raw_vmax_unit else False
                         if rule_vmax is None:
                             record["main_activity"]["kinetics"]["Vmax"] = vlm_val
-                            record["main_activity"]["kinetics"]["Vmax_unit"] = vmax_item.get("unit")
+                            if vmax_unit_ok:
+                                record["main_activity"]["kinetics"]["Vmax_unit"] = normalize_unit(raw_vmax_unit)
+                            elif is_concentration_unit(raw_vmax_unit):
+                                logger.warning(f"[SMN] VLM Vmax_unit='{raw_vmax_unit}' is a concentration unit (should be rate). Skipping unit assignment.")
+                            else:
+                                record["main_activity"]["kinetics"]["Vmax_unit"] = normalize_unit(raw_vmax_unit) if raw_vmax_unit else None
                             record["main_activity"]["kinetics"]["source"] = "VLM"
                             if caption:
                                 record["main_activity"]["kinetics"]["_evidence_Vmax"] = str(caption)[:300]
@@ -5229,16 +5304,26 @@ class SingleMainNanozymePipeline:
             if name in ("Km", "VLM_Km", "LLM_Km", "LLM_Km_alternative") and kin.get("Km") is None:
                 record["main_activity"]["kinetics"]["Km"] = val
                 if unit and not kin.get("Km_unit"):
-                    from numeric_validator import normalize_unit
-                    record["main_activity"]["kinetics"]["Km_unit"] = normalize_unit(unit)
+                    from numeric_validator import normalize_unit, is_concentration_unit, is_rate_unit
+                    if is_concentration_unit(unit):
+                        record["main_activity"]["kinetics"]["Km_unit"] = normalize_unit(unit)
+                    elif is_rate_unit(unit):
+                        logger.warning(f"[SMN] Backfill Km_unit='{unit}' is a rate unit, not concentration. Skipping.")
+                    else:
+                        record["main_activity"]["kinetics"]["Km_unit"] = normalize_unit(unit)
                 if not kin.get("source"):
                     record["main_activity"]["kinetics"]["source"] = source or "important_values"
                 backfilled.append(f"Km={val}")
             elif name in ("Vmax", "VLM_Vmax", "LLM_Vmax", "LLM_Vmax_alternative") and kin.get("Vmax") is None:
                 record["main_activity"]["kinetics"]["Vmax"] = val
                 if unit and not kin.get("Vmax_unit"):
-                    from numeric_validator import normalize_unit
-                    record["main_activity"]["kinetics"]["Vmax_unit"] = normalize_unit(unit)
+                    from numeric_validator import normalize_unit, is_concentration_unit, is_rate_unit
+                    if is_rate_unit(unit):
+                        record["main_activity"]["kinetics"]["Vmax_unit"] = normalize_unit(unit)
+                    elif is_concentration_unit(unit):
+                        logger.warning(f"[SMN] Backfill Vmax_unit='{unit}' is a concentration unit, not rate. Skipping.")
+                    else:
+                        record["main_activity"]["kinetics"]["Vmax_unit"] = normalize_unit(unit)
                 if not kin.get("source"):
                     record["main_activity"]["kinetics"]["source"] = source or "important_values"
                 backfilled.append(f"Vmax={val}")
@@ -5487,7 +5572,20 @@ class SingleMainNanozymePipeline:
                                                 )
                                                 record["main_activity"]["kinetics"][kk] = val
                                                 if f"_llm_{kk}_unit" in llm_kinetics and llm_kinetics[f"_llm_{kk}_unit"]:
-                                                    record["main_activity"]["kinetics"][f"{kk}_unit"] = llm_kinetics[f"_llm_{kk}_unit"]
+                                                    raw_unit = llm_kinetics[f"_llm_{kk}_unit"]
+                                                    from numeric_validator import is_concentration_unit, is_rate_unit, normalize_unit as _nu
+                                                    if kk == "Km" and is_concentration_unit(raw_unit):
+                                                        record["main_activity"]["kinetics"][f"{kk}_unit"] = _nu(raw_unit)
+                                                    elif kk == "Vmax" and is_rate_unit(raw_unit):
+                                                        record["main_activity"]["kinetics"][f"{kk}_unit"] = _nu(raw_unit)
+                                                    elif kk in ("kcat", "kcat_Km"):
+                                                        record["main_activity"]["kinetics"][f"{kk}_unit"] = _nu(raw_unit)
+                                                    elif kk == "Km" and is_rate_unit(raw_unit):
+                                                        logger.warning(f"[SMN] LLM Km_unit='{raw_unit}' is a rate unit, not concentration. Skipping.")
+                                                    elif kk == "Vmax" and is_concentration_unit(raw_unit):
+                                                        logger.warning(f"[SMN] LLM Vmax_unit='{raw_unit}' is a concentration unit, not rate. Skipping.")
+                                                    else:
+                                                        record["main_activity"]["kinetics"][f"{kk}_unit"] = _nu(raw_unit)
                                             elif not rule_in_range and llm_in_range:
                                                 logger.info(
                                                     f"[SMN] LLM {kk}={val} differs by >100x from rule {kk}={rule_val}, "
@@ -5495,7 +5593,7 @@ class SingleMainNanozymePipeline:
                                                 )
                                                 record["main_activity"]["kinetics"][kk] = val
                                                 if f"_llm_{kk}_unit" in llm_kinetics and llm_kinetics[f"_llm_{kk}_unit"]:
-                                                    record["main_activity"]["kinetics"][f"{kk}_unit"] = llm_kinetics[f"_llm_{kk}_unit"]
+                                                    _validate_and_assign_kinetics_unit(record["main_activity"]["kinetics"], kk, llm_kinetics[f"_llm_{kk}_unit"])
                                             else:
                                                 logger.warning(
                                                     f"[SMN] LLM {kk}={val} differs by >100x from rule {kk}={rule_val}. "
@@ -5546,7 +5644,7 @@ class SingleMainNanozymePipeline:
                                                 )
                                                 record["main_activity"]["kinetics"][kk] = val
                                                 if f"_llm_{kk}_unit" in llm_kinetics and llm_kinetics[f"_llm_{kk}_unit"]:
-                                                    record["main_activity"]["kinetics"][f"{kk}_unit"] = llm_kinetics[f"_llm_{kk}_unit"]
+                                                    _validate_and_assign_kinetics_unit(record["main_activity"]["kinetics"], kk, llm_kinetics[f"_llm_{kk}_unit"])
                                             elif not rule_in_range and llm_in_range:
                                                 logger.info(
                                                     f"[SMN] LLM {kk}={val} differs by >10x from rule {kk}={rule_val}, "
@@ -5554,7 +5652,7 @@ class SingleMainNanozymePipeline:
                                                 )
                                                 record["main_activity"]["kinetics"][kk] = val
                                                 if f"_llm_{kk}_unit" in llm_kinetics and llm_kinetics[f"_llm_{kk}_unit"]:
-                                                    record["main_activity"]["kinetics"][f"{kk}_unit"] = llm_kinetics[f"_llm_{kk}_unit"]
+                                                    _validate_and_assign_kinetics_unit(record["main_activity"]["kinetics"], kk, llm_kinetics[f"_llm_{kk}_unit"])
                                             elif rule_unit_abnormal:
                                                 logger.info(
                                                     f"[SMN] LLM {kk}={val} differs by >10x from rule {kk}={rule_val}, "
@@ -5562,7 +5660,7 @@ class SingleMainNanozymePipeline:
                                                 )
                                                 record["main_activity"]["kinetics"][kk] = val
                                                 if f"_llm_{kk}_unit" in llm_kinetics and llm_kinetics[f"_llm_{kk}_unit"]:
-                                                    record["main_activity"]["kinetics"][f"{kk}_unit"] = llm_kinetics[f"_llm_{kk}_unit"]
+                                                    _validate_and_assign_kinetics_unit(record["main_activity"]["kinetics"], kk, llm_kinetics[f"_llm_{kk}_unit"])
                                             else:
                                                 logger.warning(
                                                     f"[SMN] LLM {kk}={val} differs by >10x from rule {kk}={rule_val}. "
@@ -5631,7 +5729,7 @@ class SingleMainNanozymePipeline:
                                 record["main_activity"]["kinetics"][kk] = val
                                 record["main_activity"]["kinetics"][f"_{kk}_source"] = "llm_supplement"
                                 if f"_llm_{kk}_unit" in llm_kinetics and llm_kinetics[f"_llm_{kk}_unit"]:
-                                    record["main_activity"]["kinetics"][f"{kk}_unit"] = llm_kinetics[f"_llm_{kk}_unit"]
+                                    _validate_and_assign_kinetics_unit(record["main_activity"]["kinetics"], kk, llm_kinetics[f"_llm_{kk}_unit"])
                                 llm_ev = llm_kinetics.get(f"evidence_{kk}") or llm_kinetics.get("evidence_text")
                                 if llm_ev:
                                     record["main_activity"]["kinetics"][f"_evidence_{kk}"] = str(llm_ev)[:300]

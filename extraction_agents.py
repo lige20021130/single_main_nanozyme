@@ -47,11 +47,35 @@ class KineticsAgent:
         if record["main_activity"]["kinetics"]["Km"] is None or record["main_activity"]["kinetics"]["Vmax"] is None:
             self._extract_kinetics_from_text(record, buckets.get("kinetics", []))
         if record["main_activity"]["kinetics"]["Km"] is None or record["main_activity"]["kinetics"]["Vmax"] is None:
+            extended = list(buckets.get("kinetics", [])) + list(buckets.get("activity", []))
+            seen = set()
+            unique_extended = []
+            for t in extended:
+                if t not in seen:
+                    seen.add(t)
+                    unique_extended.append(t)
+            self._extract_kinetics_from_text(record, unique_extended)
+        if record["main_activity"]["kinetics"]["Km"] is None or record["main_activity"]["kinetics"]["Vmax"] is None:
             self._extract_kinetics_from_flattened_table(record, buckets.get("kinetics", []), selected_name)
         if record["main_activity"]["kinetics"]["Km"] is None and table_values:
             self._extract_kinetics_from_table(record, table_values)
         self._extract_kcat_from_text(record, buckets.get("kinetics", []))
+        self._validate_kinetics_units(record)
         return record
+
+    def _validate_kinetics_units(self, record):
+        from numeric_validator import is_concentration_unit, is_rate_unit
+        kin = record["main_activity"]["kinetics"]
+        km_unit = kin.get("Km_unit")
+        if km_unit and is_rate_unit(km_unit) and not is_concentration_unit(km_unit):
+            logger.warning(f"[KineticsAgent] Km_unit='{km_unit}' is a rate unit, clearing.")
+            kin["Km_unit"] = None
+            kin["needs_review"] = True
+        vmax_unit = kin.get("Vmax_unit")
+        if vmax_unit and is_concentration_unit(vmax_unit) and not is_rate_unit(vmax_unit):
+            logger.warning(f"[KineticsAgent] Vmax_unit='{vmax_unit}' is a concentration unit, clearing.")
+            kin["Vmax_unit"] = None
+            kin["needs_review"] = True
 
     def _extract_kinetics_from_text(self, record, kinetics_texts):
         km_candidates = []
@@ -68,11 +92,24 @@ class KineticsAgent:
                 if not m:
                     m = pat.search(norm_text)
                 if m:
-                    km_val = _parse_scientific_notation(m.group(1))
-                    km_unit = m.group(2)
-                    vmax_raw = m.group(3)
-                    vmax_unit = m.group(4)
-                    vmax_val = _parse_scientific_notation(vmax_raw)
+                    g1_val = _parse_scientific_notation(m.group(1))
+                    g2_unit = m.group(2)
+                    g3_val = _parse_scientific_notation(m.group(3))
+                    g4_unit = m.group(4)
+                    from numeric_validator import is_concentration_unit, is_rate_unit
+                    g1_is_conc = is_concentration_unit(g2_unit) if g2_unit else False
+                    g3_is_rate = is_rate_unit(g4_unit) if g4_unit else False
+                    g1_is_rate = is_rate_unit(g2_unit) if g2_unit else False
+                    g3_is_conc = is_concentration_unit(g4_unit) if g4_unit else False
+                    if g1_is_conc and g3_is_rate:
+                        km_val, km_unit = g1_val, g2_unit
+                        vmax_val, vmax_unit = g3_val, g4_unit
+                    elif g1_is_rate and g3_is_conc:
+                        km_val, km_unit = g3_val, g4_unit
+                        vmax_val, vmax_unit = g1_val, g2_unit
+                    else:
+                        km_val, km_unit = g1_val, g2_unit
+                        vmax_val, vmax_unit = g3_val, g4_unit
                     if isinstance(km_val, (int, float)):
                         km_candidates.append((method_pri, km_val, km_unit, "text"))
                     if isinstance(vmax_val, (int, float)):
@@ -767,7 +804,9 @@ class RuleExtractorAdapter:
             buckets.get("activity", [])
             + buckets.get("kinetics", [])
             + buckets.get("application", [])[:5]
+            + buckets.get("mechanism", [])[:5]
             + record.get("raw_supporting_text", {}).get("kinetics", [])[:5]
+            + record.get("raw_supporting_text", {}).get("activity", [])[:5]
         )
 
         if ph_profile.get("optimal_pH") is None:
@@ -781,6 +820,28 @@ class RuleExtractorAdapter:
                         except (ValueError, IndexError):
                             pass
                         break
+                if ph_profile.get("optimal_pH") is not None:
+                    break
+
+        if ph_profile.get("optimal_pH") is None:
+            _OPTIMAL_PH_EXTRA_PATTERNS = [
+                re.compile(r'\bpH\s*([\d.]+)\s*(?:was|is|showed|exhibited|displayed)\s+(?:the\s+)?(?:highest|maximum|optimal|best)', re.I),
+                re.compile(r'(?:highest|maximum|optimal|best)\s+(?:activity|catalytic)\s+(?:was\s+)?(?:observed|achieved|found|obtained)\s+at\s+pH\s*([\d.]+)', re.I),
+                re.compile(r'(?:optimal|optimum)\s+pH\s*(?:value\s*)?(?:of|was|:)\s*([\d.]+)', re.I),
+                re.compile(r'pHo\s*(?:pt)?\s*=\s*([\d.]+)', re.I),
+            ]
+            for text in search_texts:
+                for pat in _OPTIMAL_PH_EXTRA_PATTERNS:
+                    m = pat.search(text)
+                    if m:
+                        try:
+                            val = float(m.group(1))
+                            if 0 < val <= 14:
+                                ph_profile["optimal_pH"] = val
+                                record["main_activity"]["conditions"]["pH"] = m.group(1)
+                                break
+                        except (ValueError, IndexError):
+                            pass
                 if ph_profile.get("optimal_pH") is not None:
                     break
 
@@ -848,7 +909,9 @@ class RuleExtractorAdapter:
             buckets.get("activity", [])
             + buckets.get("kinetics", [])
             + buckets.get("application", [])[:5]
+            + buckets.get("mechanism", [])[:5]
             + record.get("raw_supporting_text", {}).get("kinetics", [])[:5]
+            + record.get("raw_supporting_text", {}).get("activity", [])[:5]
         )
 
         norm_texts = [_normalize_ocr_scientific(t) for t in search_texts]
@@ -863,6 +926,29 @@ class RuleExtractorAdapter:
                         temp_profile["optimal_temperature"] = f"{m.group(1)} °C"
                         record["main_activity"]["conditions"]["temperature"] = f"{m.group(1)} °C"
                         break
+                if temp_profile.get("optimal_temperature") is not None:
+                    break
+
+        if temp_profile.get("optimal_temperature") is None:
+            _OPTIMAL_TEMP_EXTRA_PATTERNS = [
+                re.compile(r'(?:optimal|optimum)\s+(?:temperature|temp)\s*(?:value\s*)?(?:of|was|:)\s*([\d.]+)\s*°?\s*C', re.I),
+                re.compile(r'(?:highest|maximum|best)\s+(?:activity|catalytic)\s+(?:was\s+)?(?:observed|achieved|found|obtained)\s+at\s*([\d.]+)\s*°?\s*C', re.I),
+                re.compile(r'([\d.]+)\s*°\s*C\s*(?:was|is)\s+(?:the\s+)?(?:optimal|optimum|best)', re.I),
+            ]
+            for text, norm in zip(search_texts, norm_texts):
+                for pat in _OPTIMAL_TEMP_EXTRA_PATTERNS:
+                    m = pat.search(text)
+                    if not m:
+                        m = pat.search(norm)
+                    if m:
+                        try:
+                            val = float(m.group(1))
+                            if 15 <= val <= 80:
+                                temp_profile["optimal_temperature"] = f"{m.group(1)} °C"
+                                record["main_activity"]["conditions"]["temperature"] = f"{m.group(1)} °C"
+                                break
+                        except (ValueError, IndexError):
+                            pass
                 if temp_profile.get("optimal_temperature") is not None:
                     break
 

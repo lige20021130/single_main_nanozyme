@@ -90,6 +90,28 @@ def _is_rate_unit(unit):
 
 
 class ConsistencyAgent:
+    _APP_TYPE_ALIASES = {
+        "detection": "sensing",
+        "colorimetric detection": "sensing",
+        "colorimetric sensing": "sensing",
+        "biosensing": "sensing",
+        "determination": "sensing",
+        "monitoring": "sensing",
+        "assay": "sensing",
+        "diagnostic": "sensing",
+        "diagnosis": "sensing",
+        "imaging": "sensing",
+        "therapy": "therapeutic",
+        "antitumor": "therapeutic",
+        "tumor therapy": "therapeutic",
+        "wound healing": "therapeutic",
+        "anti-infection": "antibacterial",
+        "anti-inflammation": "antioxidant",
+        "cytoprotection": "antioxidant",
+        "degradation": "environmental",
+        "water treatment": "environmental",
+    }
+
     def normalize_output(self, record: Dict) -> Tuple[Dict, List[str]]:
         record = copy.deepcopy(record)
         warnings = []
@@ -101,12 +123,28 @@ class ConsistencyAgent:
         warnings.extend(w3)
         record, w4 = self.deduplicate_applications(record)
         warnings.extend(w4)
+        record, w4b = self.normalize_application_types(record)
+        warnings.extend(w4b)
         record, w5 = self.check_cross_field_consistency(record)
         warnings.extend(w5)
         record, w6 = self.check_kinetics_substrate_consistency(record)
         warnings.extend(w6)
         record, w7 = self.check_application_enzyme_consistency(record)
         warnings.extend(w7)
+        return record, warnings
+
+    def normalize_application_types(self, record: Dict) -> Tuple[Dict, List[str]]:
+        warnings = []
+        for app in record.get("applications", []):
+            if not isinstance(app, dict):
+                continue
+            atype = app.get("application_type")
+            if atype and isinstance(atype, str):
+                lower = atype.strip().lower()
+                canonical = self._APP_TYPE_ALIASES.get(lower)
+                if canonical and canonical != atype.strip():
+                    app["application_type"] = canonical
+                    warnings.append(f"app_type_normalized: {atype} -> {canonical}")
         return record, warnings
 
     def normalize_enzyme_types(self, record: Dict) -> Tuple[Dict, List[str]]:
