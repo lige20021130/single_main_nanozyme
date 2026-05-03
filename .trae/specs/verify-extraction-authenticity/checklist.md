@@ -1,0 +1,24 @@
+- [x] ExtractionVerifier._find_numeric_in_source 能在原文中搜索数值，支持科学计数法归一化匹配（如 1.5×10⁻¹ 匹配 0.15）
+- [x] ExtractionVerifier._find_text_in_source 能在原文中搜索文本型字段值（enzyme_like_type、synthesis_method 等）
+- [x] ExtractionVerifier._detect_cross_context_mismatch 能检测不同字段的 evidence_text 指向不同材料/条件
+- [x] ExtractionVerifier.verify_record 对整条记录执行全字段验证，输出 verification 报告
+- [x] ExtractionVerifier._compute_verification_rate 正确计算验证率并调整 confidence
+- [x] 规则提取阶段每个字段附带 evidence_text（_extract_kinetics_from_text / _extract_kinetics_from_table）
+- [x] LLM 合并阶段检查 evidence_text，缺失时标记 llm_no_evidence
+- [x] VLM 合并阶段检查 evidence_text / caption，缺失时标记 vlm_unverified
+- [x] 应用提取阶段 application 字段附带 evidence_text
+- [x] SingleMainNanozymePipeline.extract() 中合并 LLM 结果后调用反幻觉验证
+- [x] SingleMainNanozymePipeline.extract() 中合并 VLM 结果后调用回查验证
+- [x] hallucination_suspect 数值从 kinetics 降级到 important_values，原字段设为 None
+- [x] vlm_unverified 数值保留但标记 needs_review=True
+- [x] ConsistencyGuard 检测 kinetics 内部字段的跨材料错配
+- [x] ConsistencyGuard 检测 kinetics 与 conditions 的条件错配
+- [x] ConsistencyGuard 检测 application 与 enzyme_like_type 的矛盾
+- [x] 错配结果写入 diagnostics.verification.mismatches
+- [x] DiagnosticsBuilder 增加 set_verification() 方法
+- [x] DiagnosticsBuilder.build() 输出包含 verification 子结构
+- [x] WARNING_ENUMS 包含 hallucination_suspect、vlm_unverified、cross_material_mismatch、condition_mismatch、activity_application_mismatch、llm_no_evidence
+- [x] verification_rate < 0.5 时 confidence 强制降为 low
+- [x] 端到端测试：验证报告正确标记 hallucination_suspect
+- [x] 端到端测试：验证率计算准确
+- [x] 迭代记录已更新

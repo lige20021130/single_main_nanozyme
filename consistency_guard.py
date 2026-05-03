@@ -492,6 +492,11 @@ class ConsistencyGuard:
             except (AttributeError, ValueError):
                 pass
 
+        cross_result = self.detect_cross_context_mismatches(record)
+        if cross_result["mismatches"]:
+            issues.extend(cross_result["mismatches"])
+            warnings.extend(cross_result["warnings"])
+
         return {
             "issues": issues,
             "warnings": warnings,
@@ -562,6 +567,116 @@ class ConsistencyGuard:
                 if nl not in self.selected_variants and len(name) >= 2:
                     found.append(name)
         return list(dict.fromkeys(found))
+
+    def detect_cross_context_mismatches(self, record: Dict[str, Any]) -> Dict[str, Any]:
+        mismatches: List[Dict[str, Any]] = []
+        mismatch_warnings: List[str] = []
+
+        kinetics = record.get("main_activity", {}).get("kinetics", {})
+        evidence_fields = {
+            "kinetics.Km": kinetics.get("_evidence_Km", ""),
+            "kinetics.Vmax": kinetics.get("_evidence_Vmax", ""),
+            "kinetics.kcat": kinetics.get("_evidence_kcat", ""),
+            "kinetics.kcat_Km": kinetics.get("_evidence_kcat_Km", ""),
+        }
+
+        field_materials: Dict[str, List[str]] = {}
+        field_ph: Dict[str, Optional[float]] = {}
+        ph_pattern = re.compile(r'pH\s*[=:≈~]\s*([\d.]+)', re.I)
+
+        for field, ev_text in evidence_fields.items():
+            if not ev_text:
+                continue
+            materials = self._find_nearby_materials(ev_text)
+            if materials:
+                field_materials[field] = materials
+            ph_match = ph_pattern.search(ev_text)
+            if ph_match:
+                try:
+                    field_ph[field] = float(ph_match.group(1))
+                except ValueError:
+                    field_ph[field] = None
+
+        material_fields = list(field_materials.keys())
+        for i in range(len(material_fields)):
+            for j in range(i + 1, len(material_fields)):
+                f1, f2 = material_fields[i], material_fields[j]
+                mats1 = set(m.lower() for m in field_materials[f1])
+                mats2 = set(m.lower() for m in field_materials[f2])
+                if mats1 != mats2:
+                    overlap = mats1 & mats2
+                    only_in_1 = mats1 - mats2
+                    only_in_2 = mats2 - mats1
+                    other_only_1 = any(m in self.other_candidates for m in only_in_1)
+                    other_only_2 = any(m in self.other_candidates for m in only_in_2)
+                    if other_only_1 or other_only_2:
+                        detail = (
+                            f"Evidence for {f1} mentions {field_materials[f1]}, "
+                            f"but {f2} mentions {field_materials[f2]}"
+                        )
+                        mismatches.append({
+                            "type": "cross_material_mismatch",
+                            "field1": f1,
+                            "field2": f2,
+                            "detail": detail,
+                        })
+                        mismatch_warnings.append("cross_material_mismatch")
+
+        ph_fields = {f: v for f, v in field_ph.items() if v is not None}
+        ph_field_list = list(ph_fields.keys())
+        for i in range(len(ph_field_list)):
+            for j in range(i + 1, len(ph_field_list)):
+                f1, f2 = ph_field_list[i], ph_field_list[j]
+                if abs(ph_fields[f1] - ph_fields[f2]) > 2.0:
+                    detail = (
+                        f"pH in {f1} evidence is {ph_fields[f1]}, "
+                        f"but pH in {f2} evidence is {ph_fields[f2]} (diff > 2.0)"
+                    )
+                    mismatches.append({
+                        "type": "condition_mismatch",
+                        "field1": f1,
+                        "field2": f2,
+                        "detail": detail,
+                    })
+                    mismatch_warnings.append("condition_mismatch")
+
+        enzyme_type = record.get("main_activity", {}).get("enzyme_like_type", "")
+        if enzyme_type:
+            enzyme_activity = enzyme_type.replace("-like", "").strip().lower()
+            applications = record.get("applications", [])
+            if isinstance(applications, list):
+                for app in applications:
+                    if not isinstance(app, dict):
+                        continue
+                    app_evidence = app.get("_evidence", "") or app.get("evidence", "") or ""
+                    if not app_evidence:
+                        continue
+                    app_lower = app_evidence.lower()
+                    known_types = [
+                        "peroxidase", "catalase", "oxidase", "superoxide dismutase",
+                        "superoxide dismutase-like", "glucose oxidase", "haloperoxidase",
+                    ]
+                    for kt in known_types:
+                        kt_base = kt.replace("-like", "").strip().lower()
+                        if kt_base in app_lower and kt_base != enzyme_activity:
+                            if enzyme_activity not in app_lower:
+                                detail = (
+                                    f"enzyme_like_type is '{enzyme_type}' but application evidence "
+                                    f"mentions '{kt_base}'"
+                                )
+                                mismatches.append({
+                                    "type": "activity_application_mismatch",
+                                    "field1": "main_activity.enzyme_like_type",
+                                    "field2": "applications._evidence",
+                                    "detail": detail,
+                                })
+                                mismatch_warnings.append("activity_application_mismatch")
+                                break
+
+        return {
+            "mismatches": mismatches,
+            "warnings": list(dict.fromkeys(mismatch_warnings)),
+        }
 
     def _is_selected_subject(self, sentence: str) -> bool:
         sl = sentence.lower().strip()

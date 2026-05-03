@@ -66,6 +66,8 @@ EMPTY_RECORD = {
             "kcat": None, "kcat_unit": None,
             "kcat_Km": None, "kcat_Km_unit": None,
             "substrate": None, "source": None, "needs_review": False,
+            "_evidence_Km": None, "_evidence_Vmax": None,
+            "_evidence_kcat": None, "_evidence_kcat_Km": None,
         },
         "kinetics_list": [],
         "mechanism": None,
@@ -2429,9 +2431,9 @@ class RuleExtractor:
                     vmax_unit = m.group(4)
                     vmax_val = _parse_scientific_notation(vmax_raw)
                     if isinstance(km_val, (int, float)):
-                        km_candidates.append((method_pri, km_val, km_unit, "text"))
+                        km_candidates.append((method_pri, km_val, km_unit, "text", text[:300]))
                     if isinstance(vmax_val, (int, float)):
-                        vmax_candidates.append((method_pri, vmax_val, vmax_unit, "text"))
+                        vmax_candidates.append((method_pri, vmax_val, vmax_unit, "text", text[:300]))
                     break
 
             for pat in _KM_PATTERNS:
@@ -2450,7 +2452,7 @@ class RuleExtractor:
                     else:
                         continue
                     try:
-                        km_candidates.append((method_pri, float(value), unit, "text"))
+                        km_candidates.append((method_pri, float(value), unit, "text", text[:300]))
                     except ValueError:
                         pass
                     break
@@ -2477,14 +2479,14 @@ class RuleExtractor:
                         continue
                     vmax_val = _parse_scientific_notation(value.strip())
                     if isinstance(vmax_val, (int, float)):
-                        vmax_candidates.append((method_pri, vmax_val, unit, "text"))
+                        vmax_candidates.append((method_pri, vmax_val, unit, "text", text[:300]))
                         matched_vmax = True
                     break
 
             if not matched_vmax:
                 fallback = _extract_vmax_fallback(text)
                 if fallback and isinstance(fallback.get("value"), (int, float)):
-                    vmax_candidates.append((method_pri, fallback["value"], fallback.get("unit"), fallback.get("source", "text_ocr_fallback")))
+                    vmax_candidates.append((method_pri, fallback["value"], fallback.get("unit"), fallback.get("source", "text_ocr_fallback"), text[:300]))
 
         kin = record["main_activity"]["kinetics"]
         if km_candidates:
@@ -2495,6 +2497,7 @@ class RuleExtractor:
                 _nu = _norm_unit(best[2]) if _norm_unit and best[2] else best[2]
                 kin["Km_unit"] = _nu if _nu else best[2]
                 kin["source"] = best[3]
+                kin["_evidence_Km"] = best[4]
                 if len(km_candidates) > 1:
                     logger.info(f"[SMN] Km multi-method: picked {best[1]} {best[2]} (method={best[0]}) from {len(km_candidates)} candidates")
 
@@ -2506,6 +2509,7 @@ class RuleExtractor:
                 _nu = _norm_unit(best[2]) if _norm_unit and best[2] else best[2]
                 kin["Vmax_unit"] = _nu if _nu else best[2]
                 kin["source"] = best[3]
+                kin["_evidence_Vmax"] = best[4]
                 if len(vmax_candidates) > 1:
                     logger.info(f"[SMN] Vmax multi-method: picked {best[1]} {best[2]} (method={best[0]}) from {len(vmax_candidates)} candidates")
 
@@ -2587,6 +2591,7 @@ class RuleExtractor:
                             _nu = _norm_unit(km_unit) if _norm_unit and km_unit else km_unit
                             record["main_activity"]["kinetics"]["Km_unit"] = _nu if _nu else km_unit
                             record["main_activity"]["kinetics"]["source"] = "text"
+                            record["main_activity"]["kinetics"]["_evidence_Km"] = text[:300]
                         except ValueError:
                             pass
 
@@ -2604,6 +2609,7 @@ class RuleExtractor:
                             _nu = _norm_unit(vmax_unit_raw) if _norm_unit and vmax_unit_raw else vmax_unit_raw
                             record["main_activity"]["kinetics"]["Vmax_unit"] = _nu if _nu else vmax_unit_raw
                             record["main_activity"]["kinetics"]["source"] = "text"
+                            record["main_activity"]["kinetics"]["_evidence_Vmax"] = text[:300]
                         else:
                             norm_vmax = _normalize_ocr_scientific(raw_vmax)
                             vmax_parsed2 = _parse_scientific_notation(norm_vmax)
@@ -2612,6 +2618,7 @@ class RuleExtractor:
                                 _nu = _norm_unit(vmax_unit_raw) if _norm_unit and vmax_unit_raw else vmax_unit_raw
                                 record["main_activity"]["kinetics"]["Vmax_unit"] = _nu if _nu else vmax_unit_raw
                                 record["main_activity"]["kinetics"]["source"] = "text"
+                                record["main_activity"]["kinetics"]["_evidence_Vmax"] = text[:300]
                             else:
                                 nums = _NUM_RE.findall(raw_vmax)
                                 if nums:
@@ -2622,6 +2629,7 @@ class RuleExtractor:
                                     _nu = _norm_unit(vmax_unit_raw) if _norm_unit and vmax_unit_raw else vmax_unit_raw
                                     record["main_activity"]["kinetics"]["Vmax_unit"] = _nu if _nu else vmax_unit_raw
                                     record["main_activity"]["kinetics"]["source"] = "text"
+                                    record["main_activity"]["kinetics"]["_evidence_Vmax"] = text[:300]
 
                 if has_substrate_col and not record["main_activity"]["kinetics"]["substrate"]:
                     sub_idx = None
@@ -2688,6 +2696,8 @@ class RuleExtractor:
                     _nu = _norm_unit(vmax_unit) if _norm_unit and vmax_unit else vmax_unit
                     record["main_activity"]["kinetics"]["Vmax_unit"] = _nu if _nu else vmax_unit
                     record["main_activity"]["kinetics"]["source"] = "text"
+                    record["main_activity"]["kinetics"]["_evidence_Km"] = text[:300]
+                    record["main_activity"]["kinetics"]["_evidence_Vmax"] = text[:300]
                     if substrate:
                         record["main_activity"]["kinetics"]["substrate"] = substrate
                     return True
@@ -2700,6 +2710,7 @@ class RuleExtractor:
                     _nu = _norm_unit(km_unit) if _norm_unit and km_unit else km_unit
                     record["main_activity"]["kinetics"]["Km_unit"] = _nu if _nu else km_unit
                     record["main_activity"]["kinetics"]["source"] = "text"
+                    record["main_activity"]["kinetics"]["_evidence_Km"] = text[:300]
                     if substrate:
                         record["main_activity"]["kinetics"]["substrate"] = substrate
                     return True
@@ -2721,6 +2732,7 @@ class RuleExtractor:
                     record["main_activity"]["kinetics"]["Km_unit"] = _nu if _nu else val.get("unit")
                     record["main_activity"]["kinetics"]["substrate"] = val.get("substrate")
                     record["main_activity"]["kinetics"]["source"] = "table"
+                    record["main_activity"]["kinetics"]["_evidence_Km"] = val.get("original_text") or val.get("evidence_text") or str(val)[:300]
                 except (ValueError, TypeError):
                     pass
             elif param == "Vmax" and record["main_activity"]["kinetics"]["Vmax"] is None:
@@ -2731,6 +2743,7 @@ class RuleExtractor:
                 _nu = _norm_unit(val.get("unit")) if _norm_unit and val.get("unit") else val.get("unit")
                 record["main_activity"]["kinetics"]["Vmax_unit"] = _nu if _nu else val.get("unit")
                 record["main_activity"]["kinetics"]["source"] = "table"
+                record["main_activity"]["kinetics"]["_evidence_Vmax"] = val.get("original_text") or val.get("evidence_text") or str(val)[:300]
             elif param in ("kcat", "Kcat", "k_cat") and record["main_activity"]["kinetics"]["kcat"] is None:
                 try:
                     parsed = _parse_scientific_notation(str(val["value"]))
@@ -2740,6 +2753,7 @@ class RuleExtractor:
                         _nu = _norm_unit(_raw_u) if _norm_unit and _raw_u else _raw_u
                         record["main_activity"]["kinetics"]["kcat_unit"] = _nu if _nu else _raw_u
                         record["main_activity"]["kinetics"]["source"] = "table"
+                        record["main_activity"]["kinetics"]["_evidence_kcat"] = val.get("original_text") or val.get("evidence_text") or str(val)[:300]
                 except (ValueError, TypeError):
                     pass
             elif param in ("kcat/Km", "kcat_Km", "Kcat/Km", "catalytic_efficiency") and record["main_activity"]["kinetics"]["kcat_Km"] is None:
@@ -2751,6 +2765,7 @@ class RuleExtractor:
                         _nu = _norm_unit(_raw_u) if _norm_unit and _raw_u else _raw_u
                         record["main_activity"]["kinetics"]["kcat_Km_unit"] = _nu if _nu else _raw_u
                         record["main_activity"]["kinetics"]["source"] = "table"
+                        record["main_activity"]["kinetics"]["_evidence_kcat_Km"] = val.get("original_text") or val.get("evidence_text") or str(val)[:300]
                 except (ValueError, TypeError):
                     pass
 
@@ -2780,6 +2795,7 @@ class RuleExtractor:
                             record["main_activity"]["kinetics"]["kcat"] = parsed
                             _nu = _norm_unit(unit) if _norm_unit and unit else unit
                             record["main_activity"]["kinetics"]["kcat_unit"] = _nu if _nu else unit
+                            record["main_activity"]["kinetics"]["_evidence_kcat"] = text[:300]
                             if substrate and not record["main_activity"]["kinetics"]["substrate"]:
                                 record["main_activity"]["kinetics"]["substrate"] = substrate
                             break
@@ -2797,6 +2813,7 @@ class RuleExtractor:
                             record["main_activity"]["kinetics"]["kcat"] = kcat_val
                             _nu = _norm_unit("s^-1") if _norm_unit else "s^-1"
                             record["main_activity"]["kinetics"]["kcat_unit"] = _nu if _nu else "s^-1"
+                            record["main_activity"]["kinetics"]["_evidence_kcat"] = text[:300]
                             logger.info(f"[SMN] kcat parsed from E-notation: {base}e{exp} = {kcat_val:.2e}")
                     except (ValueError, TypeError):
                         pass
@@ -2820,6 +2837,7 @@ class RuleExtractor:
                             record["main_activity"]["kinetics"]["kcat_Km"] = parsed
                             _nu = _norm_unit(unit) if _norm_unit and unit else unit
                             record["main_activity"]["kinetics"]["kcat_Km_unit"] = _nu if _nu else unit
+                            record["main_activity"]["kinetics"]["_evidence_kcat_Km"] = text[:300]
                             break
 
             if record["main_activity"]["kinetics"]["kcat_Km"] is None:
@@ -2835,6 +2853,7 @@ class RuleExtractor:
                             record["main_activity"]["kinetics"]["kcat_Km"] = kcat_km_val
                             _nu = _norm_unit("M^-1 s^-1") if _norm_unit else "M^-1 s^-1"
                             record["main_activity"]["kinetics"]["kcat_Km_unit"] = _nu if _nu else "M^-1 s^-1"
+                            record["main_activity"]["kinetics"]["_evidence_kcat_Km"] = text[:300]
                             logger.info(f"[SMN] kcat/Km parsed from E-notation: {base}e{exp} = {kcat_km_val:.2e}")
                     except (ValueError, TypeError):
                         pass
@@ -2852,6 +2871,7 @@ class RuleExtractor:
                             record["main_activity"]["kinetics"]["kcat_Km"] = kcat_km_val
                             _nu = _norm_unit("M^-1 s^-1") if _norm_unit else "M^-1 s^-1"
                             record["main_activity"]["kinetics"]["kcat_Km_unit"] = _nu if _nu else "M^-1 s^-1"
+                            record["main_activity"]["kinetics"]["_evidence_kcat_Km"] = text[:300]
                             logger.info(f"[SMN] kcat/Km from catalytic efficiency E-notation: {base}e{exp} = {kcat_km_val:.2e}")
                     except (ValueError, TypeError):
                         pass
@@ -3466,6 +3486,7 @@ class RuleExtractor:
             for key in ("application_type", "target_analyte", "method", "linear_range",
                         "detection_limit", "sample_type", "notes"):
                 app.setdefault(key, None)
+            app["_evidence"] = text[:300]
             record["applications"].append(app)
 
     _ASSAY_METHOD_PATTERNS = [
@@ -3633,6 +3654,13 @@ class NumericValidator:
 
 
 class DiagnosticsBuilder:
+    def __init__(self):
+        self._verification = None
+
+    def set_verification(self, verification: Dict[str, Any]) -> "DiagnosticsBuilder":
+        self._verification = verification
+        return self
+
     def build(self, record: Dict[str, Any], doc: PreprocessedDocument,
               selected_name: Optional[str], ambiguous: bool,
               table_classified: Dict, figure_summ: Dict) -> Dict[str, Any]:
@@ -3674,12 +3702,28 @@ class DiagnosticsBuilder:
         if not record["raw_supporting_text"].get("material") and not record["raw_supporting_text"].get("activity"):
             warnings.append("sparse_evidence")
 
-        return {
+        result = {
             "status": status,
             "confidence": confidence,
             "needs_review": needs_review,
             "warnings": warnings,
         }
+
+        if self._verification is not None:
+            result["verification"] = self._verification
+            rate = self._verification.get("overall_verification_rate", 0.0)
+            if rate < 0.5:
+                result["confidence"] = "low"
+                result["needs_review"] = True
+            elif rate < 0.8:
+                if result["confidence"] == "high":
+                    result["confidence"] = "medium"
+                result["needs_review"] = True
+            elif self._verification.get("hallucination_suspects") or self._verification.get("mismatches"):
+                if result["confidence"] == "high":
+                    result["confidence"] = "medium"
+
+        return result
 
 
 class SingleMainNanozymePipeline:
@@ -3717,6 +3761,13 @@ class SingleMainNanozymePipeline:
         except ImportError:
             self.consistency_agent = None
             logger.warning("[SMN] ConsistencyAgent not available")
+        try:
+            from extraction_verifier import ExtractionVerifier
+            self._verifier_class = ExtractionVerifier
+            logger.info("[SMN] ExtractionVerifier loaded")
+        except ImportError:
+            self._verifier_class = None
+            logger.warning("[SMN] ExtractionVerifier not available")
 
     async def _call_vlm(self, vlm_tasks: List[Dict], selected_name: str) -> Optional[List[Dict]]:
         if not self.client:
@@ -4033,6 +4084,10 @@ class SingleMainNanozymePipeline:
                             record["main_activity"]["kinetics"]["Km"] = vlm_val
                             record["main_activity"]["kinetics"]["Km_unit"] = km_item.get("unit")
                             record["main_activity"]["kinetics"]["source"] = "VLM"
+                            if caption:
+                                record["main_activity"]["kinetics"]["_evidence_Km"] = str(caption)[:300]
+                            else:
+                                record["main_activity"]["kinetics"]["_vlm_no_evidence"] = True
                             logger.info(f"[SMN] VLM Km={vlm_val} fills empty kinetics (source=VLM)")
                         elif isinstance(rule_km, (int, float)):
                             rel_diff = abs(vlm_val - rule_km) / max(abs(rule_km), 1e-10)
@@ -4066,6 +4121,10 @@ class SingleMainNanozymePipeline:
                             record["main_activity"]["kinetics"]["Vmax"] = vlm_val
                             record["main_activity"]["kinetics"]["Vmax_unit"] = vmax_item.get("unit")
                             record["main_activity"]["kinetics"]["source"] = "VLM"
+                            if caption:
+                                record["main_activity"]["kinetics"]["_evidence_Vmax"] = str(caption)[:300]
+                            else:
+                                record["main_activity"]["kinetics"]["_vlm_no_evidence"] = True
                             logger.info(f"[SMN] VLM Vmax={vlm_val} fills empty kinetics (source=VLM)")
                         elif isinstance(rule_vmax, (int, float)):
                             rel_diff = abs(vlm_val - rule_vmax) / max(abs(rule_vmax), 1e-10)
@@ -4130,7 +4189,10 @@ class SingleMainNanozymePipeline:
                                 "detection_limit": str(vlm_lod) if vlm_lod else None,
                                 "linear_range": str(vlm_lr) if vlm_lr else None,
                                 "notes": "from VLM sensing_performance",
+                                "_evidence": str(caption)[:300] if caption else None,
                             }
+                            if not caption:
+                                new_app["_vlm_no_evidence"] = True
                             apps.append(new_app)
                             record["applications"] = apps
 
@@ -4184,11 +4246,15 @@ class SingleMainNanozymePipeline:
                         continue
                     norm_app = self._normalize_app_type(hint.strip())
                     if norm_app and norm_app not in existing_types:
-                        apps.append({
+                        vlm_app = {
                             "application_type": norm_app,
                             "target_analyte": None,
                             "notes": "from VLM application_hints",
-                        })
+                            "_evidence": str(caption)[:300] if caption else None,
+                        }
+                        if not caption:
+                            vlm_app["_vlm_no_evidence"] = True
+                        apps.append(vlm_app)
                         existing_types.add(norm_app)
                 record["applications"] = apps
 
@@ -4399,6 +4465,45 @@ class SingleMainNanozymePipeline:
                 warnings.append("vlm_unavailable")
             logger.info("[SMN] VLM not available, using figure captions only")
 
+        if self._verifier_class and self._guard:
+            try:
+                verifier = self._verifier_class(
+                    text_chunks=doc.chunks,
+                    selected_name=selected_name,
+                    all_candidates=all_candidate_names,
+                )
+                verification = verifier.verify_record(record)
+                if verification.get("hallucination_suspects"):
+                    logger.warning(
+                        f"[SMN] Verification: hallucination_suspects={verification['hallucination_suspects']}"
+                    )
+                    record = verifier.demote_hallucinated_kinetics(record, verification)
+                    for hs in verification["hallucination_suspects"]:
+                        warnings.append("hallucination_suspect")
+                if verification.get("mismatches"):
+                    for mm in verification["mismatches"]:
+                        mm_type = mm.get("type", "")
+                        if mm_type in ("cross_material_mismatch", "condition_mismatch", "activity_application_mismatch"):
+                            warnings.append(mm_type)
+                        logger.warning(f"[SMN] Verification mismatch: {mm_type} - {mm.get('detail', '')}")
+                if verification.get("unverified_fields"):
+                    for uf in verification["unverified_fields"]:
+                        if "vlm" in uf.lower():
+                            warnings.append("vlm_unverified")
+                        elif "llm" in uf.lower() or "no_evidence" in uf.lower():
+                            warnings.append("llm_no_evidence")
+                logger.info(
+                    f"[SMN] Verification: rate={verification.get('overall_verification_rate', 0):.1%}, "
+                    f"suspects={len(verification.get('hallucination_suspects', []))}, "
+                    f"mismatches={len(verification.get('mismatches', []))}"
+                )
+                self._verification_data = verification
+            except Exception as e:
+                logger.warning(f"[SMN] ExtractionVerifier failed: {e}")
+                self._verification_data = None
+        else:
+            self._verification_data = None
+
         record, val_warnings = self.num_val.validate(record, strict=self.config.numeric_validation_strict)
         warnings.extend(val_warnings)
 
@@ -4422,7 +4527,8 @@ class SingleMainNanozymePipeline:
         if table_sensing_values and not record.get("applications"):
             for sv in table_sensing_values:
                 app = {"application_type": "sensing", "target_analyte": None, "method": None,
-                       "linear_range": None, "detection_limit": None, "sample_type": None, "notes": None}
+                       "linear_range": None, "detection_limit": None, "sample_type": None, "notes": None,
+                       "_evidence": str(sv)[:300]}
                 if sv["parameter"] == "LOD":
                     app["detection_limit"] = f"{sv['value']} {sv['unit']}"
                 elif sv["parameter"] == "linear_range":
@@ -4435,6 +4541,8 @@ class SingleMainNanozymePipeline:
             record["applications_note"] = None
 
         record["diagnostics"]["warnings"] = warnings
+        if getattr(self, '_verification_data', None):
+            self.diag_builder.set_verification(self._verification_data)
         diag = self.diag_builder.build(record, doc, selected_name, ambiguous, table_classified, figure_summ)
         record["diagnostics"] = diag
 
@@ -5208,6 +5316,11 @@ class SingleMainNanozymePipeline:
                                             continue
                                 else:
                                     record["main_activity"]["kinetics"][kk] = val
+                                    llm_ev = llm_kinetics.get(f"evidence_{kk}") or llm_kinetics.get("evidence_text")
+                                    if llm_ev:
+                                        record["main_activity"]["kinetics"][f"_evidence_{kk}"] = str(llm_ev)[:300]
+                                    else:
+                                        record["main_activity"]["kinetics"]["_llm_no_evidence"] = True
                         for kk in llm_kinetics:
                             if kk.startswith("_"):
                                 continue
@@ -5239,6 +5352,11 @@ class SingleMainNanozymePipeline:
                                 record["main_activity"]["kinetics"][f"_{kk}_source"] = "llm_supplement"
                                 if f"_llm_{kk}_unit" in llm_kinetics and llm_kinetics[f"_llm_{kk}_unit"]:
                                     record["main_activity"]["kinetics"][f"{kk}_unit"] = llm_kinetics[f"_llm_{kk}_unit"]
+                                llm_ev = llm_kinetics.get(f"evidence_{kk}") or llm_kinetics.get("evidence_text")
+                                if llm_ev:
+                                    record["main_activity"]["kinetics"][f"_evidence_{kk}"] = str(llm_ev)[:300]
+                                else:
+                                    record["main_activity"]["kinetics"]["_llm_no_evidence"] = True
                             else:
                                 record["main_activity"]["kinetics"][kk] = val
                 elif key == "enzyme_like_type" and "enzyme_like_type" in llm_act and llm_act["enzyme_like_type"] is not None:
@@ -5328,6 +5446,8 @@ class SingleMainNanozymePipeline:
                 for va in valid:
                     key = (va.get("application_type"), va.get("target_analyte"))
                     if key not in existing_keys:
+                        if va.get("evidence_text") and not va.get("_evidence"):
+                            va["_evidence"] = str(va["evidence_text"])[:300]
                         existing_apps.append(va)
                         existing_keys.add(key)
                     else:

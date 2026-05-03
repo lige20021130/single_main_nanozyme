@@ -47,6 +47,12 @@ WARNING_ENUMS = {
     "application_bucket_fallback_applied",
     "mechanism_bucket_fallback_applied",
     "schema_auto_fixed",
+    "hallucination_suspect",
+    "vlm_unverified",
+    "cross_material_mismatch",
+    "condition_mismatch",
+    "activity_application_mismatch",
+    "llm_no_evidence",
 }
 
 
@@ -80,6 +86,7 @@ class DiagnosticsBuilder:
         self._application_warnings: List[str] = []
         self._caption_low_confidence: bool = False
         self._kinetics_from_figure: bool = False
+        self._verification: Optional[Dict[str, Any]] = None
 
     def set_parse_status(self, status: Optional[str]) -> "DiagnosticsBuilder":
         self._parse_status = status
@@ -136,6 +143,10 @@ class DiagnosticsBuilder:
 
     def set_kinetics_from_figure(self, flag: bool) -> "DiagnosticsBuilder":
         self._kinetics_from_figure = flag
+        return self
+
+    def set_verification(self, verification: Dict[str, Any]) -> "DiagnosticsBuilder":
+        self._verification = verification
         return self
 
     def compute_field_coverage(self, record: Dict[str, Any]) -> Dict[str, str]:
@@ -234,12 +245,50 @@ class DiagnosticsBuilder:
         confidence = self._determine_confidence(status, warnings)
         needs_review = confidence != "high" or bool(warnings)
 
-        return {
+        result = {
             "status": status,
             "confidence": confidence,
             "needs_review": needs_review,
             "warnings": warnings,
         }
+
+        if self._verification is not None:
+            result["verification"] = self._verification
+
+            for field_info in self._verification.get("hallucination_suspects", []):
+                if isinstance(field_info, dict):
+                    w = field_info.get("warning_type", "hallucination_suspect")
+                else:
+                    w = "hallucination_suspect"
+                if w in WARNING_ENUMS and w not in result["warnings"]:
+                    result["warnings"].append(w)
+
+            mismatch_types = set()
+            for mm in self._verification.get("mismatches", []):
+                if isinstance(mm, dict):
+                    mt = mm.get("mismatch_type", "")
+                else:
+                    mt = str(mm)
+                if mt and mt in WARNING_ENUMS and mt not in result["warnings"]:
+                    result["warnings"].append(mt)
+                    mismatch_types.add(mt)
+
+            rate = self._verification.get("overall_verification_rate")
+            if isinstance(rate, (int, float)):
+                if rate < 0.5:
+                    result["confidence"] = "low"
+                    result["needs_review"] = True
+                elif rate < 0.8:
+                    if result["confidence"] == "high":
+                        result["confidence"] = "medium"
+                        result["needs_review"] = True
+                else:
+                    has_suspects = bool(self._verification.get("hallucination_suspects"))
+                    has_mismatches = bool(self._verification.get("mismatches"))
+                    if (has_suspects or has_mismatches) and result["confidence"] == "high":
+                        result["confidence"] = "medium"
+
+        return result
 
     def _determine_status(self, warnings: List[str]) -> str:
         if not self._selected_nanozyme:
