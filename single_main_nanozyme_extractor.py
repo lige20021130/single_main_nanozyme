@@ -1631,6 +1631,12 @@ class CandidateRecaller:
                     results.append(sa_name)
                 if self._is_valid_candidate(raw):
                     results.append(raw)
+                ldh_m = re.search(r'(\w+[- ]?(?:LDH|LDHs))\s+Supported', title, re.I)
+                if ldh_m:
+                    ldh_name = ldh_m.group(1).strip()
+                    combined = f"{metal_m.group(1)}/{ldh_name}"
+                    if self._is_valid_candidate(combined):
+                        results.append(combined)
         for m in re.finditer(
             r'\b(?:Fe|Co|Ni|Mn|Cu|Zn|Ce|Au|Ag|Pt|Pd|Ti|V|Cr|Mo|W|Ru|Rh|Ir|La|Zr|Al|Sn|Bi|In|Ga|Ge|Sb|Te|Hf|Ta|Re|Os|Y|Sc|Cd|Hg|Tl|Pb|Nb)\d*/(?:LDH|LDHs|MOF|COF|ZIF)\b',
             title, re.I,
@@ -1708,6 +1714,17 @@ class CandidateRecaller:
                 candidates[name]["sources"].add(section)
                 candidates[name]["evidence"].append(text[max(0, m.start()-40):m.end()+40])
 
+        for m in re.finditer(
+            r'\b[A-Z][a-z]?\d*(?:[- ][A-Z][a-z]?\d*)*(?:[- ]?(?:LDH|LDHs|MOF|COF|ZIF|SAN|SAC|SAzyme)\b)?'
+            r'(?:@[A-Z][a-z]?\d*(?:[- ][A-Z][a-z]?\d*)*(?:[- ]?(?:LDH|LDHs|MOF|COF|ZIF|SAN|SAC|SAzyme)\b)?)+',
+            text, re.I,
+        ):
+            name = m.group(0).strip()
+            if len(name) >= 5 and self._is_valid_candidate(name):
+                candidates.setdefault(name, {"name": name, "sources": set(), "evidence": []})
+                candidates[name]["sources"].add(section)
+                candidates[name]["evidence"].append(text[max(0, m.start()-40):m.end()+40])
+
         for word in _MORPHOLOGY_WORDS:
             idx = text.lower().find(word)
             if idx >= 0:
@@ -1740,6 +1757,10 @@ class CandidateRecaller:
         if _SUBSTRATE_PLUS_RE.match(name):
             return False
         if _SENTENCE_ID_RE.match(name):
+            return False
+        if re.match(r'^[A-Z]{2,4}/\d+$', name, re.I):
+            return False
+        if re.match(r'^[A-Z]{2,4}\d+/\d+$', name, re.I):
             return False
         if lower.startswith("the ") or lower.startswith("a "):
             return False
@@ -1901,7 +1922,11 @@ class NanozymeScorer:
                 if re.search(r'\d', cand["name"]):
                     score += 2
                 if re.search(r'(?:SA|SAN|SAC|SAzyme)$', cand["name"], re.I):
-                    score += 3
+                    score += 8
+                if re.search(r'Single[-\s]?Atom$', cand["name"], re.I):
+                    score -= 3
+                if re.search(r'/(?:LDH|LDHs|MOF|COF|ZIF)$', cand["name"], re.I):
+                    score += 5
                 title_metals = set(_METAL_ELEMENTS_RE.findall(title))
                 name_metals = set(_METAL_ELEMENTS_RE.findall(cand["name"]))
                 if title_metals and name_metals and name_metals & title_metals:
