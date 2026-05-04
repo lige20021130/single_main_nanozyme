@@ -536,11 +536,44 @@ class KineticsAgent:
 
 
 class MorphologyAgent:
+    _METAL_ELEMENTS = [
+        "Fe", "Co", "Ni", "Cu", "Zn", "Mn", "Cr", "V", "Ti", "Mo", "W",
+        "Ru", "Rh", "Pd", "Ag", "Pt", "Au", "Ir", "Os", "Ce", "La",
+        "Pr", "Nd", "Sm", "Eu", "Gd", "Dy", "Yb", "Zr", "Hf", "Nb",
+        "Ta", "Re", "Al", "Ga", "In", "Sn", "Pb", "Bi", "Pd", "Cd",
+    ]
+
+    _CHARACTERIZATION_TECHNIQUES = {
+        "XRD": re.compile(r'\bXRD\b|X-ray\s+diffraction', re.I),
+        "XPS": re.compile(r'\bXPS\b|X-ray\s+photoelectron', re.I),
+        "SEM": re.compile(r'\bSEM\b|scanning\s+electron\s+microscop', re.I),
+        "TEM": re.compile(r'\bTEM\b|transmission\s+electron\s+microscop', re.I),
+        "HRTEM": re.compile(r'\bHRTEM\b|high.resolution\s+TEM', re.I),
+        "EDX": re.compile(r'\bEDX\b|\bEDS\b|energy.dispersive\s+(?:X-ray|spectroscop)', re.I),
+        "BET": re.compile(r'\bBET\b|Brunauer.Emmett.Teller|N2\s+adsorption', re.I),
+        "Raman": re.compile(r'\bRaman\b', re.I),
+        "FTIR": re.compile(r'\bFTIR\b|\bFT-IR\b|Fourier\s+transform\s+infrared', re.I),
+        "XAFS": re.compile(r'\bXAFS\b|X-ray\s+absorption\s+fine\s+structure', re.I),
+        "EPR": re.compile(r'\bEPR\b|electron\s+paramagnetic\s+resonance', re.I),
+        "AFM": re.compile(r'\bAFM\b|atomic\s+force\s+microscop', re.I),
+        "ICP": re.compile(r'\bICP\b|inductively\s+coupled\s+plasma', re.I),
+        "TGA": re.compile(r'\bTGA\b|thermogravimet', re.I),
+        "SAED": re.compile(r'\bSAED\b|selected.area\s+electron\s+diffraction', re.I),
+        "HAADF": re.compile(r'\bHAADF\b|high.angle\s+annular\s+dark.field', re.I),
+        "UV-vis": re.compile(r'\bUV.vis\b|UV.visible\s+spectroscop', re.I),
+        "PL": re.compile(r'\bPL\b|photoluminescen', re.I),
+        "DLS": re.compile(r'\bDLS\b|dynamic\s+light\s+scattering', re.I),
+        "Zeta": re.compile(r'\bzeta\s+potential', re.I),
+    }
+
     def extract(self, record, buckets, table_values, selected_name, doc=None):
         material_texts = buckets.get("material", []) + buckets.get("characterization", []) + buckets.get("synthesis", [])[:3]
         self._extract_size_properties(record, material_texts)
         char_texts = buckets.get("characterization", []) + buckets.get("material", [])[:3]
         self._extract_physical_properties(record, char_texts)
+        all_relevant = material_texts + char_texts
+        self._extract_metal_elements(record, all_relevant, selected_name)
+        self._extract_characterization_techniques(record, all_relevant)
         return record
 
     def _extract_size_properties(self, record, material_texts):
@@ -636,6 +669,43 @@ class MorphologyAgent:
                 if sel.get("pore_size"):
                     break
 
+    def _extract_metal_elements(self, record, texts, selected_name):
+        sel = record.get("selected_nanozyme", {})
+        if not isinstance(sel, dict):
+            return
+        if sel.get("metal_elements") and len(sel["metal_elements"]) > 0:
+            return
+
+        name_lower = (selected_name or "").lower()
+        found_elements = set()
+        for elem in self._METAL_ELEMENTS:
+            if elem.lower() in name_lower:
+                found_elements.add(elem)
+
+        combined = " ".join(texts[:20])
+        for elem in self._METAL_ELEMENTS:
+            if re.search(r'\b' + re.escape(elem) + r'\b', combined):
+                found_elements.add(elem)
+
+        if found_elements:
+            sel["metal_elements"] = sorted(list(found_elements))
+
+    def _extract_characterization_techniques(self, record, texts):
+        sel = record.get("selected_nanozyme", {})
+        if not isinstance(sel, dict):
+            return
+        if sel.get("characterization") and len(sel["characterization"]) > 0:
+            return
+
+        found_techniques = set()
+        combined = " ".join(texts[:20])
+        for tech_name, pattern in self._CHARACTERIZATION_TECHNIQUES.items():
+            if pattern.search(combined):
+                found_techniques.add(tech_name)
+
+        if found_techniques:
+            sel["characterization"] = sorted(list(found_techniques))
+
 
 class SynthesisAgent:
     def extract(self, record, buckets, table_values, selected_name, doc=None):
@@ -652,10 +722,15 @@ class SynthesisAgent:
             for text in synthesis_texts:
                 for method_name, pattern in _SYNTHESIS_METHODS.items():
                     if pattern.search(text):
-                        score = method_scores.get(method_name, 0) + 1
+                        weight = 0.1 if method_name == "general_synthesis" else 1.0
+                        score = method_scores.get(method_name, 0) + weight
                         method_scores[method_name] = score
             if method_scores:
-                best_method = max(method_scores, key=method_scores.get)
+                non_generic = {k: v for k, v in method_scores.items() if k != "general_synthesis"}
+                if non_generic:
+                    best_method = max(non_generic, key=non_generic.get)
+                else:
+                    best_method = max(method_scores, key=method_scores.get)
                 sel["synthesis_method"] = best_method.replace("_", " ")
 
         synth_cond = sel.get("synthesis_conditions", {})
@@ -1254,3 +1329,50 @@ class RuleExtractorAdapter:
 
         act["pH_profile"] = ph_prof
         act["temperature_profile"] = temp_prof
+
+        apps = record.get("applications", [])
+        if apps:
+            for app in apps:
+                if app.get("detection_limit") is None and app.get("application_type") in ("sensing", "detection"):
+                    for pat in _LOD_PATTERNS:
+                        m = pat.search(all_text)
+                        if m:
+                            val = m.group(1)
+                            unit = m.group(2) if m.lastindex and m.lastindex >= 2 else ""
+                            app["detection_limit"] = val
+                            app["detection_limit_unit"] = unit
+                            logger.info(f"[SMN] Fulltext fallback: LOD={val} {unit}")
+                            break
+                    if app.get("detection_limit"):
+                        break
+
+                if app.get("linear_range") is None and app.get("application_type") in ("sensing", "detection"):
+                    for pat in _LINEAR_RANGE_PATTERNS:
+                        m = pat.search(all_text)
+                        if m:
+                            val = m.group(1)
+                            unit = m.group(2) if m.lastindex and m.lastindex >= 2 else ""
+                            app["linear_range"] = val.replace(" ", "")
+                            app["linear_range_unit"] = unit
+                            logger.info(f"[SMN] Fulltext fallback: linear_range={val} {unit}")
+                            break
+                    if app.get("linear_range"):
+                        break
+
+        kin = act.get("kinetics", {})
+        if not isinstance(kin, dict):
+            kin = {}
+            act["kinetics"] = kin
+        if kin.get("Km") is None and kin.get("Vmax") is None:
+            si_table_ref = re.search(
+                r'(?:Table\s+S\d+|Supplementary\s+Table\s+\d+)\s+(?:displays?|shows?|presents?|lists?|summarizes?)\s+.*?(?:Km|Vmax|kinetic)',
+                all_text, re.I
+            )
+            if si_table_ref:
+                diag = record.get("diagnostics", {})
+                if isinstance(diag, dict):
+                    warns = diag.get("warnings", [])
+                    if not isinstance(warns, list):
+                        warns = []
+                    warns.append("kinetics_in_SI_table_unreachable: Km/Vmax values likely in Supporting Information table")
+                    diag["warnings"] = warns

@@ -604,25 +604,33 @@ def _extract_vmax_fallback(text: str) -> Optional[Dict[str, Any]]:
     return None
 _LOD_PATTERNS = [
     re.compile(
-        r'(?:LOD|limit\s+of\s+detection|detection\s+limit)\s*(?:of|=|:|≈|~|was|is)\s*([\d.]+)\s*(nM|μM|uM|mM|M|pg/mL|ng/mL|μg/mL|mg/L|ppb|ppm)',
+        r'(?:LOD|limit\s+of\s+detection|detection\s+limit)\s*(?:of|=|:|≈|~|was|is)\s*([\d.]+)\s*(nM|μM|uM|mM|M|pg/mL|ng/mL|μg/mL|mg/L|ppb|ppm|U/L|mU/L|U/mL|ng/L|μg/L|mg/mL|pM|fM)',
         re.I,
     ),
     re.compile(
-        r'(?:LOD|limit\s+of\s+detection|detection\s+limit)\s*[\(（]\s*([\d.]+)\s*(nM|μM|uM|mM|M|pg/mL|ng/mL|μg/mL|mg/L|ppb|ppm)\s*[\)）]',
+        r'(?:LOD|limit\s+of\s+detection|detection\s+limit)\s*[\(（]\s*([\d.]+)\s*(nM|μM|uM|mM|M|pg/mL|ng/mL|μg/mL|mg/L|ppb|ppm|U/L|mU/L|U/mL|ng/L|μg/L|mg/mL|pM|fM)\s*[\)）]',
         re.I,
     ),
     re.compile(
-        r'(?:LOD|detection\s+limit)\s+(?:was\s+|is\s+)?(?:calculated\s+to\s+be\s+|found\s+to\s+be\s+)?([\d.]+)\s*(nM|μM|uM|mM|M|pg/mL|ng/mL|μg/mL|mg/L|ppb|ppm)',
+        r'(?:LOD|detection\s+limit)\s+(?:was\s+|is\s+)?(?:calculated\s+to\s+be\s+|found\s+to\s+be\s+)?([\d.]+)\s*(nM|μM|uM|mM|M|pg/mL|ng/mL|μg/mL|mg/L|ppb|ppm|U/L|mU/L|U/mL|ng/L|μg/L|mg/mL|pM|fM)',
+        re.I,
+    ),
+    re.compile(
+        r'(?:LOD|detection\s+limit)\s+(?:was\s+|is\s+)?(?:calculated\s+to\s+be\s+|found\s+to\s+be\s+)?([\d.]+)\s*(?:×\s*10[⁻\-–](\d))?\s*(nM|μM|uM|mM|M|pg/mL|ng/mL|μg/mL|mg/L|ppb|ppm|U/L|mU/L|U/mL)',
         re.I,
     ),
 ]
 _LINEAR_RANGE_PATTERNS = [
     re.compile(
-        r'(?:linear\s+range|linear\s+detection\s+range|calibration\s+range)\s*(?:of|=|:|≈|~|was|is)\s*([\d.]+\s*[-–—~to]+\s*[\d.]+)\s*(nM|μM|uM|mM|M|pg/mL|ng/mL|μg/mL|mg/L)',
+        r'(?:linear\s+range|linear\s+detection\s+range|calibration\s+range)\s*(?:of|=|:|≈|~|was|is)\s*([\d.]+\s*[-–—~to]+\s*[\d.]+)\s*(nM|μM|uM|mM|M|pg/mL|ng/mL|μg/mL|mg/L|U/L|mU/L|U/mL)',
         re.I,
     ),
     re.compile(
-        r'(?:linear\s+range|calibration\s+range)\s*[\(（]\s*([\d.]+\s*[-–—~to]+\s*[\d.]+)\s*(nM|μM|uM|mM|M|pg/mL|ng/mL|μg/mL|mg/L)\s*[\)）]',
+        r'(?:linear\s+range|calibration\s+range)\s*[\(（]\s*([\d.]+\s*[-–—~to]+\s*[\d.]+)\s*(nM|μM|uM|mM|M|pg/mL|ng/mL|μg/mL|mg/L|U/L|mU/L|U/mL)\s*[\)）]',
+        re.I,
+    ),
+    re.compile(
+        r'(?:in|within)\s+(?:the\s+)?(?:range\s+of\s+)?([\d.]+\s*[-–—~to]+\s*[\d.]+)\s*(U/L|mU/L|U/mL|nM|μM|uM|mM|M|pg/mL|ng/mL|μg/mL|mg/L)',
         re.I,
     ),
 ]
@@ -3397,14 +3405,19 @@ class RuleExtractor:
             return
 
         if sel.get("synthesis_method") is None:
-            method_scores: Dict[str, int] = {}
+            method_scores: Dict[str, float] = {}
             for text in synthesis_texts:
                 for method_name, pattern in _SYNTHESIS_METHODS.items():
                     if pattern.search(text):
-                        score = method_scores.get(method_name, 0) + 1
+                        weight = 0.1 if method_name == "general_synthesis" else 1.0
+                        score = method_scores.get(method_name, 0) + weight
                         method_scores[method_name] = score
             if method_scores:
-                best_method = max(method_scores, key=method_scores.get)
+                non_generic = {k: v for k, v in method_scores.items() if k != "general_synthesis"}
+                if non_generic:
+                    best_method = max(non_generic, key=non_generic.get)
+                else:
+                    best_method = max(method_scores, key=method_scores.get)
                 sel["synthesis_method"] = best_method.replace("_", " ")
 
         synth_cond = sel.get("synthesis_conditions", {})
@@ -5115,6 +5128,9 @@ class SingleMainNanozymePipeline:
         record["diagnostics"]["warnings"] = warnings
         if getattr(self, '_verification_data', None):
             self.diag_builder.set_verification(self._verification_data)
+        if doc and doc.chunks:
+            self.diag_builder.set_raw_text("\n".join(doc.chunks))
+        self.diag_builder.set_selected_nanozyme_full(record.get("selected_nanozyme"))
         diag = self.diag_builder.build(record, doc, selected_name, ambiguous, table_classified, figure_summ)
         record["diagnostics"] = diag
 
@@ -5690,7 +5706,19 @@ class SingleMainNanozymePipeline:
                     if rule_val is None:
                         record["selected_nanozyme"][key] = val
                     else:
-                        record["selected_nanozyme"][f"_llm_{key}"] = val
+                        _LOW_QUALITY_RULE_VALUES = {
+                            "synthesis_method": {"general synthesis", "general_synthesis"},
+                            "morphology": set(),
+                        }
+                        low_quality = _LOW_QUALITY_RULE_VALUES.get(key, set())
+                        if rule_val in low_quality and val not in low_quality:
+                            logger.info(
+                                f"[SMN] LLM {key} '{val}' overrides low-quality rule '{rule_val}'"
+                            )
+                            record["selected_nanozyme"][key] = val
+                            record["selected_nanozyme"][f"_llm_{key}_override_reason"] = "rule_value_low_quality"
+                        else:
+                            record["selected_nanozyme"][f"_llm_{key}"] = val
 
         if "main_activity" in llm:
             llm_act = llm["main_activity"]

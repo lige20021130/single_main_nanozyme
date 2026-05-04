@@ -53,6 +53,11 @@ WARNING_ENUMS = {
     "condition_mismatch",
     "activity_application_mismatch",
     "llm_no_evidence",
+    "kinetics_mentioned_but_not_extracted",
+    "LOD_mentioned_but_not_extracted",
+    "synthesis_method_generic",
+    "metal_elements_empty",
+    "characterization_empty",
 }
 
 
@@ -87,6 +92,8 @@ class DiagnosticsBuilder:
         self._caption_low_confidence: bool = False
         self._kinetics_from_figure: bool = False
         self._verification: Optional[Dict[str, Any]] = None
+        self._raw_text: Optional[str] = None
+        self._selected_nanozyme_full: Optional[Dict[str, Any]] = None
 
     def set_parse_status(self, status: Optional[str]) -> "DiagnosticsBuilder":
         self._parse_status = status
@@ -115,6 +122,14 @@ class DiagnosticsBuilder:
 
     def set_applications(self, apps: List[Dict[str, Any]]) -> "DiagnosticsBuilder":
         self._applications = apps or []
+        return self
+
+    def set_raw_text(self, raw_text: Optional[str]) -> "DiagnosticsBuilder":
+        self._raw_text = raw_text
+        return self
+
+    def set_selected_nanozyme_full(self, sel: Optional[Dict[str, Any]]) -> "DiagnosticsBuilder":
+        self._selected_nanozyme_full = sel
         return self
 
     def add_numeric_warnings(self, warnings: List[str]) -> "DiagnosticsBuilder":
@@ -207,6 +222,41 @@ class DiagnosticsBuilder:
 
         if not has_kinetics:
             warnings.append("no_kinetics_found")
+
+        if not has_kinetics and self._raw_text:
+            import re as _re
+            kinetics_mention = _re.search(
+                r'\b(?:Km|Vmax|kcat|Michaelis|Michealis|Lineweaver)\b',
+                self._raw_text, _re.I
+            )
+            if kinetics_mention:
+                warnings.append("kinetics_mentioned_but_not_extracted")
+
+        has_lod = False
+        for app in self._applications:
+            if app.get("detection_limit"):
+                has_lod = True
+                break
+        if not has_lod and self._raw_text:
+            import re as _re2
+            lod_mention = _re2.search(
+                r'\b(?:LOD|limit\s+of\s+detection|detection\s+limit)\b',
+                self._raw_text, _re2.I
+            )
+            if lod_mention:
+                warnings.append("LOD_mentioned_but_not_extracted")
+
+        if self._selected_nanozyme_full:
+            sel = self._selected_nanozyme_full
+            synth = sel.get("synthesis_method")
+            if synth and synth.lower() in ("general synthesis", "general_synthesis"):
+                warnings.append("synthesis_method_generic")
+            metals = sel.get("metal_elements")
+            if not metals or len(metals) == 0:
+                warnings.append("metal_elements_empty")
+            chars = sel.get("characterization")
+            if not chars or len(chars) == 0:
+                warnings.append("characterization_empty")
 
         if self._kinetics_from_figure:
             warnings.append("kinetics_from_figure_candidate")
