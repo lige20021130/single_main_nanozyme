@@ -7,16 +7,22 @@ from typing import Dict, List, Any, Optional, Tuple
 from collections import defaultdict
 from datetime import datetime
 
+from dependencies import is_available, get_attr
+
 logger = logging.getLogger(__name__)
 
-try:
+if is_available("consistency_guard_agentic"):
     from consistency_guard_agentic import IssueSeverity
-except ImportError:
+else:
     class IssueSeverity:
         LOW = type('Enum', (), {'value': 'low'})()
         MEDIUM = type('Enum', (), {'value': 'medium'})()
         HIGH = type('Enum', (), {'value': 'high'})()
         CRITICAL = type('Enum', (), {'value': 'critical'})()
+
+_normalize_unit_fn = get_attr("numeric_validator", "normalize_unit")
+_is_concentration_unit_fn = get_attr("numeric_validator", "is_concentration_unit")
+_is_rate_unit_fn = get_attr("numeric_validator", "is_rate_unit")
 
 EXTRACTION_MODE = "single_main_nanozyme"
 SCHEMA_VERSION = "single_main_nanozyme.v2"
@@ -499,23 +505,25 @@ _SUPERSCRIPT_TO_ASCII = str.maketrans('⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽�
 def _validate_and_assign_kinetics_unit(record_kinetics: dict, param: str, raw_unit: str) -> None:
     if not raw_unit:
         return
-    from numeric_validator import is_concentration_unit, is_rate_unit, normalize_unit
+    _norm_fn = _normalize_unit_fn
+    _conc_fn = _is_concentration_unit_fn
+    _rate_fn = _is_rate_unit_fn
     if param == "Km":
-        if is_concentration_unit(raw_unit):
-            record_kinetics["Km_unit"] = normalize_unit(raw_unit)
-        elif is_rate_unit(raw_unit):
+        if _conc_fn and _conc_fn(raw_unit):
+            record_kinetics["Km_unit"] = _norm_fn(raw_unit) if _norm_fn else raw_unit
+        elif _rate_fn and _rate_fn(raw_unit):
             logger.warning(f"[SMN] Km_unit='{raw_unit}' is a rate unit, not concentration. Skipping.")
         else:
-            record_kinetics["Km_unit"] = normalize_unit(raw_unit)
+            record_kinetics["Km_unit"] = _norm_fn(raw_unit) if _norm_fn else raw_unit
     elif param == "Vmax":
-        if is_rate_unit(raw_unit):
-            record_kinetics["Vmax_unit"] = normalize_unit(raw_unit)
-        elif is_concentration_unit(raw_unit):
+        if _rate_fn and _rate_fn(raw_unit):
+            record_kinetics["Vmax_unit"] = _norm_fn(raw_unit) if _norm_fn else raw_unit
+        elif _conc_fn and _conc_fn(raw_unit):
             logger.warning(f"[SMN] Vmax_unit='{raw_unit}' is a concentration unit, not rate. Skipping.")
         else:
-            record_kinetics["Vmax_unit"] = normalize_unit(raw_unit)
+            record_kinetics["Vmax_unit"] = _norm_fn(raw_unit) if _norm_fn else raw_unit
     elif param in ("kcat", "kcat_Km"):
-        record_kinetics[f"{param}_unit"] = normalize_unit(raw_unit)
+        record_kinetics[f"{param}_unit"] = _norm_fn(raw_unit) if _norm_fn else raw_unit
 
 
 def _extract_vmax_fallback(text: str) -> Optional[Dict[str, Any]]:
@@ -1188,24 +1196,19 @@ def validate_schema(record: Dict[str, Any]) -> Dict[str, Any]:
     diag["warnings"] = warnings
     record["diagnostics"] = diag
 
-    try:
-        from numeric_validator import normalize_unit
-    except ImportError:
-        normalize_unit = None
-
-    if normalize_unit:
+    if _normalize_unit_fn:
         kinetics = record.get("main_activity", {}).get("kinetics", {})
         for ukey in ("Km_unit", "Vmax_unit", "kcat_unit", "kcat_Km_unit"):
             raw_u = kinetics.get(ukey)
             if raw_u and isinstance(raw_u, str):
-                normed = normalize_unit(raw_u)
+                normed = _normalize_unit_fn(raw_u)
                 if normed != raw_u:
                     kinetics[ukey] = normed
         sel_nano = record.get("selected_nanozyme", {})
         for ukey in ("size_unit",):
             raw_u = sel_nano.get(ukey)
             if raw_u and isinstance(raw_u, str):
-                normed = normalize_unit(raw_u)
+                normed = _normalize_unit_fn(raw_u)
                 if normed != raw_u:
                     sel_nano[ukey] = normed
 
@@ -1215,7 +1218,7 @@ def validate_schema(record: Dict[str, Any]) -> Dict[str, Any]:
             for ukey in ("detection_limit_unit", "linear_range_unit"):
                 raw_u = app.get(ukey)
                 if raw_u and isinstance(raw_u, str):
-                    normed = normalize_unit(raw_u)
+                    normed = _normalize_unit_fn(raw_u)
                     if normed != raw_u:
                         app[ukey] = normed
 
@@ -2897,10 +2900,7 @@ class RuleExtractor:
         return "other"
 
     def _extract_kinetics_from_text(self, record: Dict[str, Any], kinetics_texts: List[str]):
-        try:
-            from numeric_validator import normalize_unit as _norm_unit
-        except ImportError:
-            _norm_unit = None
+        _norm_unit = _normalize_unit_fn
 
         km_candidates = []
         vmax_candidates = []
@@ -3007,10 +3007,7 @@ class RuleExtractor:
     def _extract_kinetics_from_flattened_table(self, record: Dict[str, Any],
                                                 kinetics_texts: List[str],
                                                 selected_name: str):
-        try:
-            from numeric_validator import normalize_unit as _norm_unit
-        except ImportError:
-            _norm_unit = None
+        _norm_unit = _normalize_unit_fn
         _FLAT_KM_HEADER = re.compile(r'Km\s*[\(（]\s*(mM|μM|uM|M|mmol|umol|nmol)\s*[\)）]', re.I)
         _FLAT_VMAX_HEADER = re.compile(r'Vmax\s*[\(（\[]\s*([^\)）\]]+)\s*[\)）\]]', re.I)
         _FLAT_SUBSTRATE_HEADER = re.compile(r'Substrate', re.I)
@@ -3166,10 +3163,7 @@ class RuleExtractor:
 
     def _try_parse_inline_table(self, text: str, selected_name: str,
                                  record: Dict[str, Any]) -> bool:
-        try:
-            from numeric_validator import normalize_unit as _norm_unit
-        except ImportError:
-            _norm_unit = None
+        _norm_unit = _normalize_unit_fn
         km_header_m = re.search(r'Km\s*[\(（]\s*(mM|μM|uM|M|mmol|umol|nmol)\s*[\)）]', text, re.I)
         vmax_header_m = re.search(r'Vmax\s*[\(（\[]\s*([^\)）\]]+?)\s*[\)）\]]', text, re.I)
         if not km_header_m and not vmax_header_m:
@@ -3238,10 +3232,7 @@ class RuleExtractor:
         return False
 
     def _extract_kinetics_from_table(self, record: Dict[str, Any], table_values: List[Dict]):
-        try:
-            from numeric_validator import normalize_unit as _norm_unit
-        except ImportError:
-            _norm_unit = None
+        _norm_unit = _normalize_unit_fn
         for val in table_values:
             param = val.get("parameter", "")
             source = val.get("source", "table")
@@ -3292,10 +3283,7 @@ class RuleExtractor:
                     pass
 
     def _extract_kcat_from_text(self, record: Dict[str, Any], kinetics_texts: List[str]):
-        try:
-            from numeric_validator import normalize_unit as _norm_unit
-        except ImportError:
-            _norm_unit = None
+        _norm_unit = _normalize_unit_fn
         for text in kinetics_texts:
             norm_text = _normalize_ocr_scientific(text)
             if record["main_activity"]["kinetics"]["kcat"] is None:
@@ -4264,35 +4252,35 @@ class SingleMainNanozymePipeline:
         self.table_proc = TableProcessor()
         self.figure_proc = FigureProcessor()
         self.rule_ext = RuleExtractor()
-        try:
+        if is_available("extraction_agents"):
             from extraction_agents import RuleExtractorAdapter
             self.rule_ext = RuleExtractorAdapter()
             logger.info("[SMN] Using RuleExtractorAdapter (4 specialized agents)")
-        except ImportError:
+        else:
             logger.warning("[SMN] extraction_agents not available, using original RuleExtractor")
         self.num_val = NumericValidator()
         self.diag_builder = DiagnosticsBuilder()
         self._guard: Optional[Any] = None
         self._agentic_guard: Optional[Any] = None
-        try:
+        if is_available("cross_validation_agent"):
             from cross_validation_agent import CrossValidationAgent
             self.cross_validator = CrossValidationAgent()
             logger.info("[SMN] CrossValidationAgent loaded")
-        except ImportError:
+        else:
             self.cross_validator = None
             logger.warning("[SMN] CrossValidationAgent not available")
-        try:
+        if is_available("consistency_agent"):
             from consistency_agent import ConsistencyAgent
             self.consistency_agent = ConsistencyAgent()
             logger.info("[SMN] ConsistencyAgent loaded")
-        except ImportError:
+        else:
             self.consistency_agent = None
             logger.warning("[SMN] ConsistencyAgent not available")
-        try:
+        if is_available("extraction_verifier"):
             from extraction_verifier import ExtractionVerifier
             self._verifier_class = ExtractionVerifier
             logger.info("[SMN] ExtractionVerifier loaded")
-        except ImportError:
+        else:
             self._verifier_class = None
             logger.warning("[SMN] ExtractionVerifier not available")
 
@@ -4348,11 +4336,10 @@ class SingleMainNanozymePipeline:
     async def _call_vlm(self, vlm_tasks: List[Dict], selected_name: str) -> Optional[List[Dict]]:
         if not self.client:
             return None
-        try:
-            from vlm_extractor import VLMExtractor
-        except ImportError:
+        if not is_available("vlm_extractor"):
             logger.warning("[SMN] VLMExtractor not available, skipping VLM")
             return None
+        from vlm_extractor import VLMExtractor
 
         name_lower = selected_name.lower()
         variants = {name_lower}
@@ -4488,11 +4475,10 @@ class SingleMainNanozymePipeline:
     ) -> Optional[List[Dict]]:
         if not self.client or not fallback_tasks:
             return None
-        try:
-            from vlm_extractor import VLMExtractor
-        except ImportError:
+        if not is_available("vlm_extractor"):
             logger.warning("[SMN] VLMExtractor not available for table fallback")
             return None
+        from vlm_extractor import VLMExtractor
 
         extractor = VLMExtractor(self.client, batch_size=1)
         results = []
@@ -4667,12 +4653,8 @@ class SingleMainNanozymePipeline:
                     continue
                 for ukey in ("Km_unit", "Vmax_unit"):
                     u = entry.get(ukey)
-                    if u and isinstance(u, str):
-                        try:
-                            from numeric_validator import normalize_unit
-                            entry[ukey] = normalize_unit(u)
-                        except ImportError:
-                            pass
+                    if u and isinstance(u, str) and _normalize_unit_fn:
+                        entry[ukey] = _normalize_unit_fn(u)
             if has_kinetics_data:
                 primary = {k: kin.get(k) for k in ("Km", "Km_unit", "Vmax", "Vmax_unit",
                                                       "kcat", "kcat_unit", "kcat_Km", "kcat_Km_unit",
@@ -4733,16 +4715,15 @@ class SingleMainNanozymePipeline:
                             continue
                         rule_km = record["main_activity"]["kinetics"].get("Km")
                         raw_km_unit = km_item.get("unit", "")
-                        from numeric_validator import is_concentration_unit, is_rate_unit, normalize_unit
-                        km_unit_ok = is_concentration_unit(raw_km_unit) if raw_km_unit else False
+                        km_unit_ok = _is_concentration_unit_fn(raw_km_unit) if raw_km_unit and _is_concentration_unit_fn else False
                         if rule_km is None:
                             record["main_activity"]["kinetics"]["Km"] = vlm_val
                             if km_unit_ok:
-                                record["main_activity"]["kinetics"]["Km_unit"] = normalize_unit(raw_km_unit)
-                            elif is_rate_unit(raw_km_unit):
+                                record["main_activity"]["kinetics"]["Km_unit"] = _normalize_unit_fn(raw_km_unit) if _normalize_unit_fn else raw_km_unit
+                            elif _is_rate_unit_fn and _is_rate_unit_fn(raw_km_unit):
                                 logger.warning(f"[SMN] VLM Km_unit='{raw_km_unit}' is a rate unit (should be concentration). Skipping unit assignment.")
                             else:
-                                record["main_activity"]["kinetics"]["Km_unit"] = normalize_unit(raw_km_unit) if raw_km_unit else None
+                                record["main_activity"]["kinetics"]["Km_unit"] = _normalize_unit_fn(raw_km_unit) if _normalize_unit_fn and raw_km_unit else (raw_km_unit or None)
                             record["main_activity"]["kinetics"]["source"] = "VLM"
                             if caption:
                                 record["main_activity"]["kinetics"]["_evidence_Km"] = str(caption)[:300]
@@ -4778,16 +4759,15 @@ class SingleMainNanozymePipeline:
                             continue
                         rule_vmax = record["main_activity"]["kinetics"].get("Vmax")
                         raw_vmax_unit = vmax_item.get("unit", "")
-                        from numeric_validator import is_concentration_unit, is_rate_unit, normalize_unit
-                        vmax_unit_ok = is_rate_unit(raw_vmax_unit) if raw_vmax_unit else False
+                        vmax_unit_ok = _is_rate_unit_fn(raw_vmax_unit) if raw_vmax_unit and _is_rate_unit_fn else False
                         if rule_vmax is None:
                             record["main_activity"]["kinetics"]["Vmax"] = vlm_val
                             if vmax_unit_ok:
-                                record["main_activity"]["kinetics"]["Vmax_unit"] = normalize_unit(raw_vmax_unit)
-                            elif is_concentration_unit(raw_vmax_unit):
+                                record["main_activity"]["kinetics"]["Vmax_unit"] = _normalize_unit_fn(raw_vmax_unit) if _normalize_unit_fn else raw_vmax_unit
+                            elif _is_concentration_unit_fn and _is_concentration_unit_fn(raw_vmax_unit):
                                 logger.warning(f"[SMN] VLM Vmax_unit='{raw_vmax_unit}' is a concentration unit (should be rate). Skipping unit assignment.")
                             else:
-                                record["main_activity"]["kinetics"]["Vmax_unit"] = normalize_unit(raw_vmax_unit) if raw_vmax_unit else None
+                                record["main_activity"]["kinetics"]["Vmax_unit"] = _normalize_unit_fn(raw_vmax_unit) if _normalize_unit_fn and raw_vmax_unit else (raw_vmax_unit or None)
                             record["main_activity"]["kinetics"]["source"] = "VLM"
                             if caption:
                                 record["main_activity"]["kinetics"]["_evidence_Vmax"] = str(caption)[:300]
@@ -5152,14 +5132,14 @@ class SingleMainNanozymePipeline:
                      f"other candidates: {all_candidate_names[1:3]}")
 
         if self.config.enable_agentic_guard:
-            try:
+            if is_available("consistency_guard_agentic"):
                 from consistency_guard_agentic import AgenticConsistencyGuard
                 self._agentic_guard = AgenticConsistencyGuard(
                     selected_name, all_candidate_names, text_chunks=doc.chunks,
                     client=self.client,
                 )
                 logger.info(f"[SMN] AgenticConsistencyGuard initialized for '{selected_name}'")
-            except ImportError:
+            else:
                 logger.warning("[SMN] consistency_guard_agentic not available, using base guard only")
                 self._agentic_guard = None
 
@@ -5191,62 +5171,63 @@ class SingleMainNanozymePipeline:
                      f"characterization={len(table_classified.get('characterization_tables',[]))}")
 
         if self.client and self.config.enable_llm and doc.table_task:
-            try:
-                from llm_extractor import TableExtractor
-                tex = TableExtractor(self.client, batch_size=2)
-                table_llm_results = await tex.extract_all_tables(doc.table_task)
-                if table_llm_results:
-                    for tr in table_llm_results:
-                        if tr.get("error"):
-                            continue
-                        for rec in tr.get("records", []):
-                            if not isinstance(rec, dict):
+            if is_available("llm_extractor"):
+                try:
+                    from llm_extractor import TableExtractor
+                    tex = TableExtractor(self.client, batch_size=2)
+                    table_llm_results = await tex.extract_all_tables(doc.table_task)
+                    if table_llm_results:
+                        for tr in table_llm_results:
+                            if tr.get("error"):
                                 continue
-                            if rec.get("Km_value") is not None:
-                                table_kinetics_values.append({
-                                    "parameter": "Km", "value": str(rec["Km_value"]),
-                                    "unit": rec.get("Km_unit"), "substrate": rec.get("substrate"),
-                                    "source": "table_llm",
-                                })
-                            if rec.get("Vmax_value") is not None:
-                                table_kinetics_values.append({
-                                    "parameter": "Vmax", "value": str(rec["Vmax_value"]),
-                                    "unit": rec.get("Vmax_unit"), "substrate": rec.get("substrate"),
-                                    "source": "table_llm",
-                                })
-                            if rec.get("kcat_value") is not None:
-                                table_kinetics_values.append({
-                                    "parameter": "kcat", "value": str(rec["kcat_value"]),
-                                    "unit": rec.get("kcat_unit", "s⁻¹"), "substrate": None,
-                                    "source": "table_llm",
-                                })
-                            if rec.get("specific_activity_value") is not None:
-                                table_kinetics_values.append({
-                                    "parameter": "specific_activity", "value": str(rec["specific_activity_value"]),
-                                    "unit": rec.get("specific_activity_unit"), "substrate": None,
-                                    "source": "table_llm",
-                                })
-                            assay = rec.get("assay_condition", {})
-                            if isinstance(assay, dict):
-                                cond = record["main_activity"]["conditions"]
-                                if assay.get("pH") is not None and cond.get("pH") is None:
-                                    try:
-                                        cond["pH"] = float(assay["pH"])
-                                    except (ValueError, TypeError):
-                                        cond["pH"] = str(assay["pH"])
-                                if assay.get("temperature") is not None and cond.get("temperature") is None:
-                                    try:
-                                        cond["temperature"] = float(assay["temperature"])
-                                    except (ValueError, TypeError):
-                                        cond["temperature"] = str(assay["temperature"])
-                                if assay.get("buffer") and not cond.get("buffer"):
-                                    cond["buffer"] = str(assay["buffer"])
-                    logger.info(f"[SMN] TableExtractor: {len(table_llm_results)} tables processed, "
-                                 f"kinetics_values now={len(table_kinetics_values)}")
-            except ImportError:
+                            for rec in tr.get("records", []):
+                                if not isinstance(rec, dict):
+                                    continue
+                                if rec.get("Km_value") is not None:
+                                    table_kinetics_values.append({
+                                        "parameter": "Km", "value": str(rec["Km_value"]),
+                                        "unit": rec.get("Km_unit"), "substrate": rec.get("substrate"),
+                                        "source": "table_llm",
+                                    })
+                                if rec.get("Vmax_value") is not None:
+                                    table_kinetics_values.append({
+                                        "parameter": "Vmax", "value": str(rec["Vmax_value"]),
+                                        "unit": rec.get("Vmax_unit"), "substrate": rec.get("substrate"),
+                                        "source": "table_llm",
+                                    })
+                                if rec.get("kcat_value") is not None:
+                                    table_kinetics_values.append({
+                                        "parameter": "kcat", "value": str(rec["kcat_value"]),
+                                        "unit": rec.get("kcat_unit", "s⁻¹"), "substrate": None,
+                                        "source": "table_llm",
+                                    })
+                                if rec.get("specific_activity_value") is not None:
+                                    table_kinetics_values.append({
+                                        "parameter": "specific_activity", "value": str(rec["specific_activity_value"]),
+                                        "unit": rec.get("specific_activity_unit"), "substrate": None,
+                                        "source": "table_llm",
+                                    })
+                                assay = rec.get("assay_condition", {})
+                                if isinstance(assay, dict):
+                                    cond = record["main_activity"]["conditions"]
+                                    if assay.get("pH") is not None and cond.get("pH") is None:
+                                        try:
+                                            cond["pH"] = float(assay["pH"])
+                                        except (ValueError, TypeError):
+                                            cond["pH"] = str(assay["pH"])
+                                    if assay.get("temperature") is not None and cond.get("temperature") is None:
+                                        try:
+                                            cond["temperature"] = float(assay["temperature"])
+                                        except (ValueError, TypeError):
+                                            cond["temperature"] = str(assay["temperature"])
+                                    if assay.get("buffer") and not cond.get("buffer"):
+                                        cond["buffer"] = str(assay["buffer"])
+                        logger.info(f"[SMN] TableExtractor: {len(table_llm_results)} tables processed, "
+                                     f"kinetics_values now={len(table_kinetics_values)}")
+                except Exception as e:
+                    logger.warning(f"[SMN] TableExtractor failed: {e}, using rule-based table extraction only")
+            else:
                 logger.debug("[SMN] TableExtractor not available, using rule-based table extraction only")
-            except Exception as e:
-                logger.warning(f"[SMN] TableExtractor failed: {e}, using rule-based table extraction only")
 
         figure_summ = self.figure_proc.summarize(doc.vlm_tasks, selected_name)
         logger.info(f"[SMN] Figures: total={figure_summ['total']}, "
@@ -5412,12 +5393,13 @@ class SingleMainNanozymePipeline:
         else:
             self._verification_data = None
 
-        try:
-            from numeric_validator import calibrate_magnitude_ranges
-            ctx = calibrate_magnitude_ranges(doc.chunks)
-            self.num_val.set_paper_context(ctx)
-        except Exception as e:
-            logger.debug(f"[SMN] Paper context calibration skipped: {e}")
+        _calibrate_fn = get_attr("numeric_validator", "calibrate_magnitude_ranges")
+        if _calibrate_fn:
+            try:
+                ctx = _calibrate_fn(doc.chunks)
+                self.num_val.set_paper_context(ctx)
+            except Exception as e:
+                logger.debug(f"[SMN] Paper context calibration skipped: {e}")
 
         record, val_warnings = self.num_val.validate(record, strict=self.config.numeric_validation_strict)
         warnings.extend(val_warnings)
@@ -5591,44 +5573,45 @@ class SingleMainNanozymePipeline:
             figure_summaries=figure_summaries_text or "(none)",
         )
 
-        try:
-            from llm_refinement import AgenticLLMExtractor, LLMSchemaValidator
-            extractor = AgenticLLMExtractor(
-                client=self.client,
-                max_iterations=self.config.llm_refinement_max_iterations,
-                validator=LLMSchemaValidator(),
-            )
-            refinement_result = await extractor.extract_with_refinement(
-                system_prompt=_LLM_SYSTEM_PROMPT,
-                user_prompt=user_prompt,
-                temperature=0.1,
-                max_tokens=2048,
-            )
-
-            if refinement_result.iterations > 1:
-                logger.info(
-                    f"[SMN] LLM refinement: {refinement_result.iterations} iterations. "
-                    f"History: {refinement_result.refinement_history[-2:]}"
+        if is_available("llm_refinement"):
+            try:
+                from llm_refinement import AgenticLLMExtractor, LLMSchemaValidator
+                extractor = AgenticLLMExtractor(
+                    client=self.client,
+                    max_iterations=self.config.llm_refinement_max_iterations,
+                    validator=LLMSchemaValidator(),
+                )
+                refinement_result = await extractor.extract_with_refinement(
+                    system_prompt=_LLM_SYSTEM_PROMPT,
+                    user_prompt=user_prompt,
+                    temperature=0.1,
+                    max_tokens=2048,
                 )
 
-            if refinement_result.validation_errors:
-                logger.warning(
-                    f"[SMN] LLM final validation errors: "
-                    f"{[f'{e.field}:{e.error_type.value}' for e in refinement_result.validation_errors[:5]]}"
-                )
+                if refinement_result.iterations > 1:
+                    logger.info(
+                        f"[SMN] LLM refinement: {refinement_result.iterations} iterations. "
+                        f"History: {refinement_result.refinement_history[-2:]}"
+                    )
 
-            if refinement_result.result:
-                logger.info(f"[SMN] LLM refinement succeeded, keys: {list(refinement_result.result.keys())}")
+                if refinement_result.validation_errors:
+                    logger.warning(
+                        f"[SMN] LLM final validation errors: "
+                        f"{[f'{e.field}:{e.error_type.value}' for e in refinement_result.validation_errors[:5]]}"
+                    )
 
-            return refinement_result.result
-        except ImportError:
+                if refinement_result.result:
+                    logger.info(f"[SMN] LLM refinement succeeded, keys: {list(refinement_result.result.keys())}")
+
+                return refinement_result.result
+            except Exception as e:
+                logger.error(f"[SMN] LLM refinement call failed: {e}")
+                return None
+        else:
             logger.warning("[SMN] llm_refinement not available, falling back to _call_llm")
             return await self._call_llm(
                 selected_name, selection_reason, buckets, table_classified, figure_summ,
             )
-        except Exception as e:
-            logger.error(f"[SMN] LLM refinement call failed: {e}")
-            return None
 
     _LLM_NAME_FIXES = [
         (re.compile(r'FeeNeC', re.I), 'Fe-N-C'),
@@ -5880,40 +5863,38 @@ class SingleMainNanozymePipeline:
             if name in ("Km", "VLM_Km", "LLM_Km", "LLM_Km_alternative") and kin.get("Km") is None:
                 record["main_activity"]["kinetics"]["Km"] = val
                 if unit and not kin.get("Km_unit"):
-                    from numeric_validator import normalize_unit, is_concentration_unit, is_rate_unit
-                    if is_concentration_unit(unit):
-                        record["main_activity"]["kinetics"]["Km_unit"] = normalize_unit(unit)
-                    elif is_rate_unit(unit):
+                    if _is_concentration_unit_fn and _is_concentration_unit_fn(unit):
+                        record["main_activity"]["kinetics"]["Km_unit"] = _normalize_unit_fn(unit) if _normalize_unit_fn else unit
+                    elif _is_rate_unit_fn and _is_rate_unit_fn(unit):
                         logger.warning(f"[SMN] Backfill Km_unit='{unit}' is a rate unit, not concentration. Skipping.")
                     else:
-                        record["main_activity"]["kinetics"]["Km_unit"] = normalize_unit(unit)
+                        record["main_activity"]["kinetics"]["Km_unit"] = _normalize_unit_fn(unit) if _normalize_unit_fn else unit
                 if not kin.get("source"):
                     record["main_activity"]["kinetics"]["source"] = source or "important_values"
                 backfilled.append(f"Km={val}")
             elif name in ("Vmax", "VLM_Vmax", "LLM_Vmax", "LLM_Vmax_alternative") and kin.get("Vmax") is None:
                 record["main_activity"]["kinetics"]["Vmax"] = val
                 if unit and not kin.get("Vmax_unit"):
-                    from numeric_validator import normalize_unit, is_concentration_unit, is_rate_unit
-                    if is_rate_unit(unit):
-                        record["main_activity"]["kinetics"]["Vmax_unit"] = normalize_unit(unit)
-                    elif is_concentration_unit(unit):
+                    if _is_rate_unit_fn and _is_rate_unit_fn(unit):
+                        record["main_activity"]["kinetics"]["Vmax_unit"] = _normalize_unit_fn(unit) if _normalize_unit_fn else unit
+                    elif _is_concentration_unit_fn and _is_concentration_unit_fn(unit):
                         logger.warning(f"[SMN] Backfill Vmax_unit='{unit}' is a concentration unit, not rate. Skipping.")
                     else:
-                        record["main_activity"]["kinetics"]["Vmax_unit"] = normalize_unit(unit)
+                        record["main_activity"]["kinetics"]["Vmax_unit"] = _normalize_unit_fn(unit) if _normalize_unit_fn else unit
                 if not kin.get("source"):
                     record["main_activity"]["kinetics"]["source"] = source or "important_values"
                 backfilled.append(f"Vmax={val}")
             elif name in ("kcat", "VLM_kcat", "LLM_kcat", "LLM_kcat_alternative") and kin.get("kcat") is None:
                 record["main_activity"]["kinetics"]["kcat"] = val
                 if unit and not kin.get("kcat_unit"):
-                    from numeric_validator import normalize_unit
-                    record["main_activity"]["kinetics"]["kcat_unit"] = normalize_unit(unit)
+                    if _normalize_unit_fn:
+                        record["main_activity"]["kinetics"]["kcat_unit"] = _normalize_unit_fn(unit)
                 backfilled.append(f"kcat={val}")
             elif name in ("kcat_Km", "VLM_kcat_Km", "LLM_kcat_Km", "LLM_kcat_Km_alternative") and kin.get("kcat_Km") is None:
                 record["main_activity"]["kinetics"]["kcat_Km"] = val
                 if unit and not kin.get("kcat_Km_unit"):
-                    from numeric_validator import normalize_unit
-                    record["main_activity"]["kinetics"]["kcat_Km_unit"] = normalize_unit(unit)
+                    if _normalize_unit_fn:
+                        record["main_activity"]["kinetics"]["kcat_Km_unit"] = _normalize_unit_fn(unit)
                 backfilled.append(f"kcat_Km={val}")
 
         if backfilled:
@@ -6161,19 +6142,18 @@ class SingleMainNanozymePipeline:
                                                 record["main_activity"]["kinetics"][kk] = val
                                                 if f"_llm_{kk}_unit" in llm_kinetics and llm_kinetics[f"_llm_{kk}_unit"]:
                                                     raw_unit = llm_kinetics[f"_llm_{kk}_unit"]
-                                                    from numeric_validator import is_concentration_unit, is_rate_unit, normalize_unit as _nu
-                                                    if kk == "Km" and is_concentration_unit(raw_unit):
-                                                        record["main_activity"]["kinetics"][f"{kk}_unit"] = _nu(raw_unit)
-                                                    elif kk == "Vmax" and is_rate_unit(raw_unit):
-                                                        record["main_activity"]["kinetics"][f"{kk}_unit"] = _nu(raw_unit)
+                                                    if kk == "Km" and _is_concentration_unit_fn and _is_concentration_unit_fn(raw_unit):
+                                                        record["main_activity"]["kinetics"][f"{kk}_unit"] = _normalize_unit_fn(raw_unit) if _normalize_unit_fn else raw_unit
+                                                    elif kk == "Vmax" and _is_rate_unit_fn and _is_rate_unit_fn(raw_unit):
+                                                        record["main_activity"]["kinetics"][f"{kk}_unit"] = _normalize_unit_fn(raw_unit) if _normalize_unit_fn else raw_unit
                                                     elif kk in ("kcat", "kcat_Km"):
-                                                        record["main_activity"]["kinetics"][f"{kk}_unit"] = _nu(raw_unit)
-                                                    elif kk == "Km" and is_rate_unit(raw_unit):
+                                                        record["main_activity"]["kinetics"][f"{kk}_unit"] = _normalize_unit_fn(raw_unit) if _normalize_unit_fn else raw_unit
+                                                    elif kk == "Km" and _is_rate_unit_fn and _is_rate_unit_fn(raw_unit):
                                                         logger.warning(f"[SMN] LLM Km_unit='{raw_unit}' is a rate unit, not concentration. Skipping.")
-                                                    elif kk == "Vmax" and is_concentration_unit(raw_unit):
+                                                    elif kk == "Vmax" and _is_concentration_unit_fn and _is_concentration_unit_fn(raw_unit):
                                                         logger.warning(f"[SMN] LLM Vmax_unit='{raw_unit}' is a concentration unit, not rate. Skipping.")
                                                     else:
-                                                        record["main_activity"]["kinetics"][f"{kk}_unit"] = _nu(raw_unit)
+                                                        record["main_activity"]["kinetics"][f"{kk}_unit"] = _normalize_unit_fn(raw_unit) if _normalize_unit_fn else raw_unit
                                             elif not rule_in_range and llm_in_range:
                                                 logger.info(
                                                     f"[SMN] LLM {kk}={val} differs by >100x from rule {kk}={rule_val}, "

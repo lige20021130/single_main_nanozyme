@@ -2,6 +2,7 @@ import re
 import logging
 from typing import Dict, List, Any, Optional
 
+from dependencies import get_attr
 from single_main_nanozyme_extractor import (
     _KM_PATTERNS, _KM_VMAX_JOINT_PATTERNS, _VMAX_PATTERNS, _VMAX_OCR_PATTERNS,
     _KCAT_PATTERNS, _KCAT_KM_PATTERNS, _LOD_PATTERNS, _LINEAR_RANGE_PATTERNS,
@@ -16,29 +17,31 @@ from single_main_nanozyme_extractor import (
 
 logger = logging.getLogger(__name__)
 
+_normalize_unit_fn = get_attr("numeric_validator", "normalize_unit")
+_is_concentration_unit_fn = get_attr("numeric_validator", "is_concentration_unit")
+_is_rate_unit_fn = get_attr("numeric_validator", "is_rate_unit")
+
 
 def _norm_unit(unit):
-    try:
-        from numeric_validator import normalize_unit
-        return normalize_unit(unit) if unit else unit
-    except ImportError:
-        return unit
+    if _normalize_unit_fn and unit:
+        return _normalize_unit_fn(unit)
+    return unit
 
 
 def _is_concentration_unit(unit):
-    try:
-        from numeric_validator import is_concentration_unit as _icu
-        return _icu(unit) if unit else False
-    except ImportError:
-        return bool(unit and re.match(r'^[mμunp]?M$|^[mμunp]?mol', unit, re.I))
+    if _is_concentration_unit_fn and unit:
+        return _is_concentration_unit_fn(unit)
+    if not unit:
+        return False
+    return bool(re.match(r'^[mμunp]?M$|^[mμunp]?mol', unit, re.I))
 
 
 def _is_rate_unit(unit):
-    try:
-        from numeric_validator import is_rate_unit as _iru
-        return _iru(unit) if unit else False
-    except ImportError:
-        return bool(unit and re.search(r'M\s*[sS]|M/?s|mM/?s|s[\u207b\-]1', unit, re.I))
+    if _is_rate_unit_fn and unit:
+        return _is_rate_unit_fn(unit)
+    if not unit:
+        return False
+    return bool(re.search(r'M\s*[sS]|M/?s|mM/?s|s[\u207b\-]1', unit, re.I))
 
 
 class KineticsAgent:

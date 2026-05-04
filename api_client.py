@@ -22,13 +22,13 @@ import threading
 
 import aiohttp
 
+from dependencies import is_available
+
 logger = logging.getLogger(__name__)
 
-try:
+CONFIG_MANAGER_AVAILABLE = is_available("config_manager")
+if CONFIG_MANAGER_AVAILABLE:
     from config_manager import ConfigManager
-    CONFIG_MANAGER_AVAILABLE = True
-except ImportError:
-    CONFIG_MANAGER_AVAILABLE = False
 
 
 def _to_config_dict(config: Any) -> Dict[str, Any]:
