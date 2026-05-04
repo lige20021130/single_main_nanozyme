@@ -1031,6 +1031,92 @@ class PDFBasicGUI:
             total_ok = sum(1 for r in reports.values() if r.parse_status != "FAILED")
             self.log(f"[OCR Fallback] 最终成功 {total_ok}/{len(all_pdf_paths)}")
 
+            # ── 阶段 C2：PyMuPDF Fallback（对仍然失败的文件） ────
+            still_failed = [p for p in all_pdf_paths if reports[p].parse_status == "FAILED"]
+            if still_failed:
+                self.log(f"[PyMuPDF Fallback] {len(still_failed)} 个文件仍失败，尝试 PyMuPDF 提取...")
+                try:
+                    import fitz as _fitz
+                    for pdf_path in still_failed:
+                        if self.stop_event.is_set():
+                            break
+                        r = reports[pdf_path]
+                        raw_stem = Path(pdf_path).stem
+                        if len(raw_stem) > 80:
+                            import hashlib as _hl
+                            _h = _hl.md5(raw_stem.encode()).hexdigest()[:8]
+                            _ym = re.match(r'(\d{4})', raw_stem)
+                            _prefix = _ym.group(1) if _ym else raw_stem[:10]
+                            stem = f"{_prefix}_{_h}"
+                        else:
+                            stem = raw_stem
+                        base = Path(output_dir) if output_dir else Path(pdf_path).parent
+                        out_json = base / (stem + ".json")
+                        images_dir = base / (stem + "_images")
+                        try:
+                            doc = _fitz.open(str(pdf_path))
+                            kids = []
+                            seen_xrefs = set()
+                            images_dir.mkdir(parents=True, exist_ok=True)
+                            img_count = 0
+                            for page_num in range(len(doc)):
+                                page = doc[page_num]
+                                text_blocks = []
+                                for block in page.get_text("dict")["blocks"]:
+                                    if block.get("type") == 0:
+                                        for line in block.get("lines", []):
+                                            for span in line.get("spans", []):
+                                                text_blocks.append({
+                                                    "type": "text",
+                                                    "content": span.get("text", ""),
+                                                    "page number": page_num + 1,
+                                                })
+                                kids.extend(text_blocks)
+                                for img_info in page.get_images(full=True):
+                                    xref = img_info[0]
+                                    if xref in seen_xrefs:
+                                        continue
+                                    seen_xrefs.add(xref)
+                                    try:
+                                        base_image = doc.extract_image(xref)
+                                        w = base_image.get("width", 0)
+                                        h = base_image.get("height", 0)
+                                        ext = base_image.get("ext", "png")
+                                        img_data = base_image.get("image", b"")
+                                        if w < 50 or h < 50 or len(img_data) < 5120:
+                                            continue
+                                        fname = f"imageFile{img_count + 1}.{ext}"
+                                        fpath = images_dir / fname
+                                        with open(fpath, "wb") as f:
+                                            f.write(img_data)
+                                        kids.append({
+                                            "type": "image",
+                                            "source": f"{stem}_images/{fname}",
+                                            "page number": page_num + 1,
+                                            "bounding box": [0, 0, w, h],
+                                        })
+                                        img_count += 1
+                                    except Exception:
+                                        continue
+                            doc.close()
+                            if img_count > 0:
+                                json_data = {"kids": kids, "title": raw_stem}
+                                out_json.write_text(json.dumps(json_data, ensure_ascii=False, indent=2), encoding="utf-8")
+                                r.parse_status = "SUCCESS_WITH_PROTOCOL_ERROR"
+                                r.artifact_written_ok = True
+                                r.ocr_fallback_used = True
+                                r.json_path = str(out_json)
+                                self.log(f"[PyMuPDF Fallback] ✓ {raw_stem[:40]}: 提取 {img_count} 张图片")
+                            else:
+                                self.log(f"[PyMuPDF Fallback] ✗ {raw_stem[:40]}: 无可提取图片")
+                        except Exception as e:
+                            self.log(f"[PyMuPDF Fallback] ✗ {raw_stem[:40]}: {e}")
+                except ImportError:
+                    self.log("[PyMuPDF Fallback] fitz(PyMuPDF) 未安装，跳过")
+
+            total_ok2 = sum(1 for r in reports.values() if r.parse_status != "FAILED")
+            self.log(f"[PyMuPDF Fallback] 最终成功 {total_ok2}/{len(all_pdf_paths)}")
+
             # ── 阶段 D：预处理 ────────────────────────────────────
             for idx, pdf_path in enumerate(all_pdf_paths, 1):
                 if self.stop_event.is_set():
@@ -1039,6 +1125,56 @@ class PDFBasicGUI:
                 self.root.after(0, lambda i=idx, t=len(all_pdf_paths): self.progress.configure(value=int(i/t*100)))
                 self.status_var.set(f"后处理 ({idx}/{len(all_pdf_paths)}): {os.path.basename(pdf_path)}")
                 r = reports[pdf_path]
+
+                # ── 阶段 D0：图片文件缺失补提取 ─────────────────
+                if Path(r.json_path).exists():
+                    _raw_stem = Path(pdf_path).stem
+                    if len(_raw_stem) > 80:
+                        import hashlib as _hl2
+                        _h2 = _hl2.md5(_raw_stem.encode()).hexdigest()[:8]
+                        _ym2 = re.match(r'(\d{4})', _raw_stem)
+                        _prefix2 = _ym2.group(1) if _ym2 else _raw_stem[:10]
+                        _stem = f"{_prefix2}_{_h2}"
+                    else:
+                        _stem = _raw_stem
+                    _base = Path(output_dir) if output_dir else Path(pdf_path).parent
+                    _images_dir = _base / (_stem + "_images")
+                    if not _images_dir.exists() or not any(_images_dir.iterdir()):
+                        try:
+                            import fitz as _fitz
+                            self.log(f"[图片补提取] {_raw_stem[:40]}: 图片目录缺失，用 PyMuPDF 补提取...")
+                            _doc = _fitz.open(str(pdf_path))
+                            _images_dir.mkdir(parents=True, exist_ok=True)
+                            _seen = set()
+                            _ic = 0
+                            for _pn in range(len(_doc)):
+                                _page = _doc[_pn]
+                                for _ii in _page.get_images(full=True):
+                                    _xref = _ii[0]
+                                    if _xref in _seen:
+                                        continue
+                                    _seen.add(_xref)
+                                    try:
+                                        _bi = _doc.extract_image(_xref)
+                                        _w = _bi.get("width", 0)
+                                        _h = _bi.get("height", 0)
+                                        _ext = _bi.get("ext", "png")
+                                        _data = _bi.get("image", b"")
+                                        if _w < 50 or _h < 50 or len(_data) < 5120:
+                                            continue
+                                        _fn = f"imageFile{_ic + 1}.{_ext}"
+                                        with open(_images_dir / _fn, "wb") as _f:
+                                            _f.write(_data)
+                                        _ic += 1
+                                    except Exception:
+                                        continue
+                            _doc.close()
+                            self.log(f"[图片补提取] {_raw_stem[:40]}: 补提取 {_ic} 张图片")
+                        except ImportError:
+                            pass
+                        except Exception as _e:
+                            self.log(f"[图片补提取] {_stem}: 失败 - {_e}")
+
                 if PREPROCESSOR_AVAILABLE and Path(r.json_path).exists():
                     pp_result = self._run_preprocessor(pdf_path)
                     if pp_result and pp_result.get("preprocess_status") == "SUCCESS":
