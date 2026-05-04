@@ -209,39 +209,43 @@ class CrossValidationAgent:
             validation = self.validate_kinetics_set(record, llm_kinetics, vlm_kinetics)
             kin = record["main_activity"]["kinetics"]
             for param, result in validation.items():
-                if result.get("final_value") is not None and kin.get(param) is None:
-                    kin[param] = result["final_value"]
-                    if result.get("final_unit"):
-                        kin[f"{param}_unit"] = result["final_unit"]
-                    if result.get("source"):
-                        kin["source"] = result["source"]
-                    if result.get("needs_review"):
-                        kin["needs_review"] = True
-                elif result.get("final_value") is not None and kin.get(param) is not None:
-                    if result["source"] != "rule" and result.get("reason", "").startswith("truncation"):
+                if result.get("final_value") is not None:
+                    should_apply = False
+                    if kin.get(param) is None:
+                        should_apply = True
+                    elif result.get("confidence") == "high":
+                        should_apply = True
+                    elif result.get("reason", "").startswith("truncation"):
+                        should_apply = True
+                    elif result.get("reason", "") == "rule_outside_magnitude_range":
+                        should_apply = True
+                    if should_apply:
                         kin[param] = result["final_value"]
                         if result.get("final_unit"):
                             kin[f"{param}_unit"] = result["final_unit"]
-                        kin["needs_review"] = True
-                    elif result["source"] != "rule" and result.get("reason", "") == "rule_outside_magnitude_range":
-                        kin[param] = result["final_value"]
-                        if result.get("final_unit"):
-                            kin[f"{param}_unit"] = result["final_unit"]
-                        kin["needs_review"] = True
-                    if result.get("_alternative") or result.get("_alternatives"):
-                        alts = result.get("_alternatives", [])
-                        if result.get("_alternative"):
-                            alts = [result["_alternative"]]
-                        for alt in alts:
-                            kin[f"_llm_{param}_alternative"] = alt["value"]
-                            record.setdefault("important_values", []).append({
-                                "name": f"{param}_alternative",
-                                "value": alt["value"],
-                                "unit": alt.get("unit"),
-                                "source": alt.get("source"),
-                                "needs_review": True,
-                                "context": f"Cross-validation: {result.get('reason', 'conflict')}"
-                            })
+                        if result.get("source"):
+                            kin["source"] = result["source"]
+                        if result.get("needs_review"):
+                            kin["needs_review"] = True
+                        if result.get("confidence"):
+                            kin[f"_confidence_{param}"] = result["confidence"]
+                        if result.get("reason"):
+                            kin[f"_reason_{param}"] = result["reason"]
+                    if not should_apply and kin.get(param) is not None:
+                        if result.get("_alternative") or result.get("_alternatives"):
+                            alts = result.get("_alternatives", [])
+                            if result.get("_alternative"):
+                                alts = [result["_alternative"]]
+                            for alt in alts:
+                                kin[f"_llm_{param}_alternative"] = alt["value"]
+                                record.setdefault("important_values", []).append({
+                                    "name": f"{param}_alternative",
+                                    "value": alt["value"],
+                                    "unit": alt.get("unit"),
+                                    "source": alt.get("source"),
+                                    "needs_review": True,
+                                    "context": f"Cross-validation: {result.get('reason', 'conflict')}"
+                                })
 
         if llm_result:
             llm_sel = llm_result.get("selected_nanozyme", {})

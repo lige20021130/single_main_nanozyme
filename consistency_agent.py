@@ -256,13 +256,20 @@ class ConsistencyAgent:
         kin = act.get("kinetics", {})
         if isinstance(kin, dict):
             km_unit = kin.get("Km_unit", "")
-            if km_unit and not _is_concentration_unit(km_unit):
-                warnings.append("Km_unit_not_concentration")
-                kin["needs_review"] = True
             vmax_unit = kin.get("Vmax_unit", "")
-            if vmax_unit and not _is_rate_unit(vmax_unit):
-                warnings.append("Vmax_unit_not_rate")
+            km_is_rate = km_unit and not _is_concentration_unit(km_unit)
+            vmax_is_conc = vmax_unit and not _is_rate_unit(vmax_unit)
+            if km_is_rate and vmax_is_conc:
+                kin["Km_unit"], kin["Vmax_unit"] = vmax_unit, km_unit
+                warnings.append("Km_Vmax_unit_swapped")
                 kin["needs_review"] = True
+            else:
+                if km_is_rate:
+                    warnings.append("Km_unit_not_concentration")
+                    kin["needs_review"] = True
+                if vmax_is_conc:
+                    warnings.append("Vmax_unit_not_rate")
+                    kin["needs_review"] = True
             kcat = kin.get("kcat")
             km = kin.get("Km")
             if kcat and km and isinstance(kcat, (int, float)) and isinstance(km, (int, float)) and km > 0:

@@ -3027,15 +3027,42 @@ class RuleExtractor:
                             all_texts.append(other_text)
 
         for text in all_texts:
-            norm_text = _normalize_ocr_scientific(text)
-            lines = norm_text.strip().split('\n')
-            if len(lines) < 2:
-                single_line = self._try_parse_inline_table(text, selected_name, record)
-                if single_line:
-                    return
-                continue
+            lines_raw = text.strip().split('\n')
+            pipe_count = sum(1 for line in lines_raw if line.strip().startswith('|'))
+            if pipe_count >= 2:
+                lines = []
+                for line in lines_raw:
+                    stripped = line.strip()
+                    if stripped.startswith('|'):
+                        cells = [c.strip() for c in stripped.strip('|').split('|')]
+                        lines.append('  '.join(cells))
+                    elif stripped:
+                        lines[-1] = lines[-1] + '  ' + stripped if lines else stripped
+                if len(lines) < 2:
+                    single_line = self._try_parse_inline_table(text, selected_name, record)
+                    if single_line:
+                        return
+                    continue
+            else:
+                norm_text = _normalize_ocr_scientific(text)
+                lines_raw = norm_text.strip().split('\n')
+                if len(lines_raw) < 2:
+                    single_line = self._try_parse_inline_table(text, selected_name, record)
+                    if single_line:
+                        return
+                    continue
+                lines = lines_raw
 
             header = lines[0]
+            separator_idx = None
+            for idx, line in enumerate(lines):
+                if re.match(r'^\s*\|?\s*[-:]{3,}\s*[-:|\s]*$', line):
+                    separator_idx = idx
+                    break
+            if separator_idx is not None:
+                data_lines = lines[separator_idx + 1:]
+            else:
+                data_lines = lines[1:]
             km_h = _FLAT_KM_HEADER.search(header)
             vmax_h = _FLAT_VMAX_HEADER.search(header)
             if not km_h and not vmax_h:
@@ -3050,17 +3077,18 @@ class RuleExtractor:
             header_parts = re.split(r'\s{2,}|\t', header)
             col_count = len(header_parts)
 
-            for line in lines[1:]:
+            for line in data_lines:
                 parts = re.split(r'\s{2,}|\t', line.strip())
                 if len(parts) < 2:
                     continue
 
                 line_lower = line.lower()
-                name_lower = (selected_name or "").lower().replace(" ", "")
+                name_lower = (selected_name or "").lower().replace(" ", "").replace("-", "")
+                name_original = (selected_name or "").lower()
                 line_compact = line_lower.replace(" ", "").replace("-", "")
 
                 is_match = (name_lower in line_compact or
-                            selected_name.lower() in line_lower or
+                            name_original in line_lower or
                             "this work" in line_lower or
                             "our" in line_lower)
 
