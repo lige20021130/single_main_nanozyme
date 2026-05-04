@@ -414,3 +414,64 @@ class CrossValidationAgent:
             }
             apps.append(new_app)
             record["applications"] = apps
+
+    def check_multi_figure_kinetics_consistency(self, vlm_results) -> List[Dict[str, Any]]:
+        if not vlm_results or len(vlm_results) < 2:
+            return []
+        figure_kinetics = []
+        for vlm_r in vlm_results:
+            if not isinstance(vlm_r, dict):
+                continue
+            ev = vlm_r.get("extracted_values", {})
+            if not isinstance(ev, dict):
+                ev = {}
+            fig_data = {"caption": vlm_r.get("_source_caption", "")}
+            for param in ("Km", "Vmax", "kcat", "kcat_Km"):
+                items = ev.get(param, [])
+                val = None
+                unit = None
+                if isinstance(items, list) and items:
+                    best = items[0] if isinstance(items[0], dict) else {"value": items[0]}
+                    val = _to_float(best.get("value")) if isinstance(best, dict) else _to_float(items[0])
+                    unit = best.get("unit") if isinstance(best, dict) else None
+                elif isinstance(items, dict) and items.get("value") is not None:
+                    val = _to_float(items["value"])
+                    unit = items.get("unit")
+                if val is not None:
+                    fig_data[param] = val
+                    fig_data[f"{param}_unit"] = unit
+            if any(k in fig_data for k in ("Km", "Vmax", "kcat", "kcat_Km")):
+                figure_kinetics.append(fig_data)
+        if len(figure_kinetics) < 2:
+            return []
+        inconsistencies = []
+        for param in ("Km", "Vmax", "kcat", "kcat_Km"):
+            values = []
+            for fk in figure_kinetics:
+                if param in fk:
+                    values.append((fk[param], fk.get(f"{param}_unit"), fk.get("caption", "")))
+            if len(values) < 2:
+                continue
+            for i in range(len(values)):
+                for j in range(i + 1, len(values)):
+                    v1, u1, c1 = values[i]
+                    v2, u2, c2 = values[j]
+                    if v1 is None or v2 is None:
+                        continue
+                    denom = max(abs(v1), abs(v2))
+                    if denom == 0:
+                        continue
+                    rel_diff = abs(v1 - v2) / denom
+                    if rel_diff > 0.3:
+                        inconsistencies.append({
+                            "parameter": param,
+                            "figure_1_value": v1,
+                            "figure_1_unit": u1,
+                            "figure_1_caption": c1[:100],
+                            "figure_2_value": v2,
+                            "figure_2_unit": u2,
+                            "figure_2_caption": c2[:100],
+                            "relative_difference": round(rel_diff, 3),
+                            "severity": "high" if rel_diff > 0.5 else "medium",
+                        })
+        return inconsistencies

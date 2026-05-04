@@ -55,3 +55,22 @@ class TestDependencies:
         dependencies.is_available("json")
         dependencies.clear_cache()
         assert dependencies.get_module("json") is not None
+
+    def test_clear_cache_resets_errors(self):
+        dependencies.is_available("nonexistent_module_xyz")
+        assert dependencies.get_import_error("nonexistent_module_xyz") is not None
+        dependencies.clear_cache()
+        assert dependencies.get_import_error("nonexistent_module_xyz") is None
+
+    def test_clear_cache_allows_reimport(self):
+        dependencies.is_available("json")
+        mod1 = dependencies.get_module("json")
+        dependencies.clear_cache()
+        mod2 = dependencies.get_module("json")
+        assert mod1 is mod2
+        assert mod2 is not None
+
+    def test_clear_cache_empty_state(self):
+        dependencies.clear_cache()
+        assert len(dependencies._IMPORT_CACHE) == 0
+        assert len(dependencies._IMPORT_ERRORS) == 0

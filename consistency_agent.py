@@ -3,7 +3,7 @@ import copy
 import logging
 from typing import Dict, List, Any, Tuple
 
-from nanozyme_models import EnzymeType
+from nanozyme_models import EnzymeType, ApplicationType
 
 logger = logging.getLogger(__name__)
 
@@ -36,27 +36,6 @@ def _is_rate_unit(unit):
 
 
 class ConsistencyAgent:
-    _APP_TYPE_ALIASES = {
-        "detection": "sensing",
-        "colorimetric detection": "sensing",
-        "colorimetric sensing": "sensing",
-        "biosensing": "sensing",
-        "determination": "sensing",
-        "monitoring": "sensing",
-        "assay": "sensing",
-        "diagnostic": "sensing",
-        "diagnosis": "sensing",
-        "imaging": "sensing",
-        "therapy": "therapeutic",
-        "antitumor": "therapeutic",
-        "tumor therapy": "therapeutic",
-        "wound healing": "therapeutic",
-        "anti-infection": "antibacterial",
-        "anti-inflammation": "antioxidant",
-        "cytoprotection": "antioxidant",
-        "degradation": "environmental",
-        "water treatment": "environmental",
-    }
 
     def normalize_output(self, record: Dict) -> Tuple[Dict, List[str]]:
         record = copy.deepcopy(record)
@@ -77,6 +56,8 @@ class ConsistencyAgent:
         warnings.extend(w6)
         record, w7 = self.check_application_enzyme_consistency(record)
         warnings.extend(w7)
+        record, w8 = self.check_analyte_enzyme_consistency(record)
+        warnings.extend(w8)
         return record, warnings
 
     def normalize_application_types(self, record: Dict) -> Tuple[Dict, List[str]]:
@@ -86,8 +67,7 @@ class ConsistencyAgent:
                 continue
             atype = app.get("application_type")
             if atype and isinstance(atype, str):
-                lower = atype.strip().lower()
-                canonical = self._APP_TYPE_ALIASES.get(lower)
+                canonical = ApplicationType.normalize_canonical(atype)
                 if canonical and canonical != atype.strip():
                     app["application_type"] = canonical
                     warnings.append(f"app_type_normalized: {atype} -> {canonical}")
@@ -302,4 +282,46 @@ class ConsistencyAgent:
             if app_type not in compatible:
                 warnings.append(f"app_type_incompatible_with_enzyme: {app_type} vs {etype}")
                 app["needs_review"] = True
+        return record, warnings
+
+    _ANALYTE_ENZYME_INCOMPATIBILITY = {
+        "peroxidase-like": {
+            "glucose": "glucose-oxidase-like",
+            "glucose oxidase": "glucose-oxidase-like",
+        },
+        "catalase-like": {
+            "glucose": "glucose-oxidase-like",
+        },
+        "superoxide-dismutase-like": {
+            "glucose": "glucose-oxidase-like",
+            "h2o2": "peroxidase-like",
+        },
+        "glutathione-peroxidase-like": {
+            "glucose": "glucose-oxidase-like",
+        },
+    }
+
+    def check_analyte_enzyme_consistency(self, record: Dict) -> Tuple[Dict, List[str]]:
+        warnings = []
+        etype = (record.get("main_activity", {}).get("enzyme_like_type") or "").lower().strip()
+        if not etype:
+            return record, warnings
+        analyte_map = self._ANALYTE_ENZYME_INCOMPATIBILITY.get(etype)
+        if not analyte_map:
+            return record, warnings
+        for app in record.get("applications", []):
+            if not isinstance(app, dict):
+                continue
+            if (app.get("application_type") or "").lower() != "sensing":
+                continue
+            analyte = (app.get("target_analyte") or "").lower().strip()
+            if not analyte:
+                continue
+            for incompatible_analyte, required_enzyme in analyte_map.items():
+                if incompatible_analyte in analyte:
+                    warnings.append(
+                        f"analyte_enzyme_incompatible: {analyte} requires {required_enzyme}, got {etype}"
+                    )
+                    app["needs_review"] = True
+                    break
         return record, warnings

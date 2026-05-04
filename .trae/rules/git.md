@@ -26,7 +26,7 @@ git commit -m "<合适的提交信息>"
 git push
 
 如果当前分支第一次推送，先查看分支：
-
+检查有无因网络问题导致之前的未提交，一并提交
 git branch --show-current
 
 假设当前分支是 main，则执行：

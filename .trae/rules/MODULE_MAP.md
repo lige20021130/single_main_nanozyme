@@ -34,8 +34,8 @@ PDF输入 → 预处理 → 规则/LLM/VLM多源提取 → 交叉验证 → 一�
 
 | 模块文件 | 核心类/函数 | 职责 | 关键依赖 |
 |----------|-----------|------|---------|
-| `cross_validation_agent.py` | `CrossValidationAgent` | 多源(Rule/LLM/VLM)交叉验证，冲突检测与合并 | 无外部依赖 |
-| `consistency_agent.py` | `ConsistencyAgent` | 输出一致性修正：酶类型归一化、材料名去后缀、应用去重、单位归一化 | nanozyme_models |
+| `cross_validation_agent.py` | `CrossValidationAgent`, `check_multi_figure_kinetics_consistency()` | 多源(Rule/LLM/VLM)交叉验证，冲突检测与合并，多图间动力学一致性检查 | 无外部依赖 |
+| `consistency_agent.py` | `ConsistencyAgent`, `check_analyte_enzyme_consistency()`, `_ANALYTE_ENZYME_INCOMPATIBILITY` | 输出一致性修正：酶类型归一化、材料名去后缀、应用去重、单位归一化、分析物-酶类型兼容性检查 | nanozyme_models |
 | `consistency_guard.py` | `ConsistencyGuard` | 对比表/他人物质检测，防止提取非目标纳米酶数据 | 无外部依赖 |
 | `consistency_guard_agentic.py` | `AgenticConsistencyGuard`, `IssueSeverity`, `GuardIssue`, `GuardCheckResult` | 智能一致性守卫，LLM辅助裁决冲突 | nanozyme_models, api_client |
 | `extraction_verifier.py` | `ExtractionVerifier` | 提取结果验证，字段与原文证据交叉核对 | 无外部依赖 |
@@ -45,8 +45,8 @@ PDF输入 → 预处理 → 规则/LLM/VLM多源提取 → 交叉验证 → 一�
 
 | 模块文件 | 核心类/函数 | 职责 | 关键依赖 |
 |----------|-----------|------|---------|
-| `nanozyme_models.py` | `EnzymeType(Enum)`, `normalize_canonical()`, `_ENZYME_ALIAS_MAP` | 酶类型枚举与归一化映射（单一真相源） | 无外部依赖 |
-| `single_main_nanozyme_extractor.py` 顶层 | `EMPTY_RECORD`, `validate_schema()`, `_SCHEMA_TOP_KEYS` | 输出JSON Schema定义与验证 | 无外部依赖 |
+| `nanozyme_models.py` | `EnzymeType(Enum)`, `ApplicationType(Enum)`, `normalize_canonical()`, `_ENZYME_ALIAS_MAP`, `_APPLICATION_TYPE_ALIAS_MAP`, `get_application_type_enum_string()` | 酶类型+应用类型枚举与归一化映射（单一真相源） | 无外部依赖 |
+| `single_main_nanozyme_extractor.py` 顶层 | `EMPTY_RECORD`, `validate_schema()`, `_SCHEMA_TOP_KEYS` | 输出JSON Schema定义与验证（含EnzymeType/ApplicationType枚举校验） | nanozyme_models |
 
 ## 基础设施层
 
@@ -98,10 +98,10 @@ PDF输入 → 预处理 → 规则/LLM/VLM多源提取 → 交叉验证 → 一�
 1. **动力学提取**: `RuleExtractor` → `KineticsAgent` → `_extract_kinetics_from_text/table/flattened_table` → `_backfill_kinetics_units` → `NumericValidator`
 2. **LLM精炼**: `SingleMainNanozymePipeline._call_llm_with_refinement` → `llm_refinement.AgenticLLMExtractor` → `LLMSchemaValidator` → 回填
 3. **VLM提取**: `SingleMainNanozymePipeline._call_vlm` → `VLMExtractor` → 结果合并到important_values → 回填kinetics
-4. **交叉验证**: Rule结果 + LLM结果 + VLM结果 → `CrossValidationAgent.merge_results` → 冲突检测 → 合并
-5. **一致性修正**: `ConsistencyAgent.normalize_output` → 酶类型/材料名/应用/单位归一化
+4. **交叉验证**: Rule结果 + LLM结果 + VLM结果 → `CrossValidationAgent.merge_results` → 冲突检测 → 合并 → `check_multi_figure_kinetics_consistency` 多图一致性
+5. **一致性修正**: `ConsistencyAgent.normalize_output` → 酶类型/材料名/应用/单位归一化 → `check_analyte_enzyme_consistency` 分析物-酶类型兼容性检查
 6. **数值校验**: `NumericValidator.validate` → 量级范围检查 → 单位验证 → 诊断标记
-7. **Schema验证**: `validate_schema` → 字段完整性 → 状态/置信度赋值
+7. **Schema验证**: `validate_schema` → 字段完整性 → EnzymeType/ApplicationType枚举校验 → 状态/置信度赋值
 
 ## 更新规则
 

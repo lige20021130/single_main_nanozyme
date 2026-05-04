@@ -1186,6 +1186,33 @@ def validate_schema(record: Dict[str, Any]) -> Dict[str, Any]:
         record["important_values"] = []
         auto_fixed = True
 
+    etype_raw = record.get("main_activity", {}).get("enzyme_like_type")
+    if etype_raw and isinstance(etype_raw, str):
+        try:
+            from nanozyme_models import EnzymeType
+            canonical = EnzymeType.normalize_canonical(etype_raw)
+            valid_values = {e.value for e in EnzymeType}
+            if canonical not in valid_values and canonical == etype_raw:
+                if "unknown_enzyme_type" not in warnings:
+                    warnings.append(f"unknown_enzyme_type: {etype_raw}")
+        except ImportError:
+            pass
+
+    for app in record.get("applications", []):
+        if not isinstance(app, dict):
+            continue
+        atype = app.get("application_type")
+        if atype and isinstance(atype, str):
+            try:
+                from nanozyme_models import ApplicationType
+                canonical = ApplicationType.normalize_canonical(atype)
+                valid_values = {e.value for e in ApplicationType}
+                if canonical not in valid_values and canonical == atype:
+                    if "unknown_application_type" not in warnings:
+                        warnings.append(f"unknown_application_type: {atype}")
+            except ImportError:
+                pass
+
     act = record.get("main_activity", {})
     if not isinstance(act.get("kinetics_list"), list):
         act["kinetics_list"] = []
@@ -2802,10 +2829,25 @@ class RuleExtractor:
             if found:
                 record["main_activity"]["substrates"] = sorted(found)
 
-        self._extract_kinetics_from_text(record, buckets.get("kinetics", []))
+        all_kinetics_texts = buckets.get("kinetics", [])
+        table_like_texts = []
+        inline_texts = []
+        for text in all_kinetics_texts:
+            lines = text.strip().split('\n')
+            pipe_count = sum(1 for line in lines if line.strip().startswith('|'))
+            has_km_header = bool(re.search(r'Km\s*[\(（]', text, re.I))
+            has_vmax_header = bool(re.search(r'Vmax\s*[\(（\[]', text, re.I))
+            has_catalyst_header = bool(re.search(r'Catalyst|Nanozyme|Material', text[:200], re.I))
+            is_table = (pipe_count >= 2) or (has_km_header and has_catalyst_header) or (has_vmax_header and has_catalyst_header)
+            if is_table:
+                table_like_texts.append(text)
+            else:
+                inline_texts.append(text)
+
+        self._extract_kinetics_from_text(record, inline_texts)
 
         if record["main_activity"]["kinetics"]["Km"] is None or record["main_activity"]["kinetics"]["Vmax"] is None:
-            self._extract_kinetics_from_flattened_table(record, buckets.get("kinetics", []), selected_name)
+            self._extract_kinetics_from_flattened_table(record, table_like_texts, selected_name)
 
         if record["main_activity"]["kinetics"]["Km"] is None and table_values:
             self._extract_kinetics_from_table(record, table_values)
@@ -4168,79 +4210,6 @@ class NumericValidator:
         return record, warnings
 
 
-class DiagnosticsBuilder:
-    def __init__(self):
-        self._verification = None
-
-    def set_verification(self, verification: Dict[str, Any]) -> "DiagnosticsBuilder":
-        self._verification = verification
-        return self
-
-    def build(self, record: Dict[str, Any], doc: PreprocessedDocument,
-              selected_name: Optional[str], ambiguous: bool,
-              table_classified: Dict, figure_summ: Dict) -> Dict[str, Any]:
-        has_name = bool(record["selected_nanozyme"].get("name"))
-        has_activity = bool(record["main_activity"].get("enzyme_like_type"))
-        has_kinetics = any(record["main_activity"]["kinetics"].get(k) is not None for k in ("Km", "Vmax"))
-        has_app = any(app.get("application_type") is not None for app in record.get("applications", []))
-
-        is_supp = (doc.document_kind == "supplementary" or
-                   record["paper"].get("document_kind") == "supplementary")
-
-        if has_name and has_activity and (has_kinetics or has_app):
-            status = "complete"
-        elif has_name and has_activity:
-            status = "partial"
-        elif has_name:
-            status = "partial"
-        else:
-            status = "failed"
-
-        if is_supp:
-            status = "partial"
-
-        if status == "complete":
-            confidence = "high"
-        elif status == "partial" and has_name and has_activity:
-            confidence = "medium"
-        else:
-            confidence = "low"
-
-        needs_review = status != "complete" or bool(record["diagnostics"].get("warnings"))
-
-        warnings = list(dict.fromkeys(record["diagnostics"].get("warnings", [])))
-
-        if ambiguous:
-            warnings.append("selected_material_ambiguous")
-        if is_supp:
-            warnings.append("supplementary_only")
-        if not record["raw_supporting_text"].get("material") and not record["raw_supporting_text"].get("activity"):
-            warnings.append("sparse_evidence")
-
-        result = {
-            "status": status,
-            "confidence": confidence,
-            "needs_review": needs_review,
-            "warnings": warnings,
-        }
-
-        if self._verification is not None:
-            result["verification"] = self._verification
-            rate = self._verification.get("overall_verification_rate", 0.0)
-            if rate < 0.5:
-                result["confidence"] = "low"
-                result["needs_review"] = True
-            elif rate < 0.8:
-                if result["confidence"] == "high":
-                    result["confidence"] = "medium"
-                result["needs_review"] = True
-            elif self._verification.get("hallucination_suspects") or self._verification.get("mismatches"):
-                if result["confidence"] == "high":
-                    result["confidence"] = "medium"
-
-        return result
-
-
 class SingleMainNanozymePipeline:
     def __init__(self, client=None, config: Optional[SMNConfig] = None):
         self.client = client
@@ -4259,7 +4228,13 @@ class SingleMainNanozymePipeline:
         else:
             logger.warning("[SMN] extraction_agents not available, using original RuleExtractor")
         self.num_val = NumericValidator()
-        self.diag_builder = DiagnosticsBuilder()
+        if is_available("diagnostics_builder"):
+            from diagnostics_builder import DiagnosticsBuilder as FullDiagnosticsBuilder
+            self.diag_builder = FullDiagnosticsBuilder()
+            logger.info("[SMN] Using full DiagnosticsBuilder from diagnostics_builder module")
+        else:
+            self.diag_builder = None
+            logger.warning("[SMN] diagnostics_builder not available, using inline diagnostics")
         self._guard: Optional[Any] = None
         self._agentic_guard: Optional[Any] = None
         if is_available("cross_validation_agent"):
@@ -5340,6 +5315,18 @@ class SingleMainNanozymePipeline:
             if all_vlm_results:
                 if self.cross_validator:
                     record = self.cross_validator.merge_results(record, {}, all_vlm_results)
+                    inconsistencies = self.cross_validator.check_multi_figure_kinetics_consistency(all_vlm_results)
+                    if inconsistencies:
+                        for inc in inconsistencies:
+                            param = inc.get("parameter", "")
+                            severity = inc.get("severity", "medium")
+                            warnings.append(f"multi_figure_{param}_inconsistency")
+                            logger.warning(
+                                f"[SMN] Multi-figure inconsistency: {param} "
+                                f"v1={inc.get('figure_1_value')} vs v2={inc.get('figure_2_value')} "
+                                f"(diff={inc.get('relative_difference')}, severity={severity})"
+                            )
+                        record["main_activity"]["kinetics"]["needs_review"] = True
                     logger.info("[SMN] VLM merged via CrossValidationAgent")
                 else:
                     record = self._merge_vlm(record, all_vlm_results)
@@ -5451,13 +5438,71 @@ class SingleMainNanozymePipeline:
             record["applications_note"] = None
 
         record["diagnostics"]["warnings"] = warnings
-        if getattr(self, '_verification_data', None):
-            self.diag_builder.set_verification(self._verification_data)
-        if doc and doc.chunks:
-            self.diag_builder.set_raw_text("\n".join(doc.chunks))
-        self.diag_builder.set_selected_nanozyme_full(record.get("selected_nanozyme"))
-        diag = self.diag_builder.build(record, doc, selected_name, ambiguous, table_classified, figure_summ)
-        record["diagnostics"] = diag
+        if self.diag_builder:
+            if getattr(self, '_verification_data', None):
+                self.diag_builder.set_verification(self._verification_data)
+            if doc and doc.chunks:
+                self.diag_builder.set_raw_text("\n".join(doc.chunks))
+            self.diag_builder.set_selected_nanozyme_full(record.get("selected_nanozyme"))
+            is_supp = (doc.document_kind == "supplementary" if doc else False) or (
+                record.get("paper", {}).get("document_kind") == "supplementary"
+            )
+            self.diag_builder.set_supplementary(is_supp)
+            self.diag_builder.set_selected_nanozyme(
+                selected_name,
+                ambiguous=ambiguous,
+            )
+            self.diag_builder.set_main_activity(record.get("main_activity"))
+            self.diag_builder.set_kinetics(
+                record.get("main_activity", {}).get("kinetics")
+            )
+            self.diag_builder.set_applications(record.get("applications", []))
+            self.diag_builder.add_numeric_warnings(
+                [w for w in warnings if w.startswith(("Km_", "Vmax_", "suspect_", "no_kinetics", "LOD_"))]
+            )
+            diag = self.diag_builder.build()
+            if not record["raw_supporting_text"].get("material") and not record["raw_supporting_text"].get("activity"):
+                if "sparse_evidence" not in diag.get("warnings", []):
+                    diag.setdefault("warnings", []).append("sparse_evidence")
+            record["diagnostics"] = diag
+        else:
+            has_name = bool(record["selected_nanozyme"].get("name"))
+            has_activity = bool(record["main_activity"].get("enzyme_like_type"))
+            has_kinetics = any(record["main_activity"]["kinetics"].get(k) is not None for k in ("Km", "Vmax"))
+            has_app = any(app.get("application_type") is not None for app in record.get("applications", []))
+            is_supp = (doc.document_kind == "supplementary" if doc else False) or (
+                record.get("paper", {}).get("document_kind") == "supplementary"
+            )
+            if has_name and has_activity and (has_kinetics or has_app):
+                status = "complete"
+            elif has_name and has_activity:
+                status = "partial"
+            elif has_name:
+                status = "partial"
+            else:
+                status = "failed"
+            if is_supp:
+                status = "partial"
+            if status == "complete":
+                confidence = "high"
+            elif status == "partial" and has_name and has_activity:
+                confidence = "medium"
+            else:
+                confidence = "low"
+            needs_review = status != "complete" or bool(warnings)
+            deduped_warnings = list(dict.fromkeys(warnings))
+            if ambiguous:
+                deduped_warnings.append("selected_material_ambiguous")
+            if is_supp:
+                deduped_warnings.append("supplementary_only")
+            if not record["raw_supporting_text"].get("material") and not record["raw_supporting_text"].get("activity"):
+                deduped_warnings.append("sparse_evidence")
+            record["diagnostics"] = {
+                "status": status,
+                "confidence": confidence,
+                "needs_review": needs_review,
+                "warnings": deduped_warnings,
+            }
 
         if self.consistency_agent:
             record, consistency_warnings = self.consistency_agent.normalize_output(record)

@@ -185,8 +185,63 @@ def get_assay_type_enum_string() -> str:
     return '"colorimetric" | "fluorometric" | "spectrophotometric" | "electrochemical" | "chemiluminescent" | "other"'
 
 
+_APPLICATION_TYPE_ALIAS_MAP: Dict[str, str] = {
+    "detection": "sensing",
+    "colorimetric detection": "sensing",
+    "colorimetric sensing": "sensing",
+    "biosensing": "sensing",
+    "biosensor": "sensing",
+    "determination": "sensing",
+    "monitoring": "sensing",
+    "assay": "sensing",
+    "diagnostic": "sensing",
+    "diagnosis": "sensing",
+    "imaging": "sensing",
+    "sensor": "sensing",
+    "therapy": "therapeutic",
+    "antitumor": "therapeutic",
+    "tumor therapy": "therapeutic",
+    "wound healing": "therapeutic",
+    "phototherapy": "therapeutic",
+    "chemodynamic therapy": "therapeutic",
+    "cytoprotection": "antioxidant",
+    "anti-inflammation": "antioxidant",
+    "ros scavenging": "antioxidant",
+    "anti-infection": "antibacterial",
+    "antibacterial activity": "antibacterial",
+    "sterilization": "antibacterial",
+    "degradation": "environmental",
+    "water treatment": "environmental",
+    "pollutant removal": "environmental",
+    "biofilm inhibition": "biofilm_inhibition",
+    "anti-biofilm": "biofilm_inhibition",
+}
+
+
+class ApplicationType(Enum):
+    SENSING = "sensing"
+    THERAPEUTIC = "therapeutic"
+    ANTIBACTERIAL = "antibacterial"
+    ENVIRONMENTAL = "environmental"
+    ANTIOXIDANT = "antioxidant"
+    BIOFILM_INHIBITION = "biofilm_inhibition"
+    OTHER = "other"
+
+    @classmethod
+    def normalize_canonical(cls, value: str) -> str:
+        if not value:
+            return value
+        key = value.strip().lower()
+        if key in _APPLICATION_TYPE_ALIAS_MAP:
+            return _APPLICATION_TYPE_ALIAS_MAP[key]
+        for member in cls:
+            if member.value.lower() == key:
+                return member.value
+        return value
+
+
 def get_application_type_enum_string() -> str:
-    return '"sensing" | "therapeutic" | "antibacterial" | "environmental" | "antioxidant" | "biofilm_inhibition" | "other"'
+    return " | ".join(f'"{e.value}"' for e in ApplicationType)
 
 
 def get_figure_type_enum_string() -> str:
