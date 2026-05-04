@@ -29,6 +29,9 @@ from nanozyme_models import ENZYME_REGISTRY, get_all_substrate_keywords, get_all
 logger = logging.getLogger(__name__)
 
 # ========== 配置（可从外部 config.yaml 覆盖） ==========
+_TABLE_NUM_PAT = re.compile(
+    r'(?i)(?:supplementary\s+)?(?:table|tbl\.?)\s+([A-Z]\d*|S\d+|\d+)',
+)
 DEFAULT_CONFIG = {
     "min_sentence_length": 15,
     "max_sentence_length": 500,
@@ -4747,20 +4750,37 @@ class NanozymePreprocessor:
         """
         从 kids 中查找独立的表格标题行（常见于 Elsevier/RSC 解析结果）。
         返回 list of {text, page, kid_id}
+        改进：捕获标题行后续段落作为完整标题（多行标题）。
         """
         captions: List[Dict[str, Any]] = []
         scan_kids = kids if kids is not None else self.kids
 
         def _scan(items: List[Any]) -> None:
-            for elem in items:
+            for i, elem in enumerate(items):
                 if not isinstance(elem, dict):
                     continue
                 content = self._normalize_text(
                     elem.get("content", "") or elem.get("text", "") or ""
                 )
                 if content and self._is_table_caption_line(content):
+                    full_text = content
+                    for j in range(i + 1, min(i + 4, len(items))):
+                        sib = items[j]
+                        if not isinstance(sib, dict):
+                            continue
+                        sib_type = str(sib.get("type", "")).lower()
+                        if sib_type in ("table", "image", "picture"):
+                            break
+                        sib_content = self._normalize_text(
+                            sib.get("content", "") or sib.get("text", "") or ""
+                        )
+                        if not sib_content:
+                            continue
+                        if self._is_table_caption_line(sib_content):
+                            break
+                        full_text += " " + sib_content
                     captions.append({
-                        "text": content,
+                        "text": full_text,
                         "page": elem.get("page number", 1),
                         "kid_id": elem.get("id"),
                     })
@@ -4776,10 +4796,21 @@ class NanozymePreprocessor:
     ) -> str:
         """
         将已有的 captions 列表中的标题关联到指定表格。
-        关联策略：同页优先，距离最近（页码差最小）。
+        关联策略：优先 Table 编号匹配，回退页码距离。
         """
         if table.get("caption"):
             return table["caption"]
+        table_text = table.get("text", "") or ""
+        table_cells = table.get("cells", [])
+        if table_cells and not table_text:
+            table_text = "\n".join(" | ".join(r) for r in table_cells)
+        table_num_match = _TABLE_NUM_PAT.search(table_text)
+        if table_num_match:
+            table_num = table_num_match.group(1)
+            for cap in captions:
+                cap_match = _TABLE_NUM_PAT.search(cap["text"])
+                if cap_match and cap_match.group(1) == table_num:
+                    return cap["text"]
         table_page = table.get("page", 1)
         best_cap = ""
         best_dist = 99999
@@ -4788,7 +4819,7 @@ class NanozymePreprocessor:
             if dist < best_dist:
                 best_dist = dist
                 best_cap = cap["text"]
-        return best_cap if best_dist <= 2 else ""
+        return best_cap if best_dist <= 3 else ""
 
     def _table_to_markdown(self, table: Dict[str, Any]) -> str:
         """将表格转为 Markdown 格式文本"""
@@ -4877,6 +4908,9 @@ class NanozymePreprocessor:
         table_items: List[Dict[str, Any]] = []
 
         for idx, tbl in enumerate(tables, start=1):
+            if not tbl.get("caption"):
+                captions = self._find_table_captions()
+                tbl["caption"] = self._associate_table_caption(tbl, captions)
             caption = tbl.get("caption", "")
             cells = tbl.get("cells", [])
             content_text = tbl.get("text", "") or ""

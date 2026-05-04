@@ -901,7 +901,16 @@ _TABLE_TYPE_PATTERNS = {
     "sensing_table": re.compile(r'\bLOD\b|\bdetection\s+limit\b|\blinear\s+range\b|\bsensor', re.I),
     "comparison_table": re.compile(r'\bcompar\w+\b|\bvs\.?\b|\bdifferent\s+nanozyme', re.I),
     "recovery_table": re.compile(r'\brecovery\b|\bspiked\b|\bRSD\b', re.I),
-    "characterization_table": re.compile(r'\bXRD\b|\bXPS\b|\bBET\b|\bTEM\b|\bSEM\b', re.I),
+    "characterization_table": re.compile(r'\bXRD\b|\bXPS\b|\bBET\b|\bTEM\b|\bSEM\b|\bFTIR\b|\bRaman\b|\bUV.?vis\b|\bXRF\b|\bICP\b|\bEDS\b|\bTGA\b|\bDLS\b|\bXAS\b', re.I),
+}
+
+_PREPROCESSOR_TO_SMN_TYPE = {
+    "kinetics_parameters": "kinetics_table",
+    "sensing_performance": "sensing_table",
+    "composition": "characterization_table",
+    "material_surface_properties": "characterization_table",
+    "electronic_structure": "characterization_table",
+    "application_performance": "general_table",
 }
 
 _THIS_WORK_RE = re.compile(
@@ -2327,29 +2336,28 @@ class TableProcessor:
             caption = tbl.get("caption", "")
             full_text = f"{headers} {rows_text} {content_text} {markdown} {caption}"
 
-            classified = False
-            for tbl_type, pattern in _TABLE_TYPE_PATTERNS.items():
-                if pattern.search(full_text):
-                    entry = {"table_type": tbl_type, "headers": tbl.get("headers", tbl.get("columns", [])),
-                             "row_count": len(rows), "text": full_text[:500],
-                             "rows": rows, "content_text": content_text, "markdown": markdown, "caption": caption}
+            preprocessor_type = tbl.get("table_type", "")
+            tbl_type = _PREPROCESSOR_TO_SMN_TYPE.get(preprocessor_type, "")
+            if not tbl_type:
+                for tt, pattern in _TABLE_TYPE_PATTERNS.items():
+                    if pattern.search(full_text):
+                        tbl_type = tt
+                        break
+            if not tbl_type:
+                tbl_type = "general_table"
 
-                    if tbl_type == "comparison_table":
-                        this_work_rows = self._filter_this_work(tbl, selected_name)
-                        entry["this_work_rows"] = this_work_rows
-                        entry["other_rows_count"] = len(rows) - len(this_work_rows)
-                    elif tbl_type == "kinetics_table":
-                        entry["this_work_rows"] = self._filter_this_work(tbl, selected_name)
+            entry = {"table_type": tbl_type, "headers": tbl.get("headers", tbl.get("columns", [])),
+                     "row_count": len(rows), "text": full_text[:500],
+                     "rows": rows, "content_text": content_text, "markdown": markdown, "caption": caption}
 
-                    result[f"{tbl_type}s"].append(entry)
-                    classified = True
-                    break
-            if not classified:
-                result["general_tables"].append({
-                    "table_type": "general_table", "headers": tbl.get("headers", tbl.get("columns", [])),
-                    "row_count": len(rows), "text": full_text[:500],
-                    "rows": rows, "content_text": content_text, "markdown": markdown, "caption": caption,
-                })
+            if tbl_type == "comparison_table":
+                this_work_rows = self._filter_this_work(tbl, selected_name)
+                entry["this_work_rows"] = this_work_rows
+                entry["other_rows_count"] = len(rows) - len(this_work_rows)
+            elif tbl_type in ("kinetics_table", "sensing_table"):
+                entry["this_work_rows"] = self._filter_this_work(tbl, selected_name)
+
+            result[f"{tbl_type}s"].append(entry)
 
         return result
 
@@ -2362,10 +2370,78 @@ class TableProcessor:
                 this_work_rows.append({"cells": row, "source": "this_work"})
         return this_work_rows
 
+    def _find_column_indices(self, headers: List[str], keywords_map: Dict[str, str]) -> Dict[str, int]:
+        col_map: Dict[str, int] = {}
+        for i, h in enumerate(headers):
+            h_lower = str(h).lower().strip()
+            for param, kw in keywords_map.items():
+                if param not in col_map and kw in h_lower:
+                    col_map[param] = i
+        return col_map
+
+    def _extract_kinetics_from_structured_rows(
+        self, tbl: Dict, selected_name: str
+    ) -> List[Dict]:
+        rows = tbl.get("rows", [])
+        if not rows or len(rows) < 2:
+            return []
+        headers = [str(h) for h in rows[0]]
+        col_map = self._find_column_indices(headers, {
+            "Km": "km", "Km_unit": "km(", "Vmax": "vmax", "Vmax_unit": "vmax(",
+            "kcat": "kcat", "kcat_Km": "kcat/km", "substrate": "substrate",
+            "material": "material",
+        })
+        if "Km" not in col_map and "Vmax" not in col_map and "kcat" not in col_map:
+            return []
+        name_lower = selected_name.lower() if selected_name else ""
+        values: List[Dict] = []
+        for row in rows[1:]:
+            if not isinstance(row, (list, tuple)) or len(row) == 0:
+                continue
+            row_text = " ".join(str(c) for c in row).lower()
+            is_target = (
+                _THIS_WORK_RE.search(row_text) or
+                (name_lower and name_lower in row_text) or
+                ("material" not in col_map)
+            )
+            if not is_target:
+                continue
+            if "Km" in col_map and col_map["Km"] < len(row):
+                km_val = row[col_map["Km"]]
+                km_unit = row[col_map["Km_unit"]] if "Km_unit" in col_map and col_map["Km_unit"] < len(row) else None
+                if km_val is not None and str(km_val).strip():
+                    sub = row[col_map["substrate"]] if "substrate" in col_map and col_map["substrate"] < len(row) else None
+                    values.append({"parameter": "Km", "value": str(km_val).strip(),
+                                   "unit": str(km_unit).strip() if km_unit else None,
+                                   "substrate": str(sub).strip() if sub else None,
+                                   "source": "table_structured"})
+            if "Vmax" in col_map and col_map["Vmax"] < len(row):
+                vmax_val = row[col_map["Vmax"]]
+                vmax_unit = row[col_map["Vmax_unit"]] if "Vmax_unit" in col_map and col_map["Vmax_unit"] < len(row) else None
+                if vmax_val is not None and str(vmax_val).strip():
+                    values.append({"parameter": "Vmax", "value": str(vmax_val).strip(),
+                                   "unit": str(vmax_unit).strip() if vmax_unit else None,
+                                   "substrate": None, "source": "table_structured"})
+            if "kcat" in col_map and col_map["kcat"] < len(row):
+                kcat_val = row[col_map["kcat"]]
+                if kcat_val is not None and str(kcat_val).strip():
+                    values.append({"parameter": "kcat", "value": str(kcat_val).strip(),
+                                   "unit": "s⁻¹", "substrate": None, "source": "table_structured"})
+            if "kcat_Km" in col_map and col_map["kcat_Km"] < len(row):
+                kcat_km_val = row[col_map["kcat_Km"]]
+                if kcat_km_val is not None and str(kcat_km_val).strip():
+                    values.append({"parameter": "kcat_Km", "value": str(kcat_km_val).strip(),
+                                   "unit": "M⁻¹s⁻¹", "substrate": None, "source": "table_structured"})
+        return values
+
     def get_kinetics_values(self, classified: Dict[str, Any], selected_name: str) -> List[Dict]:
         values = []
         name_lower = selected_name.lower() if selected_name else ""
         for tbl in classified.get("kinetics_tables", []):
+            structured = self._extract_kinetics_from_structured_rows(tbl, selected_name)
+            if structured:
+                values.extend(structured)
+                continue
             this_work_rows = tbl.get("this_work_rows", [])
             rows = tbl.get("rows", [])
             content_text = tbl.get("content_text", "")
@@ -2407,6 +2483,11 @@ class TableProcessor:
                 row_text = " ".join(str(c) for c in cells)
                 self._extract_kinetics_from_row(row_text, values)
 
+        for tbl in classified.get("general_tables", []):
+            structured = self._extract_kinetics_from_structured_rows(tbl, selected_name)
+            if structured:
+                values.extend(structured)
+
         return values
 
     def _extract_kinetics_from_row(self, row_text: str, values: List[Dict]) -> None:
@@ -2445,7 +2526,33 @@ class TableProcessor:
 
     def get_sensing_values(self, classified: Dict[str, Any]) -> List[Dict]:
         values = []
-        for tbl in classified.get("sensing_tables", []):
+        for tbl in classified.get("sensing_tables", []) + classified.get("general_tables", []):
+            rows = tbl.get("rows", [])
+            if rows and len(rows) >= 2:
+                headers = [str(h) for h in rows[0]]
+                col_map = self._find_column_indices(headers, {
+                    "LOD": "lod", "LOD_unit": "lod(", "linear_range_low": "linear",
+                    "target_analyte": "analyte", "material": "material",
+                })
+                if "LOD" in col_map or "linear_range_low" in col_map:
+                    for row in rows[1:]:
+                        if not isinstance(row, (list, tuple)):
+                            continue
+                        if "LOD" in col_map and col_map["LOD"] < len(row):
+                            lod_val = row[col_map["LOD"]]
+                            lod_unit = row[col_map["LOD_unit"]] if "LOD_unit" in col_map and col_map["LOD_unit"] < len(row) else None
+                            if lod_val is not None and str(lod_val).strip():
+                                values.append({"parameter": "LOD", "value": str(lod_val).strip(),
+                                               "unit": str(lod_unit).strip() if lod_unit else None,
+                                               "source": "table_structured"})
+                        if "linear_range_low" in col_map and col_map["linear_range_low"] < len(row):
+                            lr_val = row[col_map["linear_range_low"]]
+                            lr_unit = row[col_map["linear_range_unit"]] if "linear_range_unit" in col_map and col_map["linear_range_unit"] < len(row) else None
+                            if lr_val is not None and str(lr_val).strip():
+                                values.append({"parameter": "linear_range", "value": str(lr_val).strip(),
+                                               "unit": str(lr_unit).strip() if lr_unit else None,
+                                               "source": "table_structured"})
+                    continue
             for row_dict in tbl.get("this_work_rows", []):
                 cells = row_dict.get("cells", [])
                 row_text = " ".join(str(c) for c in cells)
@@ -2459,6 +2566,48 @@ class TableProcessor:
                     if lr_m:
                         values.append({"parameter": "linear_range", "value": lr_m.group(1), "unit": lr_m.group(2), "source": "table"})
                         break
+        return values
+
+    def get_characterization_values(self, classified: Dict[str, Any], selected_name: str) -> List[Dict]:
+        values = []
+        name_lower = selected_name.lower() if selected_name else ""
+        for tbl in classified.get("characterization_tables", []) + classified.get("general_tables", []):
+            rows = tbl.get("rows", [])
+            if not rows or len(rows) < 2:
+                continue
+            headers = [str(h) for h in rows[0]]
+            col_map = self._find_column_indices(headers, {
+                "surface_area": "surface area",
+                "surface_area_unit": "m²/g",
+                "pore_size": "pore size",
+                "pore_size_unit": "pore size (",
+                "particle_size": "particle size",
+                "particle_size_unit": "particle size (",
+                "zeta_potential": "zeta",
+                "material": "material",
+            })
+            for row in rows[1:]:
+                if not isinstance(row, (list, tuple)) or len(row) == 0:
+                    continue
+                row_text = " ".join(str(c) for c in row).lower()
+                is_target = (
+                    _THIS_WORK_RE.search(row_text) or
+                    (name_lower and name_lower in row_text) or
+                    ("material" not in col_map)
+                )
+                if not is_target:
+                    continue
+                for param in ("surface_area", "pore_size", "particle_size", "zeta_potential"):
+                    if param in col_map and col_map[param] < len(row):
+                        val = row[col_map[param]]
+                        if val is not None and str(val).strip():
+                            unit_key = f"{param}_unit"
+                            unit = row[col_map[unit_key]] if unit_key in col_map and col_map[unit_key] < len(row) else None
+                            values.append({
+                                "parameter": param, "value": str(val).strip(),
+                                "unit": str(unit).strip() if unit else None,
+                                "source": "table_structured",
+                            })
         return values
 
 
@@ -3045,24 +3194,27 @@ class RuleExtractor:
             _norm_unit = None
         for val in table_values:
             param = val.get("parameter", "")
+            source = val.get("source", "table")
             if param == "Km" and record["main_activity"]["kinetics"]["Km"] is None:
-                try:
-                    record["main_activity"]["kinetics"]["Km"] = float(val["value"])
+                raw_val = val["value"]
+                parsed = _parse_scientific_notation(str(raw_val))
+                if isinstance(parsed, (int, float)):
+                    record["main_activity"]["kinetics"]["Km"] = parsed
                     _nu = _norm_unit(val.get("unit")) if _norm_unit and val.get("unit") else val.get("unit")
                     record["main_activity"]["kinetics"]["Km_unit"] = _nu if _nu else val.get("unit")
                     record["main_activity"]["kinetics"]["substrate"] = val.get("substrate")
-                    record["main_activity"]["kinetics"]["source"] = "table"
+                    record["main_activity"]["kinetics"]["source"] = source
                     record["main_activity"]["kinetics"]["_evidence_Km"] = val.get("original_text") or val.get("evidence_text") or str(val)[:300]
-                except (ValueError, TypeError):
-                    pass
             elif param == "Vmax" and record["main_activity"]["kinetics"]["Vmax"] is None:
-                try:
-                    record["main_activity"]["kinetics"]["Vmax"] = float(val["value"])
-                except (ValueError, TypeError):
-                    record["main_activity"]["kinetics"]["Vmax"] = val["value"]
+                raw_val = val["value"]
+                parsed = _parse_scientific_notation(str(raw_val))
+                if isinstance(parsed, (int, float)):
+                    record["main_activity"]["kinetics"]["Vmax"] = parsed
+                else:
+                    record["main_activity"]["kinetics"]["Vmax"] = raw_val
                 _nu = _norm_unit(val.get("unit")) if _norm_unit and val.get("unit") else val.get("unit")
                 record["main_activity"]["kinetics"]["Vmax_unit"] = _nu if _nu else val.get("unit")
-                record["main_activity"]["kinetics"]["source"] = "table"
+                record["main_activity"]["kinetics"]["source"] = source
                 record["main_activity"]["kinetics"]["_evidence_Vmax"] = val.get("original_text") or val.get("evidence_text") or str(val)[:300]
             elif param in ("kcat", "Kcat", "k_cat") and record["main_activity"]["kinetics"]["kcat"] is None:
                 try:
@@ -3072,7 +3224,7 @@ class RuleExtractor:
                         _raw_u = val.get("unit", "s^-1")
                         _nu = _norm_unit(_raw_u) if _norm_unit and _raw_u else _raw_u
                         record["main_activity"]["kinetics"]["kcat_unit"] = _nu if _nu else _raw_u
-                        record["main_activity"]["kinetics"]["source"] = "table"
+                        record["main_activity"]["kinetics"]["source"] = source
                         record["main_activity"]["kinetics"]["_evidence_kcat"] = val.get("original_text") or val.get("evidence_text") or str(val)[:300]
                 except (ValueError, TypeError):
                     pass
@@ -3084,7 +3236,7 @@ class RuleExtractor:
                         _raw_u = val.get("unit", "M^-1 s^-1")
                         _nu = _norm_unit(_raw_u) if _norm_unit and _raw_u else _raw_u
                         record["main_activity"]["kinetics"]["kcat_Km_unit"] = _nu if _nu else _raw_u
-                        record["main_activity"]["kinetics"]["source"] = "table"
+                        record["main_activity"]["kinetics"]["source"] = source
                         record["main_activity"]["kinetics"]["_evidence_kcat_Km"] = val.get("original_text") or val.get("evidence_text") or str(val)[:300]
                 except (ValueError, TypeError):
                     pass
@@ -4938,9 +5090,54 @@ class SingleMainNanozymePipeline:
         table_classified = self.table_proc.classify_and_summarize(tables, selected_name)
         table_kinetics_values = self.table_proc.get_kinetics_values(table_classified, selected_name)
         table_sensing_values = self.table_proc.get_sensing_values(table_classified)
+        table_characterization_values = self.table_proc.get_characterization_values(table_classified, selected_name)
         logger.info(f"[SMN] Tables: kinetics={len(table_classified.get('kinetics_tables',[]))}, "
                      f"comparison={len(table_classified.get('comparison_tables',[]))}, "
-                     f"sensing={len(table_classified.get('sensing_tables',[]))}")
+                     f"sensing={len(table_classified.get('sensing_tables',[]))}, "
+                     f"characterization={len(table_classified.get('characterization_tables',[]))}")
+
+        if self.client and self.config.enable_llm and doc.table_task:
+            try:
+                from llm_extractor import TableExtractor
+                tex = TableExtractor(self.client, batch_size=2)
+                table_llm_results = await tex.extract_all_tables(doc.table_task)
+                if table_llm_results:
+                    for tr in table_llm_results:
+                        if tr.get("error"):
+                            continue
+                        for rec in tr.get("records", []):
+                            if not isinstance(rec, dict):
+                                continue
+                            if rec.get("Km_value") is not None:
+                                table_kinetics_values.append({
+                                    "parameter": "Km", "value": str(rec["Km_value"]),
+                                    "unit": rec.get("Km_unit"), "substrate": rec.get("substrate"),
+                                    "source": "table_llm",
+                                })
+                            if rec.get("Vmax_value") is not None:
+                                table_kinetics_values.append({
+                                    "parameter": "Vmax", "value": str(rec["Vmax_value"]),
+                                    "unit": rec.get("Vmax_unit"), "substrate": rec.get("substrate"),
+                                    "source": "table_llm",
+                                })
+                            if rec.get("kcat_value") is not None:
+                                table_kinetics_values.append({
+                                    "parameter": "kcat", "value": str(rec["kcat_value"]),
+                                    "unit": rec.get("kcat_unit", "s⁻¹"), "substrate": None,
+                                    "source": "table_llm",
+                                })
+                            if rec.get("specific_activity_value") is not None:
+                                table_kinetics_values.append({
+                                    "parameter": "specific_activity", "value": str(rec["specific_activity_value"]),
+                                    "unit": rec.get("specific_activity_unit"), "substrate": None,
+                                    "source": "table_llm",
+                                })
+                    logger.info(f"[SMN] TableExtractor: {len(table_llm_results)} tables processed, "
+                                 f"kinetics_values now={len(table_kinetics_values)}")
+            except ImportError:
+                logger.debug("[SMN] TableExtractor not available, using rule-based table extraction only")
+            except Exception as e:
+                logger.warning(f"[SMN] TableExtractor failed: {e}, using rule-based table extraction only")
 
         figure_summ = self.figure_proc.summarize(doc.vlm_tasks, selected_name)
         logger.info(f"[SMN] Figures: total={figure_summ['total']}, "
@@ -4951,6 +5148,30 @@ class SingleMainNanozymePipeline:
         logger.info(f"[SMN] Rule extraction: enzyme_type={record['main_activity']['enzyme_like_type']}, "
                      f"Km={record['main_activity']['kinetics'].get('Km')}, "
                      f"apps={len(record.get('applications',[]))}")
+
+        if table_characterization_values:
+            sel = record.get("selected_nanozyme", {})
+            for cv in table_characterization_values:
+                param = cv.get("parameter", "")
+                val = cv.get("value")
+                unit = cv.get("unit")
+                if param == "surface_area" and not sel.get("surface_area"):
+                    sel["surface_area"] = f"{val} {unit}" if unit else str(val)
+                elif param == "pore_size" and not sel.get("pore_size"):
+                    sel["pore_size"] = f"{val} {unit}" if unit else str(val)
+                elif param == "particle_size" and not sel.get("size"):
+                    num_m = re.search(r'[\d.]+', str(val))
+                    if num_m:
+                        try:
+                            sel["size"] = float(num_m.group())
+                            sel["size_unit"] = unit or "nm"
+                        except (ValueError, TypeError):
+                            sel["size"] = f"{val} {unit}" if unit else str(val)
+                    else:
+                        sel["size"] = f"{val} {unit}" if unit else str(val)
+                elif param == "zeta_potential" and not sel.get("zeta_potential"):
+                    sel["zeta_potential"] = f"{val} {unit}" if unit else str(val)
+            logger.info(f"[SMN] Table characterization values applied: {len(table_characterization_values)}")
 
         if self._agentic_guard and self.config.enable_agentic_guard:
             rule_check = self._agentic_guard.check_after_rule_extraction(record, buckets)
