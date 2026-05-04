@@ -3,63 +3,9 @@ import copy
 import logging
 from typing import Dict, List, Any, Tuple
 
-logger = logging.getLogger(__name__)
+from nanozyme_models import EnzymeType
 
-_ALIASES_TO_CANONICAL = {
-    "peroxidase_like": "peroxidase-like",
-    "peroxidase-like": "peroxidase-like",
-    "peroxidase like": "peroxidase-like",
-    "pod-like": "peroxidase-like",
-    "pod_like": "peroxidase-like",
-    "oxidase_like": "oxidase-like",
-    "oxidase-like": "oxidase-like",
-    "oxidase like": "oxidase-like",
-    "oxd-like": "oxidase-like",
-    "oxd_like": "oxidase-like",
-    "catalase_like": "catalase-like",
-    "catalase-like": "catalase-like",
-    "catalase like": "catalase-like",
-    "cat-like": "catalase-like",
-    "cat_like": "catalase-like",
-    "superoxide_dismutase_like": "superoxide-dismutase-like",
-    "superoxide-dismutase-like": "superoxide-dismutase-like",
-    "sod-like": "superoxide-dismutase-like",
-    "sod_like": "superoxide-dismutase-like",
-    "glucose_oxidase_like": "glucose-oxidase-like",
-    "glucose-oxidase-like": "glucose-oxidase-like",
-    "gox-like": "glucose-oxidase-like",
-    "gox_like": "glucose-oxidase-like",
-    "glutathione_peroxidase_like": "glutathione-peroxidase-like",
-    "glutathione-peroxidase-like": "glutathione-peroxidase-like",
-    "gpx-like": "glutathione-peroxidase-like",
-    "gpx_like": "glutathione-peroxidase-like",
-    "glutathione_oxidase_like": "glutathione-oxidase-like",
-    "glutathione-oxidase-like": "glutathione-oxidase-like",
-    "gshox-like": "glutathione-oxidase-like",
-    "gshox_like": "glutathione-oxidase-like",
-    "laccase_like": "laccase-like",
-    "laccase-like": "laccase-like",
-    "phosphatase_like": "phosphatase-like",
-    "phosphatase-like": "phosphatase-like",
-    "alp-like": "phosphatase-like",
-    "alp_like": "phosphatase-like",
-    "esterase_like": "esterase-like",
-    "esterase-like": "esterase-like",
-    "nuclease_like": "nuclease-like",
-    "nuclease-like": "nuclease-like",
-    "nitroreductase_like": "nitroreductase-like",
-    "nitroreductase-like": "nitroreductase-like",
-    "ntr-like": "nitroreductase-like",
-    "ntr_like": "nitroreductase-like",
-    "hydrolase_like": "hydrolase-like",
-    "hydrolase-like": "hydrolase-like",
-    "haloperoxidase_like": "haloperoxidase-like",
-    "haloperoxidase-like": "haloperoxidase-like",
-    "tyrosinase_like": "tyrosinase-like",
-    "tyrosinase-like": "tyrosinase-like",
-    "cascade_enzymatic": "cascade-enzymatic",
-    "cascade-enzymatic": "cascade-enzymatic",
-}
+logger = logging.getLogger(__name__)
 
 _NANO_SUFFIXES = re.compile(
     r'\s+'
@@ -154,20 +100,10 @@ class ConsistencyAgent:
             return record, warnings
         etype = act.get("enzyme_like_type")
         if etype and isinstance(etype, str):
-            canonical = _ALIASES_TO_CANONICAL.get(etype)
-            if not canonical:
-                lower = etype.lower().replace(" ", "_")
-                canonical = _ALIASES_TO_CANONICAL.get(lower)
-            if not canonical:
-                lower2 = etype.lower().replace(" ", "-")
-                canonical = _ALIASES_TO_CANONICAL.get(lower2)
+            canonical = EnzymeType.normalize_canonical(etype)
             if canonical and canonical != etype:
                 act["enzyme_like_type"] = canonical
                 warnings.append(f"enzyme_type_normalized: {etype} -> {canonical}")
-            elif etype and "_" in etype:
-                hyphen = etype.replace("_", "-")
-                act["enzyme_like_type"] = hyphen
-                warnings.append(f"enzyme_type_underscore_to_hyphen: {etype} -> {hyphen}")
         return record, warnings
 
     def normalize_all_units(self, record: Dict) -> Tuple[Dict, List[str]]:

@@ -22,6 +22,8 @@ _ENZYME_ALIAS_MAP: Dict[str, str] = {
     "ntr-like": "nitroreductase-like",
     "glutathione oxidase (gshox)-like": "glutathione-oxidase-like",
     "gshox-like": "glutathione-oxidase-like",
+    "haloperoxidase (vhpo)-like": "haloperoxidase-like",
+    "vhpo-like": "haloperoxidase-like",
 }
 
 
@@ -48,15 +50,31 @@ class EnzymeType(Enum):
         if not value:
             return value
         key = value.strip().lower()
+
         if key in _ENZYME_ALIAS_MAP:
             return _ENZYME_ALIAS_MAP[key]
+
+        hyphen_key = key.replace("_", "-")
+        if hyphen_key in _ENZYME_ALIAS_MAP:
+            return _ENZYME_ALIAS_MAP[hyphen_key]
+
         cleaned = re.sub(r'\s*\([A-Za-z]+\)\s*', ' ', key).strip()
         cleaned = re.sub(r'\s+', '-', cleaned)
+        if cleaned in _ENZYME_ALIAS_MAP:
+            return _ENZYME_ALIAS_MAP[cleaned]
+
+        cleaned_hyphen = cleaned.replace("_", "-")
+        if cleaned_hyphen in _ENZYME_ALIAS_MAP:
+            return _ENZYME_ALIAS_MAP[cleaned_hyphen]
+
         for member in cls:
             if member.value.lower() == cleaned:
                 return member.value
         for member in cls:
             if member.value.lower() == key:
+                return member.value
+        for member in cls:
+            if member.value.lower() == hyphen_key:
                 return member.value
         return value
 

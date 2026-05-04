@@ -16,28 +16,21 @@ from dataclasses import dataclass, asdict
 import yaml
 import logging
 
-# 导入升级模块
-try:
+from dependencies import is_available, get_module
+
+CONFIG_MANAGER_AVAILABLE = is_available("config_manager")
+if CONFIG_MANAGER_AVAILABLE:
     from config_manager import ConfigManager
-    CONFIG_MANAGER_AVAILABLE = True
-except ImportError:
-    CONFIG_MANAGER_AVAILABLE = False
-    print("警告: 未找到 config_manager 模块，将使用手动 YAML 读取")
 
-try:
-    from logging_setup import setup_logging
-    LOGGING_SETUP_AVAILABLE = True
-except ImportError:
-    LOGGING_SETUP_AVAILABLE = False
-    print("警告: 未找到 logging_setup 模块，将使用默认日志配置")
+LOGGING_SETUP_AVAILABLE = is_available("logging_setup")
+if LOGGING_SETUP_AVAILABLE:
+    from logging_setup import setup_logging, GUILogHandler
+else:
+    GUILogHandler = None
 
-# 导入处理层（假设在同一目录）
-try:
+PREPROCESSOR_AVAILABLE = is_available("nanozyme_preprocessor_midjson")
+if PREPROCESSOR_AVAILABLE:
     from nanozyme_preprocessor_midjson import NanozymePreprocessor
-    PREPROCESSOR_AVAILABLE = True
-except ImportError:
-    PREPROCESSOR_AVAILABLE = False
-    print("警告: 未找到 nanozyme_preprocessor_midjson 模块，预处理功能不可用")
 
 
 def _resolve_pdf_assets(pdf_path: Path, output_dir: Optional[str]) -> Tuple[Path, Path]:
@@ -463,8 +456,6 @@ class PDFBasicGUI:
             self.root.after(0, lambda: self.vlm_label.config(text=f"✗ 测试异常", foreground="red"))
 
     def setup_logging_handler(self):
-        """设置日志处理器,将 logging 输出到 GUI（集成统一日志模块）"""
-        # 根治 pin_memory warning：在 root logger 上挂 Filter，全局压制
         class _PinMemoryFilter(logging.Filter):
             def filter(self, record):
                 if record.levelno == logging.WARNING and 'pin_memory' in record.getMessage():
@@ -472,54 +463,31 @@ class PDFBasicGUI:
                 return True
         logging.getLogger().addFilter(_PinMemoryFilter())
 
-        # 先通过 logging_setup 初始化基础日志配置（文件日志、模块级别等）
         if LOGGING_SETUP_AVAILABLE:
             try:
                 setup_logging(level=logging.INFO, log_file="ocr_gui.log", use_colors=False)
                 self.log("[系统] 统一日志模块已初始化（含文件日志: ocr_gui.log）")
             except Exception as e:
                 self.log(f"[系统] 统一日志初始化失败，使用默认配置: {e}")
-        
-        # 添加 GUI 日志处理器（将 logging 转发到 GUI 日志窗口）
-        class GUILogHandler(logging.Handler):
-            def __init__(self, gui_instance):
-                super().__init__()
-                self.gui = gui_instance
-                
-            def emit(self, record):
-                log_msg = self.format(record)
-                # pin_memory on CPU 是无害 warning，归类为 benign 避免误导
-                if record.levelno == logging.WARNING and 'pin_memory' in log_msg:
-                    if log_msg not in self.gui._benign_warning_cache:
-                        self.gui._benign_warning_cache.add(log_msg)
-                        self.gui.log(f"[BENIGN] {log_msg}")
-                    return
-                # 根据日志级别添加前缀
-                if record.levelno >= logging.ERROR:
-                    prefix = "[ERROR]"
-                elif record.levelno >= logging.WARNING:
-                    prefix = "[WARN]"
-                elif record.levelno >= logging.INFO:
-                    prefix = "[INFO]"
-                else:
-                    prefix = "[DEBUG]"
-                self.gui.log(f"{prefix} {log_msg}")
-        
-        # 创建并配置处理器
-        handler = GUILogHandler(self)
-        handler.setLevel(logging.INFO)
-        formatter = logging.Formatter('%(message)s')
-        handler.setFormatter(formatter)
-        
-        # 添加到根日志器
-        root_logger = logging.getLogger()
-        root_logger.addHandler(handler)
-        root_logger.setLevel(logging.INFO)
+
+        if LOGGING_SETUP_AVAILABLE and GUILogHandler is not None:
+            gui_handler = GUILogHandler(gui_callback=self.log)
+            gui_handler.setLevel(logging.INFO)
+            gui_handler.setFormatter(logging.Formatter('%(message)s'))
+            root_logger = logging.getLogger()
+            root_logger.addHandler(gui_handler)
+            root_logger.setLevel(logging.INFO)
+        else:
+            handler = logging.StreamHandler()
+            handler.setLevel(logging.INFO)
+            handler.setFormatter(logging.Formatter('%(message)s'))
+            logging.getLogger().addHandler(handler)
+
         for name in ('single_main_nanozyme_extractor', 'nanozyme_preprocessor_midjson',
                      'extraction_pipeline', 'llm_extractor', 'vlm_extractor',
                      'api_client', 'RuleExtractor', 'TableProcessor'):
             logging.getLogger(name).setLevel(logging.INFO)
-        
+
         self.log("[系统] 日志系统已初始化")
 
     def log(self, msg):

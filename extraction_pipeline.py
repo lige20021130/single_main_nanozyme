@@ -19,26 +19,28 @@ from pathlib import Path
 from typing import Optional, Callable, Dict, Any, List
 from datetime import datetime
 
-# 尝试导入新模块
-try:
-    from config_manager import ConfigManager, get_config
-    from cache_manager import CacheManager, get_cache_manager
-    from task_queue import TaskQueue, TaskStatus, get_task_queue
-    from logging_setup import setup_logging, get_logger
-    CONFIG_MANAGER_AVAILABLE = True
-except ImportError as e:
-    CONFIG_MANAGER_AVAILABLE = False
-    get_logger = lambda x: logging.getLogger(x)
+from logging_setup import setup_logging, get_logger
+from dependencies import is_available, get_module
 
-# 导入原有模块
+CONFIG_MANAGER_AVAILABLE = is_available("config_manager")
+CACHE_MANAGER_AVAILABLE = is_available("cache_manager")
+TASK_QUEUE_AVAILABLE = is_available("task_queue")
+if CONFIG_MANAGER_AVAILABLE:
+    from config_manager import ConfigManager, get_config
+if CACHE_MANAGER_AVAILABLE:
+    from cache_manager import CacheManager, get_cache_manager
+if TASK_QUEUE_AVAILABLE:
+    from task_queue import TaskQueue, TaskStatus, get_task_queue
+
 try:
     import yaml
     from api_client import APIClient
     MODULES_AVAILABLE = True
-except ImportError as e:
+except ImportError:
     MODULES_AVAILABLE = False
 
-try:
+SMN_AVAILABLE = is_available("single_main_nanozyme_extractor")
+if SMN_AVAILABLE:
     from single_main_nanozyme_extractor import (
         SingleMainNanozymePipeline,
         SMNConfig,
@@ -46,9 +48,6 @@ try:
         EXTRACTION_MODE as SMN_MODE,
         SCHEMA_VERSION as SMN_SCHEMA_VERSION,
     )
-    SMN_AVAILABLE = True
-except ImportError:
-    SMN_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -71,8 +70,12 @@ class ExtractionPipeline:
         output_dir: Optional[str] = None,
         enable_cache: bool = True,
         enable_queue: bool = False,
-        use_new_modules: bool = True
+        use_new_modules: bool = True,
+        per_document_timeout: float = 600,
+        pipeline_timeout: float = 3600,
     ):
+        self.per_document_timeout = per_document_timeout
+        self.pipeline_timeout = pipeline_timeout
         """
         初始化提取管道
         
@@ -94,8 +97,7 @@ class ExtractionPipeline:
             self.confidence_threshold = self.config.pipeline.confidence_threshold
             self.rulebook_path = self.config.pipeline.rulebook_path
             
-            # 初始化缓存管理器
-            if self.enable_cache:
+            if self.enable_cache and CACHE_MANAGER_AVAILABLE:
                 self.cache_manager = get_cache_manager(
                     str(self.config.pipeline.cache_dir),
                     max_age_days=7
@@ -103,8 +105,7 @@ class ExtractionPipeline:
             else:
                 self.cache_manager = None
             
-            # 初始化任务队列
-            if enable_queue and self.config.queue.enabled:
+            if enable_queue and self.config.queue.enabled and TASK_QUEUE_AVAILABLE:
                 self.task_queue = TaskQueue(
                     queue_file=str(self.config.pipeline.task_queue_path),
                     max_retry=self.config.queue.max_retries,
@@ -132,12 +133,8 @@ class ExtractionPipeline:
             logger.info("任务队列已启用")
     
     def _setup_logging(self):
-        """设置日志"""
         if not logging.getLogger().handlers:
-            if CONFIG_MANAGER_AVAILABLE:
-                setup_logging(level=logging.INFO, detailed=False)
-            else:
-                logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+            setup_logging(level=logging.INFO, detailed=False)
     
     async def process_mid_json_single_main_nanozyme(
         self,
@@ -205,7 +202,13 @@ class ExtractionPipeline:
 
             try:
                 pipeline = SingleMainNanozymePipeline(client=client, config=smn_cfg)
-                record = await pipeline.extract(mid)
+                record = await asyncio.wait_for(
+                    pipeline.extract(mid),
+                    timeout=self.per_document_timeout,
+                )
+            except asyncio.TimeoutError:
+                logger.error(f"[SMN] 提取超时 ({self.per_document_timeout}s): {mid_json_path}")
+                raise
             finally:
                 if client:
                     try:

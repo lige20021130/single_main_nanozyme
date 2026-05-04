@@ -2,54 +2,9 @@ import re
 import logging
 from typing import Dict, List, Optional, Any
 
-logger = logging.getLogger(__name__)
+from nanozyme_models import EnzymeType
 
-ENZYME_TYPE_NORMALIZATION = {
-    "peroxidase-like": "peroxidase_like",
-    "peroxidase like": "peroxidase_like",
-    "peroxidase": "peroxidase_like",
-    "pod-like": "peroxidase_like",
-    "oxidase-like": "oxidase_like",
-    "oxidase like": "oxidase_like",
-    "oxidase": "oxidase_like",
-    "od-like": "oxidase_like",
-    "oxd-like": "oxidase_like",
-    "catalase-like": "catalase_like",
-    "catalase like": "catalase_like",
-    "catalase": "catalase_like",
-    "cat-like": "catalase_like",
-    "superoxide dismutase-like": "superoxide_dismutase_like",
-    "superoxide-dismutase-like": "superoxide_dismutase_like",
-    "superoxide dismutase like": "superoxide_dismutase_like",
-    "sod-like": "superoxide_dismutase_like",
-    "sod like": "superoxide_dismutase_like",
-    "glucose oxidase-like": "glucose_oxidase_like",
-    "glucose-oxidase-like": "glucose_oxidase_like",
-    "glucose oxidase like": "glucose_oxidase_like",
-    "gox-like": "glucose_oxidase_like",
-    "laccase-like": "laccase_like",
-    "laccase like": "laccase_like",
-    "laccase": "laccase_like",
-    "phosphatase-like": "phosphatase_like",
-    "phosphatase like": "phosphatase_like",
-    "phosphatase": "phosphatase_like",
-    "alp-like": "phosphatase_like",
-    "esterase-like": "esterase_like",
-    "esterase like": "esterase_like",
-    "esterase": "esterase_like",
-    "nuclease-like": "nuclease_like",
-    "nuclease like": "nuclease_like",
-    "nuclease": "nuclease_like",
-    "nitroreductase-like": "nitroreductase_like",
-    "nitroreductase like": "nitroreductase_like",
-    "ntr-like": "nitroreductase_like",
-    "hydrolase-like": "hydrolase_like",
-    "hydrolase like": "hydrolase_like",
-    "hydrolase": "hydrolase_like",
-    "haloperoxidase-like": "haloperoxidase_like",
-    "haloperoxidase like": "haloperoxidase_like",
-    "vhpo-like": "haloperoxidase_like",
-}
+logger = logging.getLogger(__name__)
 
 VALID_ENZYME_TYPES = {
     "peroxidase_like", "oxidase_like", "catalase_like",
@@ -95,37 +50,10 @@ SIGNAL_TYPES = {
 def normalize_enzyme_type(raw: Optional[str]) -> str:
     if not raw:
         return "unknown"
-    key = raw.strip().lower()
-    if key in ENZYME_TYPE_NORMALIZATION:
-        return ENZYME_TYPE_NORMALIZATION[key]
-    for pattern, normalized in ENZYME_TYPE_NORMALIZATION.items():
-        if pattern in key or key in pattern:
-            return normalized
-    if re.search(r'(?i)peroxidase', key):
-        return "peroxidase_like"
-    if re.search(r'(?i)oxidase', key) and not re.search(r'(?i)glucose', key):
-        return "oxidase_like"
-    if re.search(r'(?i)catalase', key):
-        return "catalase_like"
-    if re.search(r'(?i)dismutase', key):
-        return "superoxide_dismutase_like"
-    if re.search(r'(?i)glucose\s*oxidase', key):
-        return "glucose_oxidase_like"
-    if re.search(r'(?i)laccase', key):
-        return "laccase_like"
-    if re.search(r'(?i)phosphatase', key):
-        return "phosphatase_like"
-    if re.search(r'(?i)esterase', key):
-        return "esterase_like"
-    if re.search(r'(?i)nuclease', key):
-        return "nuclease_like"
-    if re.search(r'(?i)nitroreductase', key):
-        return "nitroreductase_like"
-    if re.search(r'(?i)hydrolase', key):
-        return "hydrolase_like"
-    if re.search(r'(?i)haloperoxidase', key):
-        return "haloperoxidase_like"
-    return "other"
+    canonical = EnzymeType.normalize_canonical(raw)
+    if canonical and canonical != raw:
+        return canonical.replace("-", "_")
+    return "unknown"
 
 
 def normalize_assay_method(raw: Optional[str]) -> str:

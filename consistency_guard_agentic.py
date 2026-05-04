@@ -4,6 +4,8 @@ from typing import Optional, Dict, List, Any, Set
 from dataclasses import dataclass, field
 from enum import Enum
 
+from nanozyme_models import EnzymeType
+
 logger = logging.getLogger(__name__)
 
 
@@ -228,12 +230,4 @@ class AgenticConsistencyGuard:
     def _normalize_enzyme_type(etype: str) -> Optional[str]:
         if not etype:
             return None
-        t = etype.lower().replace(" ", "-").replace("_", "-")
-        aliases = {
-            "pod-like": "peroxidase-like",
-            "sod-like": "superoxide-dismutase-like",
-            "gpx-like": "glutathione-peroxidase-like",
-            "cat-like": "catalase-like",
-            "oxd-like": "oxidase-like",
-        }
-        return aliases.get(t, t)
+        return EnzymeType.normalize_canonical(etype)

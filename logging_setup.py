@@ -17,6 +17,7 @@
 
 import logging
 import sys
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Optional, Dict
 from datetime import datetime
@@ -172,8 +173,11 @@ def setup_logging(
         if log_file:
             log_path = Path(log_file)
             log_path.parent.mkdir(parents=True, exist_ok=True)
-            
-            file_handler = logging.FileHandler(log_path, encoding='utf-8')
+
+            file_handler = RotatingFileHandler(
+                log_path, encoding='utf-8',
+                maxBytes=10 * 1024 * 1024, backupCount=5,
+            )
             file_handler.setLevel(logging.DEBUG)
             file_handler.setFormatter(logging.Formatter(DETAILED_FORMAT))
             root_logger.addHandler(file_handler)
