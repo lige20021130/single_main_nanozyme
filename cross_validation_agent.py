@@ -314,7 +314,20 @@ class CrossValidationAgent:
             for vlm_r in vlm_results:
                 if not isinstance(vlm_r, dict):
                     continue
-                fig_kin = vlm_r.get("kinetics", {})
+                ev = vlm_r.get("extracted_values", {})
+                if not isinstance(ev, dict):
+                    ev = {}
+                fig_kin = {}
+                for param in ("Km", "Vmax", "kcat", "kcat_Km"):
+                    items = ev.get(param, [])
+                    if isinstance(items, list) and items:
+                        best = items[0] if isinstance(items[0], dict) else {"value": items[0]}
+                        if best.get("value") is not None:
+                            fig_kin[param] = best["value"]
+                            fig_kin[f"{param}_unit"] = best.get("unit")
+                    elif isinstance(items, dict) and items.get("value") is not None:
+                        fig_kin[param] = items["value"]
+                        fig_kin[f"{param}_unit"] = items.get("unit")
                 if isinstance(fig_kin, dict):
                     for param in ("Km", "Vmax", "kcat", "kcat_Km"):
                         v = fig_kin.get(param)
@@ -330,7 +343,7 @@ class CrossValidationAgent:
                                     "context": vlm_r.get("_source_caption", ""),
                                 })
 
-                particle_size = vlm_r.get("particle_size")
+                particle_size = ev.get("particle_size")
                 if particle_size and record["selected_nanozyme"].get("size") is None:
                     if isinstance(particle_size, dict):
                         record["selected_nanozyme"]["size"] = particle_size.get("value")
@@ -346,11 +359,11 @@ class CrossValidationAgent:
                     elif isinstance(observations, str):
                         record["selected_nanozyme"]["morphology"] = observations
 
-                sensing = vlm_r.get("sensing_performance")
+                sensing = ev.get("sensing_performance")
                 if isinstance(sensing, dict):
                     self._merge_vlm_sensing_into_applications(record, sensing)
 
-                other_vals = vlm_r.get("other_values", [])
+                other_vals = ev.get("other_values", [])
                 if isinstance(other_vals, list):
                     for ov in other_vals:
                         if isinstance(ov, dict):

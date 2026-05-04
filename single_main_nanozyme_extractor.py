@@ -2307,6 +2307,23 @@ class EvidenceBucketBuilder:
         return buckets
 
     def _infer_section(self, contexts: List[Dict], idx: int, chunk: str) -> str:
+        if idx < len(contexts):
+            ctx = contexts[idx]
+            section_type = ctx.get("section_type", "")
+            if section_type in ("results", "experimental", "methods", "discussion"):
+                signal_types = ctx.get("signal_types", [])
+                if "kinetics" in signal_types:
+                    return "kinetics"
+                if "activity" in signal_types:
+                    return "activity"
+                if "application" in signal_types or "sensing" in signal_types:
+                    return "application"
+                if "material" in signal_types:
+                    return "characterization"
+                if section_type == "experimental":
+                    return "synthesis"
+            elif section_type == "abstract":
+                return "activity"
         cl = chunk.lower()[:500]
         if any(kw in cl for kw in ["synthesis", "preparation"]):
             return "synthesis"
@@ -2743,30 +2760,35 @@ class RuleExtractor:
                               table_values: List[Dict], selected_name: str,
                               doc: PreprocessedDocument = None) -> Dict[str, Any]:
         if record["main_activity"]["enzyme_like_type"] is None:
-            search_texts = buckets.get("activity", []) + buckets.get("mechanism", [])
-            if doc:
-                title = doc.metadata.get("title", "")
-                if title:
-                    search_texts.insert(0, title)
-                for chunk in doc.chunks[:3]:
-                    if "abstract" in chunk.lower()[:200]:
-                        search_texts.insert(0, chunk[:2000])
-                        break
-            for text in search_texts:
-                for pattern, etype in _ENZYME_TYPE_PATTERNS:
-                    if pattern.search(text):
-                        record["main_activity"]["enzyme_like_type"] = etype
-                        break
-                if record["main_activity"]["enzyme_like_type"]:
-                    break
-            if record["main_activity"]["enzyme_like_type"] is None and doc:
-                for chunk in doc.chunks:
+            if doc and doc.hints:
+                detected = doc.hints.get("detected_enzyme_types", [])
+                if detected and isinstance(detected, list):
+                    record["main_activity"]["enzyme_like_type"] = detected[0]
+            if record["main_activity"]["enzyme_like_type"] is None:
+                search_texts = buckets.get("activity", []) + buckets.get("mechanism", [])
+                if doc:
+                    title = doc.metadata.get("title", "")
+                    if title:
+                        search_texts.insert(0, title)
+                    for chunk in doc.chunks[:3]:
+                        if "abstract" in chunk.lower()[:200]:
+                            search_texts.insert(0, chunk[:2000])
+                            break
+                for text in search_texts:
                     for pattern, etype in _ENZYME_TYPE_PATTERNS:
-                        if pattern.search(chunk):
+                        if pattern.search(text):
                             record["main_activity"]["enzyme_like_type"] = etype
                             break
                     if record["main_activity"]["enzyme_like_type"]:
                         break
+                if record["main_activity"]["enzyme_like_type"] is None and doc:
+                    for chunk in doc.chunks:
+                        for pattern, etype in _ENZYME_TYPE_PATTERNS:
+                            if pattern.search(chunk):
+                                record["main_activity"]["enzyme_like_type"] = etype
+                                break
+                        if record["main_activity"]["enzyme_like_type"]:
+                            break
 
         if not record["main_activity"]["substrates"]:
             found = set()
@@ -4770,6 +4792,50 @@ class SingleMainNanozymePipeline:
                     if not record["selected_nanozyme"].get("size"):
                         record["selected_nanozyme"]["size"] = f"{ps['value']} {ps.get('unit', 'nm')}"
 
+                for kcat_item in ev.get("kcat", []):
+                    if isinstance(kcat_item, dict) and kcat_item.get("value") is not None:
+                        iv = {
+                            "name": "VLM_kcat",
+                            "value": str(kcat_item["value"]),
+                            "unit": kcat_item.get("unit", "s⁻¹"),
+                            "context": f"VLM {figure_type} figure",
+                            "source": "VLM",
+                            "needs_review": True,
+                        }
+                        record["important_values"].append(iv)
+                        try:
+                            vlm_val = float(kcat_item["value"])
+                        except (ValueError, TypeError):
+                            continue
+                        if record["main_activity"]["kinetics"].get("kcat") is None:
+                            record["main_activity"]["kinetics"]["kcat"] = vlm_val
+                            record["main_activity"]["kinetics"]["kcat_unit"] = kcat_item.get("unit", "s⁻¹")
+                            record["main_activity"]["kinetics"]["source"] = "VLM"
+                            if caption:
+                                record["main_activity"]["kinetics"]["_evidence_kcat"] = str(caption)[:300]
+
+                for kcat_km_item in ev.get("kcat_Km", []):
+                    if isinstance(kcat_km_item, dict) and kcat_km_item.get("value") is not None:
+                        iv = {
+                            "name": "VLM_kcat_Km",
+                            "value": str(kcat_km_item["value"]),
+                            "unit": kcat_km_item.get("unit", "M⁻¹s⁻¹"),
+                            "context": f"VLM {figure_type} figure",
+                            "source": "VLM",
+                            "needs_review": True,
+                        }
+                        record["important_values"].append(iv)
+                        try:
+                            vlm_val = float(kcat_km_item["value"])
+                        except (ValueError, TypeError):
+                            continue
+                        if record["main_activity"]["kinetics"].get("kcat_Km") is None:
+                            record["main_activity"]["kinetics"]["kcat_Km"] = vlm_val
+                            record["main_activity"]["kinetics"]["kcat_Km_unit"] = kcat_km_item.get("unit", "M⁻¹s⁻¹")
+                            record["main_activity"]["kinetics"]["source"] = "VLM"
+                            if caption:
+                                record["main_activity"]["kinetics"]["_evidence_kcat_Km"] = str(caption)[:300]
+
                 sp = ev.get("sensing_performance")
                 if isinstance(sp, dict):
                     for param in ("LOD", "linear_range", "sensitivity"):
@@ -5132,6 +5198,21 @@ class SingleMainNanozymePipeline:
                                     "unit": rec.get("specific_activity_unit"), "substrate": None,
                                     "source": "table_llm",
                                 })
+                            assay = rec.get("assay_condition", {})
+                            if isinstance(assay, dict):
+                                cond = record["main_activity"]["conditions"]
+                                if assay.get("pH") is not None and cond.get("pH") is None:
+                                    try:
+                                        cond["pH"] = float(assay["pH"])
+                                    except (ValueError, TypeError):
+                                        cond["pH"] = str(assay["pH"])
+                                if assay.get("temperature") is not None and cond.get("temperature") is None:
+                                    try:
+                                        cond["temperature"] = float(assay["temperature"])
+                                    except (ValueError, TypeError):
+                                        cond["temperature"] = str(assay["temperature"])
+                                if assay.get("buffer") and not cond.get("buffer"):
+                                    cond["buffer"] = str(assay["buffer"])
                     logger.info(f"[SMN] TableExtractor: {len(table_llm_results)} tables processed, "
                                  f"kinetics_values now={len(table_kinetics_values)}")
             except ImportError:
@@ -5330,16 +5411,29 @@ class SingleMainNanozymePipeline:
                 warnings.extend(guard_warnings)
                 logger.info(f"[SMN] Guard warnings: {guard_warnings}")
 
-        if table_sensing_values and not record.get("applications"):
+        if table_sensing_values:
+            apps = record.get("applications", [])
             for sv in table_sensing_values:
-                app = {"application_type": "sensing", "target_analyte": None, "method": None,
-                       "linear_range": None, "detection_limit": None, "sample_type": None, "notes": None,
-                       "_evidence": str(sv)[:300]}
-                if sv["parameter"] == "LOD":
-                    app["detection_limit"] = f"{sv['value']} {sv['unit']}"
-                elif sv["parameter"] == "linear_range":
-                    app["linear_range"] = f"{sv['value']} {sv['unit']}"
-                record["applications"].append(app)
+                matched = None
+                for app in apps:
+                    if app.get("application_type") in ("sensing", "biosensing", "detection"):
+                        matched = app
+                        break
+                if matched:
+                    if sv["parameter"] == "LOD" and not matched.get("detection_limit"):
+                        matched["detection_limit"] = f"{sv['value']} {sv['unit']}" if sv.get("unit") else str(sv["value"])
+                    elif sv["parameter"] == "linear_range" and not matched.get("linear_range"):
+                        matched["linear_range"] = f"{sv['value']} {sv['unit']}" if sv.get("unit") else str(sv["value"])
+                else:
+                    app = {"application_type": "sensing", "target_analyte": None, "method": None,
+                           "linear_range": None, "detection_limit": None, "sample_type": None, "notes": None,
+                           "_evidence": str(sv)[:300]}
+                    if sv["parameter"] == "LOD":
+                        app["detection_limit"] = f"{sv['value']} {sv['unit']}" if sv.get("unit") else str(sv["value"])
+                    elif sv["parameter"] == "linear_range":
+                        app["linear_range"] = f"{sv['value']} {sv['unit']}" if sv.get("unit") else str(sv["value"])
+                    apps.append(app)
+            record["applications"] = apps
 
         if not record.get("applications"):
             record["applications_note"] = "当前文献未包含相关内容"
