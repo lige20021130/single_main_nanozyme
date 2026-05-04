@@ -156,7 +156,7 @@ DEFAULT_CONFIG = {
         "min_file_size_kb": 10,
         "min_dimension": 50,
         "min_dimension_with_caption": 30,
-        "uncaptioned_min_both": 200,
+        "uncaptioned_min_both": 150,
         "require_caption_for_small": True,
         "allow_uncaptioned_in_supplementary": False,
         "max_images_main": 8,
@@ -172,6 +172,9 @@ DEFAULT_CONFIG = {
         ],
         "fig": [
             r"^(?:figure|fig\.?)\s+(\d+)\b",
+        ],
+        "table": [
+            r"^table\s+(\d+)\b",
         ],
     },
     "adaptive_chunking": {
@@ -331,6 +334,12 @@ class NanozymePreprocessor:
         self.images_root = Path(images_root) if images_root else self.json_path.parent
         self.output_root = Path(output_root) if output_root else self.json_path.parent
         self.pdf_stem = pdf_stem or self.json_path.stem
+        if len(self.pdf_stem) > 80:
+            import hashlib as _hl
+            h = _hl.md5(self.pdf_stem.encode()).hexdigest()[:8]
+            year_match = re.match(r'(\d{4})', self.pdf_stem)
+            prefix = year_match.group(1) if year_match else self.pdf_stem[:10]
+            self.pdf_stem = f"{prefix}_{h}"
         self.high_value_dir = self.output_root / "high_value_images" / self.pdf_stem
         self.high_value_dir.mkdir(parents=True, exist_ok=True)
 
@@ -4394,7 +4403,7 @@ class NanozymePreprocessor:
     def _parse_caption_label(self, caption: str) -> Optional[Tuple[str, int]]:
         normalized = self._normalize_heading_token_spaces(caption)
         caption_patterns = self.config.get("caption_patterns", DEFAULT_CONFIG["caption_patterns"]) if hasattr(self, "config") else DEFAULT_CONFIG["caption_patterns"]
-        for figure_kind in ("sfig", "scheme", "fig"):
+        for figure_kind in ("sfig", "scheme", "fig", "table"):
             for pattern in caption_patterns.get(figure_kind, []):
                 match = re.match(pattern, normalized, re.IGNORECASE)
                 if match:
@@ -4414,6 +4423,10 @@ class NanozymePreprocessor:
         m = re.match(r'^scheme\.?\s*(\d+)\b', cleaned, re.IGNORECASE)
         if m:
             return "scheme", int(m.group(1))
+        # Table: Table<N>
+        m = re.match(r'^table\.?\s*(\d+)\b', cleaned, re.IGNORECASE)
+        if m:
+            return "table", int(m.group(1))
         return None
 
     def _infer_figure_id(self, caption: str, fallback_index: int) -> str:
@@ -4430,7 +4443,7 @@ class NanozymePreprocessor:
         fig_num = ""
         if "_" in figure_id:
             parts = figure_id.rsplit("_", 1)
-            fig_kind = parts[0].replace("fig", "Figure").replace("sfig", "Figure").replace("scheme", "Scheme")
+            fig_kind = parts[0].replace("fig", "Figure").replace("sfig", "Figure").replace("scheme", "Scheme").replace("table", "Table")
             try:
                 fig_num = str(int(parts[1]))
             except ValueError:
