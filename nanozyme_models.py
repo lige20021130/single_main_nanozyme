@@ -24,6 +24,21 @@ _ENZYME_ALIAS_MAP: Dict[str, str] = {
     "gshox-like": "glutathione-oxidase-like",
     "haloperoxidase (vhpo)-like": "haloperoxidase-like",
     "vhpo-like": "haloperoxidase-like",
+    "multi-enzyme-like": "multi-enzyme-like",
+    "dual-enzyme-like": "multi-enzyme-like",
+    "triple-enzyme-like": "multi-enzyme-like",
+    "ribozyme-like": "ribozyme-like",
+    "cellulase-like": "cellulase-like",
+    "amylase-like": "amylase-like",
+    "protease-like": "protease-like",
+    "lipase-like": "lipase-like",
+    "urease-like": "urease-like",
+    "ascorbate-oxidase-like": "ascorbate-oxidase-like",
+    "aao-like": "ascorbate-oxidase-like",
+    "dehydrogenase-like": "dehydrogenase-like",
+    "invertase-like": "invertase-like",
+    "chitinase-like": "chitinase-like",
+    "xylanase-like": "xylanase-like",
 }
 
 
@@ -44,6 +59,18 @@ class EnzymeType(Enum):
     NUCLEASE = "nuclease-like"
     TYROSINASE = "tyrosinase-like"
     CASCADE_ENZYMATIC = "cascade-enzymatic"
+    MULTI_ENZYME = "multi-enzyme-like"
+    RIBOZYME = "ribozyme-like"
+    CELLULASE = "cellulase-like"
+    AMYLASE = "amylase-like"
+    PROTEASE = "protease-like"
+    LIPASE = "lipase-like"
+    UREASE = "urease-like"
+    ASCORBATE_OXIDASE = "ascorbate-oxidase-like"
+    DEHYDROGENASE = "dehydrogenase-like"
+    INVERTASE = "invertase-like"
+    CHITINASE = "chitinase-like"
+    XYLANASE = "xylanase-like"
 
     @classmethod
     def normalize_canonical(cls, value: str) -> str:
