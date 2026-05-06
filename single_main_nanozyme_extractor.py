@@ -289,6 +289,33 @@ _ENZYME_TYPE_PATTERNS = [
     (re.compile(r'\blaccase[-\s]?like\b', re.I), "laccase-like"),
     (re.compile(r'\bhaloperoxidase[-\s]?like\b', re.I), "haloperoxidase-like"),
     (re.compile(r'\bcascade\s+enzym\w+\s+activ', re.I), "cascade-enzymatic"),
+    (re.compile(r'\bmulti[-\s]?enzyme[-\s]?like\b', re.I), "multi-enzyme-like"),
+    (re.compile(r'\bdual[-\s]?enzyme[-\s]?like\b', re.I), "multi-enzyme-like"),
+    (re.compile(r'\btriple[-\s]?enzyme[-\s]?like\b', re.I), "multi-enzyme-like"),
+    (re.compile(r'\bperoxidase\s+and\s+oxidase[-\s]?like\b', re.I), "multi-enzyme-like"),
+    (re.compile(r'\bperoxidase[-\s]?oxidase[-\s]?like\b', re.I), "multi-enzyme-like"),
+    (re.compile(r'\bPOD[-\s]?like\s+and\s+OXD[-\s]?like\b', re.I), "multi-enzyme-like"),
+    (re.compile(r'\bcatalase\s+and\s+peroxidase[-\s]?like\b', re.I), "multi-enzyme-like"),
+    (re.compile(r'\btyrosinase[-\s]?like\b', re.I), "tyrosinase-like"),
+    (re.compile(r'\bribozyme[-\s]?like\b', re.I), "ribozyme-like"),
+    (re.compile(r'\bcellulase[-\s]?like\b', re.I), "cellulase-like"),
+    (re.compile(r'\bamylase[-\s]?like\b', re.I), "amylase-like"),
+    (re.compile(r'\bprotease[-\s]?like\b', re.I), "protease-like"),
+    (re.compile(r'\blipase[-\s]?like\b', re.I), "lipase-like"),
+    (re.compile(r'\burease[-\s]?like\b', re.I), "urease-like"),
+    (re.compile(r'\bascorbate\s+oxidase[-\s]?like\b', re.I), "ascorbate-oxidase-like"),
+    (re.compile(r'\bAAO[-\s]?like\b', re.I), "ascorbate-oxidase-like"),
+    (re.compile(r'\bchloroperoxidase[-\s]?like\b', re.I), "haloperoxidase-like"),
+    (re.compile(r'\bcytochrome\s+c\s+oxidase[-\s]?like\b', re.I), "oxidase-like"),
+    (re.compile(r'\bformate\s+dehydrogenase[-\s]?like\b', re.I), "dehydrogenase-like"),
+    (re.compile(r'\balcohol\s+dehydrogenase[-\s]?like\b', re.I), "dehydrogenase-like"),
+    (re.compile(r'\bglucose\s+dehydrogenase[-\s]?like\b', re.I), "dehydrogenase-like"),
+    (re.compile(r'\bDNAse[-\s]?like\b', re.I), "nuclease-like"),
+    (re.compile(r'\bDNase[-\s]?like\b', re.I), "nuclease-like"),
+    (re.compile(r'\bRNase[-\s]?like\b', re.I), "nuclease-like"),
+    (re.compile(r'\binvertase[-\s]?like\b', re.I), "invertase-like"),
+    (re.compile(r'\bchitinase[-\s]?like\b', re.I), "chitinase-like"),
+    (re.compile(r'\bxylanase[-\s]?like\b', re.I), "xylanase-like"),
 ]
 
 _SUBSTRATE_KEYWORDS = {
@@ -708,6 +735,18 @@ _LOD_PATTERNS = [
         r'(?:LOD|detection\s+limit)\s*[\(（\[]\s*([\d.]+)\s*[×x\u00d7]?\s*10[\u207b\u2212\u2013\-]?\s*(\d+)?\s*(nM|μM|uM|mM|M|pg/mL|ng/mL)\s*[\)）\]]',
         re.I,
     ),
+    re.compile(
+        r'(?:minimum\s+detect(?:able|ion))\s*(?:of|=|:|~)?\s*([\d.]+)\s*(nM|μM|uM|mM|M|pg/mL|ng/mL|μg/mL|mg/L|ppb|ppm)',
+        re.I,
+    ),
+    re.compile(
+        r'(?:sensitivity)\s*(?:of|=|:|~)?\s*([\d.]+)\s*(nM|μM|uM|mM|M|pg/mL|ng/mL|μg/mL|mg/L|ppb|ppm)',
+        re.I,
+    ),
+    re.compile(
+        r'(?:could\s+detect|can\s+detect|able\s+to\s+detect)\s+(?:down\s+to\s+)?([\d.]+)\s*(nM|μM|uM|mM|M|pg/mL|ng/mL|μg/mL|mg/L|ppb|ppm)',
+        re.I,
+    ),
 ]
 _LINEAR_RANGE_PATTERNS = [
     re.compile(
@@ -728,6 +767,14 @@ _LINEAR_RANGE_PATTERNS = [
     ),
     re.compile(
         r'([\d.]+)\s*[-–—~]\s*([\d.]+)\s*(nM|μM|uM|mM|M|pg/mL|ng/mL|μg/mL|mg/L)\s+(?:linear|calibration)',
+        re.I,
+    ),
+    re.compile(
+        r'(?:working\s+range|dynamic\s+range)\s*(?:of|=|:|~)?\s*([\d.]+\s*[-–—~to]+\s*[\d.]+)\s*(nM|μM|uM|mM|M|pg/mL|ng/mL|μg/mL|mg/L|U/L|mU/L)',
+        re.I,
+    ),
+    re.compile(
+        r'(?:linear|calibration)\s+(?:from|between)\s*([\d.]+)\s*(?:to|[-–—~])\s*([\d.]+)\s*(nM|μM|uM|mM|M|pg/mL|ng/mL|μg/mL|mg/L)',
         re.I,
     ),
 ]
@@ -988,11 +1035,31 @@ _SYNTHESIS_CONDITION_PATTERNS = {
         re.compile(r'\b(?:subsequent|followed\s+by)\s+(?:calcination|annealing|pyrolysis|carbonization)\s+(?:at|under)\s*([\d.]+)\s*°?C', re.I),
         re.compile(r'\b(?:heated|calcined|annealed|carbonized|pyrolyzed)\s+(?:to|up\s+to)\s*([\d.]+)\s*°?C', re.I),
         re.compile(r'\b([\d.]+)\s*°C\s*(?:for|during)\s+[\d.]+\s*(?:h|hr|min)\b', re.I),
+        re.compile(r'\b(?:calcined|annealed|heated|sintered)\s+at\s*([\d.]+)\s*[°º˚]?\s*C', re.I),
+        re.compile(r'\b(?:calcination|annealing|sintering)\s+(?:temperature|temp)\s*(?:of|was|=|:|≈|~)\s*([\d.]+)\s*[°º˚]?\s*C', re.I),
+        re.compile(r'\b(?:dried|dry)\s+at\s*([\d.]+)\s*[°º˚]?\s*C', re.I),
+        re.compile(r'\b(?:maintained|kept|held)\s+at\s*([\d.]+)\s*[°º˚]?\s*C\s+for\b', re.I),
+        re.compile(r'\b(?:reaction|synthesis)\s+(?:temperature|temp)\s*(?:of|was|=|:)\s*([\d.]+)\s*[°º˚]?\s*C', re.I),
+        re.compile(r'\b(\d{2,4})\s*[°º˚]?\s*C\s+(?:for|under)\s+\d+\s*h\b', re.I),
     ],
     "time": [
         re.compile(r'\bfor\s+([\d.]+)\s*(h|hr|hrs|hour|hours|min|minutes?)\b', re.I),
         re.compile(r'\b(?:reaction|synthesis|annealing|calcination|pyrolysis|carbonization)\s+(?:time|duration)\s*(?:of|was|=|:)\s*([\d.]+)\s*(h|hr|hrs|hour|hours|min|minutes?)', re.I),
         re.compile(r'\b(?:maintained|kept|held)\s+(?:at|for)\s*[\d.]+\s*°?C\s+(?:for\s+)?([\d.]+)\s*(h|hr|hrs|hour|hours|min|minutes?)', re.I),
+        re.compile(r'\bfor\s*([\d.]+)\s*[-–—~to]+\s*([\d.]+)\s*(h|hour|hours|min|minutes?)\b', re.I),
+        re.compile(r'\b(?:aged|stirred|incubated|refluxed)\s+for\s*([\d.]+)\s*(h|hr|hrs|hour|hours|min|minutes?)\b', re.I),
+        re.compile(r'\bovernight\b', re.I),
+    ],
+    "pH": [
+        re.compile(r'\bpH\s*(?:of|was|=|:|≈|~)\s*([\d.]+)\s*(?:was|in|under|at)\s+the\s+synthesis', re.I),
+        re.compile(r'\bsynthesis\s+(?:was\s+)?(?:carried\s+out|performed|conducted)\s+(?:at|under)\s+pH\s*([\d.]+)', re.I),
+        re.compile(r'\bpH\s*([\d.]+)\s+(?:was|is)\s+(?:adjusted|maintained)\s+(?:to|at)\s+(?:during|in|for)\s+(?:the\s+)?synthesis', re.I),
+        re.compile(r'\b(?:reaction|synthesis)\s+pH\s*(?:of|was|=|:)\s*([\d.]+)', re.I),
+    ],
+    "solvent": [
+        re.compile(r'\b(?:dissolved|dispersed)\s+in\s+([\w\-]+(?:\s[\w\-]+){0,2})\b', re.I),
+        re.compile(r'\b(?:using|with|in)\s+([\w\-]+(?:\s[\w\-]+){0,2})\s+as\s+(?:the\s+)?solvent\b', re.I),
+        re.compile(r'\bsolvent\s*(?:was|:|=)\s*([\w\-]+(?:\s[\w\-]+){0,2})\b', re.I),
     ],
     "precursors": [
         re.compile(r'\busing\s+([\w\d]+(?:\s*[\(（][^)）]*[\)）])?(?:\s*,\s*[\w\d]+(?:\s*[\(（][^)）]*[\)）])?)*)\s+as\s+(?:the\s+)?(?:precursor|starting\s+material|reactant)', re.I),
@@ -2894,7 +2961,9 @@ class RuleExtractor:
                 if detected and isinstance(detected, list):
                     record["main_activity"]["enzyme_like_type"] = detected[0]
             if record["main_activity"]["enzyme_like_type"] is None:
-                search_texts = buckets.get("activity", []) + buckets.get("mechanism", [])
+                search_texts = (buckets.get("activity", []) + buckets.get("mechanism", [])
+                                + buckets.get("kinetics", [])[:5]
+                                + buckets.get("application", [])[:3])
                 if doc:
                     title = doc.metadata.get("title", "")
                     if title:
@@ -2964,7 +3033,7 @@ class RuleExtractor:
         self._extract_assay_method(record, buckets.get("activity", []) + buckets.get("kinetics", []))
         self._extract_signal(record, buckets.get("activity", []) + buckets.get("kinetics", []))
         self._extract_buffer(record, buckets.get("activity", []) + buckets.get("kinetics", []))
-        self._extract_mechanism(record, buckets.get("mechanism", []) + buckets.get("activity", []))
+        self._extract_mechanism(record, buckets.get("mechanism", []) + buckets.get("activity", []) + buckets.get("kinetics", [])[:5] + buckets.get("application", [])[:3])
 
         if doc:
             self._fulltext_fallback_extract(record, doc, selected_name)
@@ -3789,6 +3858,28 @@ class RuleExtractor:
                 if synth_cond.get("precursors"):
                     break
 
+        if synth_cond.get("pH") is None:
+            for text in synthesis_texts:
+                for pat in _SYNTHESIS_CONDITION_PATTERNS.get("pH", []):
+                    m = pat.search(text)
+                    if m:
+                        synth_cond["pH"] = m.group(1)
+                        break
+                if synth_cond.get("pH"):
+                    break
+
+        if not synth_cond.get("solvent"):
+            for text in synthesis_texts:
+                for pat in _SYNTHESIS_CONDITION_PATTERNS.get("solvent", []):
+                    m = pat.search(text)
+                    if m:
+                        raw = m.group(1).strip()
+                        if raw.lower() not in ("the", "a", "an", "this"):
+                            synth_cond["solvent"] = raw
+                        break
+                if synth_cond.get("solvent"):
+                    break
+
     def _extract_size_properties(self, record: Dict[str, Any], material_texts: List[str]):
         sel = record.get("selected_nanozyme", {})
         if not isinstance(sel, dict):
@@ -4041,27 +4132,114 @@ class RuleExtractor:
                     logger.info(f"[SMN] Fulltext fallback: crystal_structure={sel.get('crystal_structure')}")
                     break
 
+        if not kin.get("Km") and not kin.get("Vmax"):
+            for pat in _KM_PATTERNS:
+                m = pat.search(norm_text)
+                if m:
+                    try:
+                        km_val = m.group(1)
+                        km_unit = m.group(2) if m.lastindex and m.lastindex >= 2 else "mM"
+                        kin["Km"] = f"{km_val} {km_unit}"
+                        logger.info(f"[SMN] Fulltext fallback: Km={km_val} {km_unit}")
+                        break
+                    except (IndexError, ValueError):
+                        pass
+            for pat in _VMAX_PATTERNS:
+                m = pat.search(norm_text)
+                if m:
+                    try:
+                        vmax_val = m.group(1)
+                        vmax_unit = m.group(2) if m.lastindex and m.lastindex >= 2 else "M/s"
+                        kin["Vmax"] = f"{vmax_val} {vmax_unit}"
+                        logger.info(f"[SMN] Fulltext fallback: Vmax={vmax_val} {vmax_unit}")
+                        break
+                    except (IndexError, ValueError):
+                        pass
+
+        if act.get("enzyme_like_type") is None:
+            for pat, etype in _ENZYME_TYPE_PATTERNS:
+                if pat.search(all_text):
+                    act["enzyme_like_type"] = etype
+                    logger.info(f"[SMN] Fulltext fallback: enzyme_type={etype}")
+                    break
+
+        if act.get("mechanism") is None:
+            for pat, mech in self._MECHANISM_PATTERNS:
+                if pat.search(all_text):
+                    act["mechanism"] = mech
+                    logger.info(f"[SMN] Fulltext fallback: mechanism={mech}")
+                    break
+
+        if not record.get("applications"):
+            apps_found = []
+            tl = all_text.lower()
+            for app_type, keywords in self._APP_TYPE_KEYWORDS.items():
+                for kw in keywords:
+                    if kw.lower() in tl:
+                        apps_found.append(app_type)
+                        break
+            if apps_found:
+                app = {"application_type": apps_found[0]}
+                for pat in _LOD_PATTERNS:
+                    m = pat.search(norm_text)
+                    if m:
+                        try:
+                            app["LOD"] = f"{m.group(1)} {m.group(2)}"
+                            break
+                        except (IndexError, ValueError):
+                            pass
+                for pat in _ANALYTE_PATTERNS:
+                    m = pat.search(all_text)
+                    if m:
+                        try:
+                            app["analyte"] = m.group(1).strip()
+                            break
+                        except (IndexError, ValueError):
+                            pass
+                for pat in _LINEAR_RANGE_PATTERNS:
+                    m = pat.search(norm_text)
+                    if m:
+                        try:
+                            app["linear_range"] = f"{m.group(1)} {m.group(2)}"
+                            break
+                        except (IndexError, ValueError):
+                            pass
+                record["applications"] = [app]
+                logger.info(f"[SMN] Fulltext fallback: applications={apps_found}")
+
         act["pH_profile"] = ph_prof
         act["temperature_profile"] = temp_prof
 
     _APP_TYPE_KEYWORDS = {
         "sensing": ["detection", "sensing", "sensor", "biosensor", "assay", "monitoring", "determin",
                     "biosensing", "imaging", "point-of-care", "poc", "diagnos", "theranost", "biomarker",
-                    "elisa", "immunoassay", "lateral flow", "paper-based"],
+                    "elisa", "immunoassay", "lateral flow", "paper-based",
+                    "colorimetric", "fluorometric", "electrochemical", "chemiluminescent",
+                    "ratiometric", "turn-on", "turn-off", "selective detection", "sensitive detection"],
         "therapeutic": ["therapeutic", "antitumor", "wound heal", "cytoprotect",
                         "neuroprotect", "anti-inflammator", "antiinflammator", "therapy",
                         "catalytic therapy", "tumor therapy", "tumor ablation",
                         "photothermal therapy", "sonodynamic therapy", "chemodynamic therapy",
-                        "photodynamic therapy", "immunotherapy", "gene therapy"],
+                        "photodynamic therapy", "immunotherapy", "gene therapy",
+                        "synergistic therapy", "combination therapy", "chemo-therapy",
+                        "radiotherapy", "magnetotherapy", "starvation therapy"],
         "antibacterial": ["antibacterial", "disinfect", "steriliz", "bactericid", "antimicrobial",
-                          "anti-bacterial", "antiviral", "antifungal"],
+                          "anti-bacterial", "antiviral", "antifungal",
+                          "wound infection", "bacterial killing", "membrane disruption"],
         "environmental": ["pollutant", "heavy metal", "pesticide", "organophosph", "endocrine",
                           "degrad", "environmental", "drinking water", "waste water", "river",
                           "lake", "tap water", "sea water", "environmental remediation",
-                          "water purification", "soil remediation", "air purification"],
+                          "water purification", "soil remediation", "air purification",
+                          "organic pollutant", "dye degrad", "antibiotic removal"],
         "antioxidant": ["antioxidant", "ros scaveng", "radical scaveng", "cytoprotect",
-                        "oxidative stress", "anti-oxid", "radioprotect"],
+                        "oxidative stress", "anti-oxid", "radioprotect",
+                        "cell protection", "inflammation reduction"],
         "biofilm_inhibition": ["biofilm", "anti-biofilm", "antibiofilm", "quorum sensing inhibition"],
+        "food_safety": ["food safety", "food quality", "food contaminant", "foodborne",
+                        "mycotoxin", "aflatoxin", "patulin", "ochratoxin",
+                        "food additive", "food preserv"],
+        "drug_delivery": ["drug delivery", "drug release", "nanocarrier", "controlled release",
+                          "stimuli-responsive", "ph-responsive", "thermo-responsive"],
     }
 
     _ANALYTE_PATTERNS = [
@@ -4070,6 +4248,15 @@ class RuleExtractor:
         re.compile(r'\b(?:Hg[\s2]*\+{1,2}|Pb[\s2]*\+{1,2}|Cd[\s2]*\+{1,2}|Cu[\s2]*\+{1,2}|Fe[\s3]*\+{1,2}|Cr\s*[Vv][Ii]+|As\s*[Vv][Ii]+)\b', re.I),
         re.compile(r'\b(?:xanthine|hypoxanthine|acetylcholine|choline|urea|hydrogen\s+peroxide|H2O2|phenol|bisphenol|catechol|hydroquinone)\b', re.I),
         re.compile(r'\b(?:mercury|lead|cadmium|arsenic|chromium)\b', re.I),
+        re.compile(r'\b(?:sensing|detecting|monitoring)\s+(?:of\s+)?([\w\-]+(?:\s[\w\-]+){0,2})', re.I),
+        re.compile(r'\b(?:thrombin|lysozyme|trypsin|urease|horseradish|HRP|BSA|albumin)\b', re.I),
+        re.compile(r'\b(?:nitrofurantoin|chloramphenicol|tetracycline|kanamycin|gentamicin|ampicillin)\b', re.I),
+        re.compile(r'\b(?:malathion|paraoxon|chlorpyrifos|diazinon|atrazine|simazine)\b', re.I),
+        re.compile(r'\b(?:microcystin|okadaic\s+acid|saxitoxin|brevetoxin)\b', re.I),
+        re.compile(r'\b(?:alpha-fetoprotein|AFP|CEA|PSA|CA[-\s]?125|CA[-\s]?19[-\s]?9)\b', re.I),
+        re.compile(r'\b(?:miRNA|microRNA|DNA|mRNA|aptamer)\b', re.I),
+        re.compile(r'\b(?:E\.?\s*coli|S\.?\s*aureus|Salmonella|Listeria|Staphylococcus)\b', re.I),
+        re.compile(r'\b(?:cancer\s+cell|tumor\s+cell|HeLa|MCF[-\s]?7|HepG2|A549)\b', re.I),
     ]
 
     _SAMPLE_TYPE_MAP = {
@@ -4245,6 +4432,7 @@ class RuleExtractor:
     _MECHANISM_PATTERNS = [
         (re.compile(r'\bFenton[-\s]like\b', re.I), "Fenton-like"),
         (re.compile(r'\bFenton\s+reaction\b', re.I), "Fenton-like"),
+        (re.compile(r'\bFenton\b', re.I), "Fenton-like"),
         (re.compile(r'\bHaber[-\s]Weiss\b', re.I), "Haber-Weiss"),
         (re.compile(r'\bROS\s+generat', re.I), "ROS generation"),
         (re.compile(r'\b\*OH\b|hydroxyl\s+radical', re.I), "hydroxyl radical generation"),
@@ -4258,9 +4446,42 @@ class RuleExtractor:
         (re.compile(r'\bmetal[-\s]N\d\b', re.I), "M-Nx site catalysis"),
         (re.compile(r'\bM[-\s]N[xc]\d?\b', re.I), "M-Nx site catalysis"),
         (re.compile(r'\bphoto[-\s]?Fenton\b', re.I), "photo-Fenton"),
+        (re.compile(r'\bsono[-\s]?Fenton\b', re.I), "sono-Fenton"),
+        (re.compile(r'\belectro[-\s]?Fenton\b', re.I), "electro-Fenton"),
         (re.compile(r'\bphotocatalyt', re.I), "photocatalytic"),
         (re.compile(r'\bsonocatalyt', re.I), "sonocatalytic"),
         (re.compile(r'\bpiezocatalyt', re.I), "piezocatalytic"),
+        (re.compile(r'\b\*O2[-\^]?\b|\bsuperoxide\s+radical', re.I), "superoxide generation"),
+        (re.compile(r'\b1O2\b', re.I), "singlet oxygen generation"),
+        (re.compile(r'\bradical\s+scaveng', re.I), "radical scavenging"),
+        (re.compile(r'\bROS[-\s]mediated\b', re.I), "ROS-mediated"),
+        (re.compile(r'\bROS[-\s]induced\b', re.I), "ROS-induced"),
+        (re.compile(r'\bcatalytic\s+cycle\b', re.I), "catalytic cycle"),
+        (re.compile(r'\bactive\s+site\b', re.I), "active site catalysis"),
+        (re.compile(r'\bM[-\s]N[xc]\d?\s+(?:site|center|coordination|moiety)\b', re.I), "M-Nx site catalysis"),
+        (re.compile(r'\bsingle[-\s]?atom\s+(?:site|center|catalyst)', re.I), "single-atom catalysis"),
+        (re.compile(r'\bSA[-\s]?C\b', re.I), "single-atom catalysis"),
+        (re.compile(r'\bdefect[-\s]?mediated\b', re.I), "defect-mediated"),
+        (re.compile(r'\bsulfur\s+vacancy\b', re.I), "sulfur vacancy mediated"),
+        (re.compile(r'\bnitrogen\s+vacancy\b', re.I), "nitrogen vacancy mediated"),
+        (re.compile(r'\bsurface[-\s]?mediated\b', re.I), "surface-mediated"),
+        (re.compile(r'\badsorption[-\s]?mediated\b', re.I), "adsorption-mediated"),
+        (re.compile(r'\binterfacial\s+catalys', re.I), "interfacial catalysis"),
+        (re.compile(r'\benzyme[-\s]?mimick', re.I), "enzyme-mimicking"),
+        (re.compile(r'\bbiomimetic\s+catalys', re.I), "biomimetic catalysis"),
+        (re.compile(r'\bchemodynamic\s+therap', re.I), "chemodynamic"),
+        (re.compile(r'\bphotodynamic\s+therap', re.I), "photodynamic"),
+        (re.compile(r'\bsonodynamic\s+therap', re.I), "sonodynamic"),
+        (re.compile(r'\bGSH\s+deplet', re.I), "GSH depletion"),
+        (re.compile(r'\bglutathione\s+deplet', re.I), "GSH depletion"),
+        (re.compile(r'\b\*OOH\b', re.I), "hydroperoxyl radical generation"),
+        (re.compile(r'\bH2O2\s+generat', re.I), "H2O2 generation"),
+        (re.compile(r'\bwater\s+oxidation\b', re.I), "water oxidation"),
+        (re.compile(r'\boxygen\s+evolution\b', re.I), "oxygen evolution"),
+        (re.compile(r'\boxygen\s+reduction\b', re.I), "oxygen reduction"),
+        (re.compile(r'\bhydrogen\s+evolution\b', re.I), "hydrogen evolution"),
+        (re.compile(r'\bCO2\s+reduction\b', re.I), "CO2 reduction"),
+        (re.compile(r'\bN2\s+fixation\b', re.I), "N2 fixation"),
     ]
 
     def _extract_mechanism(self, record: Dict[str, Any], texts: List[str]):
