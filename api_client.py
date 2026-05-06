@@ -208,9 +208,15 @@ class APIClient:
     
     async def __aenter__(self):
         """异步上下文管理器入口"""
+        connector = aiohttp.TCPConnector(
+            limit=10,
+            limit_per_host=10,
+            keepalive_timeout=30,
+        )
         self._session = aiohttp.ClientSession(
             timeout=aiohttp.ClientTimeout(total=300),
-            headers={'Content-Type': 'application/json'}
+            headers={'Content-Type': 'application/json'},
+            connector=connector,
         )
         return self
     

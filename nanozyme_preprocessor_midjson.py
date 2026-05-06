@@ -23,15 +23,80 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 import logging
 
+try:
+    import orjson as _orjson
+    def _fast_json_loads(data):
+        if isinstance(data, bytes):
+            return _orjson.loads(data)
+        return _orjson.loads(data.encode('utf-8') if isinstance(data, str) else data)
+    def _fast_json_dumps(obj, indent=False):
+        opts = _orjson.OPT_INDENT_2 if indent else 0
+        return _orjson.dumps(obj, option=opts).decode('utf-8')
+except ImportError:
+    _orjson = None
+    def _fast_json_loads(data):
+        return json.loads(data)
+    def _fast_json_dumps(obj, indent=False):
+        return json.dumps(obj, indent=indent, ensure_ascii=False)
+
 from config_manager import ConfigManager
 from nanozyme_models import ENZYME_REGISTRY, get_all_substrate_keywords, get_all_enzyme_keywords, get_enzyme_type_enum_string, get_assay_type_enum_string, get_application_type_enum_string, EnzymeType
 
 logger = logging.getLogger(__name__)
 
-# ========== 配置（可从外部 config.yaml 覆盖） ==========
 _TABLE_NUM_PAT = re.compile(
     r'(?i)(?:supplementary\s+)?(?:table|tbl\.?)\s+([A-Z]\d*|S\d+|\d+)',
 )
+_PRE_RE_ONLY_DIGITS_PUNCT = re.compile(r'^\s*[\d\W]+\s*$')
+_PRE_RE_DOT_BRACKET = re.compile(r'^\d+\.\s+\[')
+_PRE_RE_VOL_PAGE = re.compile(r'^\d+\s+\d+[-,]\s*\d+\s*[.,]\s*\d{4}')
+_PRE_RE_MONTH_YEAR = re.compile(r'^[A-Z][a-z]+\s+\d+,\s+\d{4}')
+_PRE_RE_VOL_ISSUE_PAGE = re.compile(r'^\d+\s+\(\d+\)\s+\d+-\d+\s+\d{4}')
+_PRE_RE_AUTHOR_DOT = re.compile(r"^\d+\s+[A-Z][A-Za-z'’\-]+,\s+[A-Z]\.")
+_PRE_RE_AUTHOR_ETAL = re.compile(r"^\d+\s+[A-Z][A-Za-z'’\-]+.*\bet al\.")
+_PRE_RE_ORCID = re.compile(r'orcid\.org/\d{4}', re.IGNORECASE)
+_PRE_RE_ORCID_FULL = re.compile(r'\d{4}-\d{4}-\d{4}-\d{3}[\dX]')
+_PRE_RE_EMAIL = re.compile(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}')
+_PRE_RE_GRANT = re.compile(r'grant\s+number', re.IGNORECASE)
+_PRE_RE_FUNDING = re.compile(r'funding\s+from', re.IGNORECASE)
+_PRE_RE_NNSFC = re.compile(r'national\s+natural\s+science\s+fou', re.IGNORECASE)
+_PRE_RE_CN_NNSFC = re.compile(r'^\d+国自然|^\d+NSFC')
+_PRE_RE_AUTHOR_COMMA = re.compile(r'^[A-Z][a-z]+,\s*[A-Z]\.')
+_PRE_RE_AUTHOR_MARKERS = re.compile(r'[§†‡]\s*\[[a-z](?:,\s*[a-z])*\]')
+_PRE_RE_NAME_PATTERN = re.compile(r'[A-Z][a-z]+\s+[A-Z][a-z]+')
+_PRE_RE_SPECIAL_MARKS = re.compile(r'[§†‡*]')
+_PRE_RE_HYPHEN_BREAK = re.compile(r'(\w)-\s*\n\s*(\w)')
+_PRE_RE_MULTI_SPACE = re.compile(r'\s+')
+_PRE_RE_REST_ONLY = re.compile(r'^[\d.δxyzαβγ+\-]*$')
+_PRE_RE_LOWERCASE_CLEAN = re.compile(r'[^a-z0-9\s\-+^α-ω]')
+_PRE_RE_YEAR_MATCH = re.compile(r'(\d{4})')
+_PRE_RE_RESPECTIVELY = re.compile(r"(?i)\brespectively\b")
+_PRE_RE_KINETIC_KEYWORDS = re.compile(r"(?i)\b(?:K\s*m|V\s*m|Km|Vmax|Michaelis|Lineweaver|kinetic parameters?)\b")
+_PRE_RE_ABSTRACT = re.compile(r"(?i)^abstract\b")
+_PRE_RE_SUPP_FIG = re.compile(r'(?i)^supplementary\s+figure')
+_PRE_RE_SUPP_TBL = re.compile(r'(?i)^supplementary\s+table')
+_PRE_RE_ABSTRACT_COLON = re.compile(r"(?i)^abstract\s*:")
+_PRE_RE_URL_PATTERN = re.compile(r"(?i)\b(?:https?://|www\.|pubs\.acs\.org|sciencedirect|elsevier\.com|rsc\.li)\b")
+_PRE_RE_VOL_NUM = re.compile(r"(?i)\b(?:volume|number|pages|issn)\b")
+_PRE_RE_PUB_META = re.compile(r"(?i)\b(?:doi\s*:|received\b|accepted\b|published\b|corresponding authors?\b|e-mail addresses?\b)\b")
+_PRE_RE_FOOT_MARKS = re.compile(r"\s*[†‡*#]+\s*$")
+_PRE_RE_SECTION_START = re.compile(r"(?i)^(abstract|keywords?|graphical abstract|highlights?)\b")
+_PRE_RE_STUDY_PHRASE = re.compile(r"(?i)\b(herein|in this article|in this study|we report|we demonstrate)\b")
+_PRE_RE_HAS_LOWER = re.compile(r"[a-z]")
+_PRE_RE_HAS_UPPER = re.compile(r"[A-Z]")
+_PRE_RE_HAS_DIGIT_SPECIAL = re.compile(r"[0-9α-ωΑ-Ω+\-()/]")
+_PRE_RE_LEADING_NUM = re.compile(r"(?i)^\d+(\.\d+)?\s+")
+_PRE_RE_THREE_WORDS = re.compile(r"\b[a-zA-Z]\s+[a-zA-Z]{2,}\s+[a-zA-Z]{2,}")
+_PRE_RE_NANOZYME_KW = re.compile(r"(?i)\b(nanozyme|nanozymes|nanoparticles?|nanosheets?|nanotubes?|catalyst|enzyme-like|oxidase|peroxidase|catalase|therapy|sensing|detection|photodynamic|carbon|metal|single atom|activity)\b")
+_PRE_RE_JUNK_KW = re.compile(r"(?i)\b(cite this|doi|received|accepted|published|downloaded from|subscriber access|view article online|journal homepage|contents lists available|science direct|sciencedirect)\b")
+_PRE_RE_SI_TITLE = re.compile(r"(?i)^(?:supporting|supplementary)\s+(?:information|material|data)\b")
+_PRE_RE_STRIP_PUNCT = re.compile(r"[^a-z0-9]+")
+_PRE_RE_TRIM_EDGE = re.compile(r"^[^\w]+|[^\w]+$")
+_PRE_RE_BRACKET_NOTE = re.compile(r'\s*\[[^\]]+\]')
+_PRE_RE_FOOT_SYMBOLS = re.compile(r'[\*†‡§#¶]+')
+_PRE_RE_DOUBLE_COMMA = re.compile(r'\s*,\s*,\s*')
+_PRE_RE_ORCID_TRAIL = re.compile(r'\bORCID\b.*$', re.IGNORECASE)
+_PRE_RE_TRAIL_SEMI = re.compile(r'[;,]\s*$')
 DEFAULT_CONFIG = {
     "min_sentence_length": 15,
     "max_sentence_length": 500,
@@ -340,7 +405,7 @@ class NanozymePreprocessor:
         if len(self.pdf_stem) > 80:
             import hashlib as _hl
             h = _hl.md5(self.pdf_stem.encode()).hexdigest()[:8]
-            year_match = re.match(r'(\d{4})', self.pdf_stem)
+            year_match = _PRE_RE_YEAR_MATCH.match(self.pdf_stem)
             prefix = year_match.group(1) if year_match else self.pdf_stem[:10]
             self.pdf_stem = f"{prefix}_{h}"
         self.high_value_dir = self.output_root / "high_value_images" / self.pdf_stem
@@ -356,8 +421,8 @@ class NanozymePreprocessor:
         self.runtime_overrides = runtime_overrides or {}
         self.config = self._load_effective_config()
 
-        with open(json_path, 'r', encoding='utf-8') as f:
-            self.data = json.load(f)
+        with open(json_path, 'rb') as f:
+            self.data = _fast_json_loads(f.read())
         self.kids = self.data.get('kids', [])
 
         self.images: List[Dict] = []
@@ -399,8 +464,8 @@ class NanozymePreprocessor:
     def _load_rulebook(self) -> Dict:
         if self.rulebook_path.exists():
             try:
-                with open(self.rulebook_path, 'r', encoding='utf-8') as f:
-                    return json.load(f)
+                with open(self.rulebook_path, 'rb') as f:
+                    return _fast_json_loads(f.read())
             except Exception as e:
                 logger.warning(f"加载规则库失败: {e}")
         return {}
@@ -467,18 +532,18 @@ class NanozymePreprocessor:
             return True
         if self._looks_like_author_info(text):
             return True
-        if re.match(r'^\s*[\d\W]+\s*$', text):
+        if _PRE_RE_ONLY_DIGITS_PUNCT.match(text):
             return True
         return False
 
     def _looks_like_reference_tail(self, text: str) -> bool:
         """识别参考文献尾部行：年份/卷期/页码/期刊名+数字组合"""
         t = text.strip()
-        if re.match(r'^\d+\.\s+\[', t):
+        if _PRE_RE_DOT_BRACKET.match(t):
             return True
-        if re.match(r'^\d+\s+\d+[-,]\s*\d+\s*[.,]\s*\d{4}', t):
+        if _PRE_RE_VOL_PAGE.match(t):
             return True
-        if re.match(r'^[A-Z][a-z]+\s+\d+,\s+\d{4}', t):
+        if _PRE_RE_MONTH_YEAR.match(t):
             return True
         vol_page_year = r'[A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2}\s+\d+\s*\(\d+\)\s*,\s*\d+[-,]\d+'
         if re.match(vol_page_year, t):
@@ -486,11 +551,11 @@ class NanozymePreprocessor:
         journal_abbrev = r'^[A-Z][A-Za-z.]+(?:\s+[A-Z][A-Za-z.]+){0,3}\s+\d+\s*\(\d+\)\s*,?\s*\d+[-,]\d+\s+\d{4}$'
         if re.match(journal_abbrev, t):
             return True
-        if re.match(r'^\d+\s+\(\d+\)\s+\d+-\d+\s+\d{4}', t):
+        if _PRE_RE_VOL_ISSUE_PAGE.match(t):
             return True
-        if re.match(r"^\d+\s+[A-Z][A-Za-z'’\-]+,\s+[A-Z]\.", t):
+        if _PRE_RE_AUTHOR_DOT.match(t):
             return True
-        if re.match(r"^\d+\s+[A-Z][A-Za-z'’\-]+.*\bet al\.", t):
+        if _PRE_RE_AUTHOR_ETAL.match(t):
             return True
         author_title_journal = r"^[A-Z][A-Za-z'’\-]+,\s+.+,\s+(?:[A-Z][A-Za-z.&\-]+(?:\s+[A-Z][A-Za-z.&\-]+){0,5})(?:\s+\d+|\.)"
         if re.match(author_title_journal, t):
@@ -500,27 +565,27 @@ class NanozymePreprocessor:
     def _looks_like_author_info(self, text: str) -> bool:
         """识别作者/单位/ORCID/grant等噪声行"""
         t = text.strip()
-        if re.search(r'orcid\.org/\d{4}', t, re.IGNORECASE):
+        if _PRE_RE_ORCID.search(t):
             return True
-        if re.search(r'\d{4}-\d{4}-\d{4}-\d{3}[\dX]', t):
+        if _PRE_RE_ORCID_FULL.search(t):
             return True
-        if re.search(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', t):
+        if _PRE_RE_EMAIL.search(t):
             return True
-        if re.search(r'grant\s+number', t, re.IGNORECASE):
+        if _PRE_RE_GRANT.search(t):
             return True
-        if re.search(r'funding\s+from', t, re.IGNORECASE):
+        if _PRE_RE_FUNDING.search(t):
             return True
-        if re.search(r'national\s+natural\s+science\s+fou', t, re.IGNORECASE):
+        if _PRE_RE_NNSFC.search(t):
             return True
-        if re.match(r'^\d+国自然|^\d+NSFC', t):
+        if _PRE_RE_CN_NNSFC.match(t):
             return True
-        if re.match(r'^[A-Z][a-z]+,\s*[A-Z]\.', t) and len(t) < 80:
+        if _PRE_RE_AUTHOR_COMMA.match(t) and len(t) < 80:
             return True
-        author_marker_count = len(re.findall(r'[§†‡]\s*\[[a-z](?:,\s*[a-z])*\]', t))
+        author_marker_count = len(_PRE_RE_AUTHOR_MARKERS.findall(t))
         if author_marker_count >= 2:
             return True
-        name_comma_pattern = len(re.findall(r'[A-Z][a-z]+\s+[A-Z][a-z]+', t))
-        if name_comma_pattern >= 3 and re.search(r'[§†‡*]', t):
+        name_comma_pattern = len(_PRE_RE_NAME_PATTERN.findall(t))
+        if name_comma_pattern >= 3 and _PRE_RE_SPECIAL_MARKS.search(t):
             return True
         return False
 
@@ -528,8 +593,8 @@ class NanozymePreprocessor:
         """基础文本清洗（内部通用版，不改词序）"""
         if not isinstance(text, str):
             return ""
-        text = re.sub(r'(\w)-\s*\n\s*(\w)', r'\1\2', text)
-        text = re.sub(r'\s+', ' ', text)
+        text = _PRE_RE_HYPHEN_BREAK.sub(r'\1\2', text)
+        text = _PRE_RE_MULTI_SPACE.sub(' ', text)
         return text.strip()
 
     # ============================================================
@@ -575,11 +640,11 @@ class NanozymePreprocessor:
         # 软连字符（U+00AD）
         text = text.replace('\u00ad', '')
         # 行末断词（如 "nano-\nparticle" → "nanoparticle"）
-        text = re.sub(r'(\w)-\s*\n\s*(\w)', r'\1\2', text)
+        text = _PRE_RE_HYPHEN_BREAK.sub(r'\1\2', text)
         # 换行变空格
         text = text.replace('\n', ' ').replace('\r', ' ')
         # 连续空白合并
-        text = re.sub(r'\s+', ' ', text)
+        text = _PRE_RE_MULTI_SPACE.sub(' ', text)
         return text.strip()
 
     @classmethod
@@ -650,13 +715,13 @@ class NanozymePreprocessor:
                 candidate2 = tok[:2]
                 if candidate2 in cls._ELEMENT_SYMBOLS:
                     rest = tok[2:]
-                    if not rest or re.match(r'^[\d.δxyzαβγ+\-]*$', rest) or (rest and rest[0].isupper()):
+                    if not rest or _PRE_RE_REST_ONLY.match(rest) or (rest and rest[0].isupper()):
                         return True
             # 1字母元素（H, C, N, O, S, K, B, P, I, W...）
             candidate1 = tok[:1]
             if candidate1 in cls._ELEMENT_SYMBOLS:
                 rest = tok[1:]
-                if not rest or re.match(r'^[\d.δxyzαβγ+\-]*$', rest) or (rest and rest[0].isupper()):
+                if not rest or _PRE_RE_REST_ONLY.match(rest) or (rest and rest[0].isupper()):
                     return True
             return False
 
@@ -769,8 +834,8 @@ class NanozymePreprocessor:
         # 转小写
         s = s.lower()
         # 去除非字母数字（保留空格）
-        s = re.sub(r'[^a-z0-9\s\-+^α-ω]', ' ', s)
-        s = re.sub(r'\s+', ' ', s)
+        s = _PRE_RE_LOWERCASE_CLEAN.sub(' ', s)
+        s = _PRE_RE_MULTI_SPACE.sub(' ', s)
         return s.strip()
 
     # ============================================================
@@ -1300,11 +1365,11 @@ class NanozymePreprocessor:
 
     def _hard_recall_context_window(self, sentence: SentenceInfo) -> int:
         text = sentence.normalized_text or sentence.text or ""
-        if re.search(r"(?i)\brespectively\b", text):
+        if _PRE_RE_RESPECTIVELY.search(text):
             return 1
         if self._is_incomplete_sentence(text):
             return 1
-        if re.search(r"(?i)\b(?:K\s*m|V\s*m|Km|Vmax|Michaelis|Lineweaver|kinetic parameters?)\b", text):
+        if _PRE_RE_KINETIC_KEYWORDS.search(text):
             return 1
         if re.search(self._HARD_RECALL_TABLE_FIGURE_PATTERN, text) and re.search(self._HARD_RECALL_CONTEXT_WORDS, text):
             return 1
@@ -1420,7 +1485,7 @@ class NanozymePreprocessor:
                 if item.get("page number", 1) > 2:
                     break
                 content = self._normalize_text(item.get("content", ""))
-                if content and re.match(r"(?i)^abstract\b", content):
+                if content and _PRE_RE_ABSTRACT.match(content):
                     has_abstract = True
                     break
             if not has_abstract:
@@ -1457,7 +1522,7 @@ class NanozymePreprocessor:
         ]
         if text is not None:
             normalized = self._normalize_heading_token_spaces(text)
-            normalized = re.sub(r"^[^\w]+|[^\w]+$", "", normalized).strip()
+            normalized = _PRE_RE_TRIM_EDGE.sub("", normalized).strip()
             return "supplementary" if any(re.fullmatch(pattern, normalized) for pattern in supplementary_heading_patterns) else "main"
 
         candidates = [
@@ -1548,14 +1613,14 @@ class NanozymePreprocessor:
                 page_stats["toc_heading_count"] += 1
             
             # 检测 Supplementary Figure/Table 条目
-            if re.match(r'(?i)^supplementary\s+figure', content):
+            if _PRE_RE_SUPP_FIG.match(content):
                 page_stats["supplementary_figure_entries"] += 1
                 page_stats["total_pages_with_entries"] += 1
                 # 检测是否为纯形态学图注
                 if any(re.search(pat, content) for pat in pure_morphology_keywords):
                     page_stats["pure_morphology_entries"] += 1
             
-            if re.match(r'(?i)^supplementary\s+table', content):
+            if _PRE_RE_SUPP_TBL.match(content):
                 page_stats["supplementary_table_entries"] += 1
                 page_stats["total_pages_with_entries"] += 1
         
@@ -1631,7 +1696,7 @@ class NanozymePreprocessor:
         return self._detect_section(normalized)
 
     def _is_abstract_start(self, text: str) -> bool:
-        return bool(re.match(r"(?i)^abstract\s*:", self._normalize_heading_token_spaces(text)))
+        return bool(_PRE_RE_ABSTRACT_COLON.match(self._normalize_heading_token_spaces(text)))
 
     def _normalize_scientific_notation(self, text: str) -> str:
         sup_map = {
@@ -1757,11 +1822,11 @@ class NanozymePreprocessor:
 
         if normalized.upper() in {"ARTICLE", "PAPER"}:
             return True
-        if re.search(r"(?i)\b(?:https?://|www\.|pubs\.acs\.org|sciencedirect|elsevier\.com|rsc\.li)\b", normalized):
+        if _PRE_RE_URL_PATTERN.search(normalized):
             return True
-        if re.search(r"(?i)\b(?:volume|number|pages|issn)\b", normalized) and len(normalized.split()) <= 12:
+        if _PRE_RE_VOL_NUM.search(normalized) and len(normalized.split()) <= 12:
             return True
-        if re.search(r"(?i)\b(?:doi\s*:|received\b|accepted\b|published\b|corresponding authors?\b|e-mail addresses?\b)\b", normalized):
+        if _PRE_RE_PUB_META.search(normalized):
             return True
         if self._looks_like_author_info(normalized):
             return True
@@ -1774,7 +1839,7 @@ class NanozymePreprocessor:
     def _clean_title_candidate_text(self, text: str) -> str:
         normalized = self._normalize_heading_token_spaces(text)
         normalized = normalized.strip(" •†‡*#|")
-        normalized = re.sub(r"\s*[†‡*#]+\s*$", "", normalized).strip()
+        normalized = _PRE_RE_FOOT_MARKS.sub("", normalized).strip()
         return normalized
 
     def _looks_like_title_candidate(self, elem: Dict[str, Any], title: str) -> bool:
@@ -1793,9 +1858,9 @@ class NanozymePreprocessor:
             return False
         if len(normalized.split()) < 4 or len(normalized.split()) > 28:
             return False
-        if re.search(r"(?i)^(abstract|keywords?|graphical abstract|highlights?)\b", normalized):
+        if _PRE_RE_SECTION_START.search(normalized):
             return False
-        if re.search(r"(?i)\b(herein|in this article|in this study|we report|we demonstrate)\b", normalized):
+        if _PRE_RE_STUDY_PHRASE.search(normalized):
             return False
         if normalized.endswith((".", ";", ":")):
             return False
@@ -1851,28 +1916,28 @@ class NanozymePreprocessor:
         elif len(normalized) > 220:
             score -= 1.5
 
-        if re.search(r"[a-z]", normalized) and re.search(r"[A-Z]", normalized):
+        if _PRE_RE_HAS_LOWER.search(normalized) and _PRE_RE_HAS_UPPER.search(normalized):
             score += 0.5
-        if re.search(r"[0-9α-ωΑ-Ω+\-()/]", normalized):
+        if _PRE_RE_HAS_DIGIT_SPECIAL.search(normalized):
             score += 0.5
-        if re.match(r"(?i)^\d+(\.\d+)?\s+", normalized):
+        if _PRE_RE_LEADING_NUM.match(normalized):
             score -= 3.0
-        if re.search(r"\b[a-zA-Z]\s+[a-zA-Z]{2,}\s+[a-zA-Z]{2,}", normalized):
+        if _PRE_RE_THREE_WORDS.search(normalized):
             score -= 2.5
         if normalized.endswith((".", ";", ":")):
             score -= 2.5
-        if re.search(r"(?i)\b(nanozyme|nanozymes|nanoparticles?|nanosheets?|nanotubes?|catalyst|enzyme-like|oxidase|peroxidase|catalase|therapy|sensing|detection|photodynamic|carbon|metal|single atom|activity)\b", normalized):
+        if _PRE_RE_NANOZYME_KW.search(normalized):
             score += 2.0
-        if re.search(r"(?i)\b(cite this|doi|received|accepted|published|downloaded from|subscriber access|view article online|journal homepage|contents lists available|science direct|sciencedirect)\b", normalized):
+        if _PRE_RE_JUNK_KW.search(normalized):
             score -= 8.0
-        if re.search(r"(?i)\b(volume|number|pages|issn)\b", normalized):
+        if _PRE_RE_VOL_NUM.search(normalized):
             score -= 8.0
         if self._looks_like_author_info(normalized):
             score -= 8.0
         heading_section = self._detect_heading_section(normalized)
         if heading_section != "unknown":
             if heading_section == "backmatter" and self.document_kind == "supplementary":
-                si_title_prefix = re.match(r"(?i)^(?:supporting|supplementary)\s+(?:information|material|data)\b", normalized)
+                si_title_prefix = _PRE_RE_SI_TITLE.match(normalized)
                 if si_title_prefix and len(normalized) > si_title_prefix.end() + 10:
                     pass
                 else:
@@ -1923,7 +1988,7 @@ class NanozymePreprocessor:
         for candidate in raw_candidates:
             title = candidate["title"]
             score = self._score_title_candidate(candidate["elem"], title, candidate.get("ordinal", 0))
-            title_key = re.sub(r"[^a-z0-9]+", "", title.lower())
+            title_key = _PRE_RE_STRIP_PUNCT.sub("", title.lower())
             candidate_info = {
                 "origin": candidate["origin"],
                 "page": candidate["page"],
@@ -1994,17 +2059,17 @@ class NanozymePreprocessor:
     def _metadata_text_key(self, text: Any) -> str:
         if text is None:
             return ""
-        return re.sub(r"[^a-z0-9]+", "", str(text).lower())
+        return _PRE_RE_STRIP_PUNCT.sub("", str(text).lower())
 
     def _clean_author_candidate(self, author: Any) -> str:
         if not isinstance(author, str):
             return ""
         author = self._normalize_text(author)
-        author = re.sub(r'\s*\[[^\]]+\]', '', author)
-        author = re.sub(r'[\*†‡§#¶]+', '', author)
-        author = re.sub(r'\s*,\s*,\s*', ', ', author)
-        author = re.sub(r'\bORCID\b.*$', '', author, flags=re.IGNORECASE)
-        author = re.sub(r'[;,]\s*$', '', author)
+        author = _PRE_RE_BRACKET_NOTE.sub('', author)
+        author = _PRE_RE_FOOT_SYMBOLS.sub('', author)
+        author = _PRE_RE_DOUBLE_COMMA.sub(', ', author)
+        author = _PRE_RE_ORCID_TRAIL.sub('', author)
+        author = _PRE_RE_TRAIL_SEMI.sub('', author)
         author = re.sub(r'\s+,', ',', author)
         author = re.sub(r'\s{2,}', ' ', author)
         capitalized_seen = 0
@@ -5594,8 +5659,8 @@ class NanozymePreprocessor:
     }
 
         if save_path:
-            with open(save_path, 'w', encoding='utf-8') as f:
-                json.dump(mid_json, f, indent=2, ensure_ascii=False)
+            with open(save_path, 'wb') as f:
+                f.write(_fast_json_dumps(mid_json, indent=True).encode('utf-8'))
         return mid_json
 
     def _build_prompt_template(self) -> str:

@@ -19,6 +19,22 @@ from pathlib import Path
 from typing import Optional, Callable, Dict, Any, List
 from datetime import datetime
 
+try:
+    import orjson as _orjson
+    def _fast_json_loads(data):
+        if isinstance(data, bytes):
+            return _orjson.loads(data)
+        return _orjson.loads(data.encode('utf-8') if isinstance(data, str) else data)
+    def _fast_json_dumps(obj, indent=False):
+        opts = _orjson.OPT_INDENT_2 if indent else 0
+        return _orjson.dumps(obj, option=opts).decode('utf-8')
+except ImportError:
+    _orjson = None
+    def _fast_json_loads(data):
+        return json.loads(data)
+    def _fast_json_dumps(obj, indent=False):
+        return json.dumps(obj, indent=indent, ensure_ascii=False)
+
 from logging_setup import setup_logging, get_logger
 from dependencies import is_available, get_module
 
@@ -159,8 +175,8 @@ class ExtractionPipeline:
             logger.info("[SMN] 开始 single_main_nanozyme 提取流程")
             logger.info("=" * 60)
 
-            with open(mid_json_path, "r", encoding="utf-8") as f:
-                mid = json.load(f)
+            with open(mid_json_path, "rb") as f:
+                mid = _fast_json_loads(f.read())
 
             metadata = mid.get("metadata", {})
             logger.info(
@@ -287,8 +303,8 @@ class ExtractionPipeline:
             candidate_path = parent / candidate
             if candidate_path.exists():
                 try:
-                    with open(candidate_path, 'r', encoding='utf-8') as f:
-                        data = json.load(f)
+                    with open(candidate_path, 'rb') as f:
+                        data = _fast_json_loads(f.read())
                     meta = data.get('metadata', {})
                     author = meta.get('author')
                     if author and isinstance(author, str) and len(author.strip()) > 2:
@@ -325,15 +341,15 @@ class ExtractionPipeline:
         result['metadata']['output_path'] = str(out_path)
 
         try:
-            with open(temp_path, 'w', encoding='utf-8') as f:
-                json.dump(result, f, indent=2, ensure_ascii=False)
+            with open(temp_path, 'wb') as f:
+                f.write(_fast_json_dumps(result, indent=True).encode('utf-8'))
             temp_path.replace(out_path)
         except PermissionError:
             alt_path = self.output_dir / f"{mid_json_path.stem}_extracted_alt.json"
             logger.warning(f"目标文件被锁定，保存至替代路径: {alt_path}")
             result['metadata']['output_path'] = str(alt_path)
-            with open(alt_path, 'w', encoding='utf-8') as f:
-                json.dump(result, f, indent=2, ensure_ascii=False)
+            with open(alt_path, 'wb') as f:
+                f.write(_fast_json_dumps(result, indent=True).encode('utf-8'))
             out_path = alt_path
         finally:
             if temp_path.exists():

@@ -371,37 +371,83 @@ _KCAT_KM_PATTERNS = [
     re.compile(r'\bkcat/Km\s*(?:of|for)\s+\S+\s+(?:was|=|:|≈|~|\u2248)\s*([\d.]+(?:\s*[×x\u00d7]\s*10(?:\u207b|\u2212|\u2013|-)?\s*[-]?\d+)?)\s*(s(?:\u207b|\u2212|\u2013|-)?(?:\^?-)?1\s*[·\u00b7\s]?\s*(?:u|M|m|μ|n)M(?:\u207b|\u2212|\u2013|-)?(?:\^?-)?1|M(?:\u207b|\u2212|\u2013|-)?1\s*[·\u00b7\s]?\s*s(?:\u207b|\u2212|\u2013|-)?1)', re.I),
 ]
 
+_RE_KM = re.compile(r'\bK\s+m\b', re.I)
+_RE_VMAX = re.compile(r'\bV\s+max\b', re.I)
+_RE_VM_NOAX = re.compile(r'\bV\s+m\b(?!\s*ax)', re.I)
+_RE_KCAT = re.compile(r'\bk\s+cat\b', re.I)
+_RE_10_SQ_NUM = re.compile(r'10\s*\u25a1\s*(\d)')
+_RE_NUM_SQ_10 = re.compile(r'([\d.]+)\s*\u25a1\s*10')
+_RE_ALPHA_SQ_NUM = re.compile(r'([a-zA-Z\u03bc])\s*\u25a1\s*(\d)')
+_RE_DIG_SQ_DIG = re.compile(r'(\d)\s*\u25a1\s*(\d)')
+_RE_DEG_C = re.compile(r'([\d.]+)\s*[\u02da\u00b0\u00ba\u25e6]\s*C\b', re.I)
+_RE_SQ_C = re.compile(r'([\d.]+)\s*\u25a1\s*C\b', re.I)
+_RE_DEG_SPACE_C = re.compile(r'([\d.]+)\s*°\s+C\b', re.I)
+_RE_WE = re.compile(r'(\w)e(\d)')
+_RE_M_S_NEG1 = re.compile(r'\b([m\u03bcunp]?M)\s+(s)\s*[\u207b\u2212\u2013\-]?\s*1\b')
+_RE_MS_NEG1 = re.compile(r'\b([m\u03bcunp]?M)(s)\s*[\u207b\u2212\u2013\-]?\s*1\b')
+_RE_S_NEG1 = re.compile(r'\b(s)\s+[\-–—]\s*1\b', re.I)
+_RE_M_M_NEG1 = re.compile(r'\b(m)\s+(M)\s*[\u207b\u2212\u2013\-]?\s*1\b')
+_RE_M_MS_NEG1 = re.compile(r'\b(m)\s+(Ms)\s*[\u207b\u2212\u2013\-]?\s*1\b', re.I)
+_RE_M_M = re.compile(r'\b(m)\s+(M)\b')
+_RE_NUM_10_NEG = re.compile(r'([\d.]+)\s+10\s*[\u207b\u2212\u2013\-]\s*(\d+)')
+_RE_NUM_X10_NEG = re.compile(r'([\d.]+)\s*[x\u00d7]\s*10\s*[\^]?\s*[\u2212\u2013\-]\s*(\d+)')
+_RE_NUM_X10_POS = re.compile(r'([\d.]+)\s*[x\u00d7]\s*10\s*[\^]?\s*(\d+)')
+_RE_NUM_X10_BARE = re.compile(r'([\d.]+)\s*[x\u00d7]\s*10\s*(\d+)')
+_RE_NUM_10_M_S = re.compile(r'(\d+)\s+10\s+(\d+)\s+Ms?\s*[\-–—]?\s*1\b', re.I)
+_RE_NUM_10_MS = re.compile(r'(\d+)\s+10\s+(\d+)\s+[Mm]\s*[Ss]\s*[\-–—]?\s*1\b', re.I)
+_RE_SCI_X10 = re.compile(r'([\d.]+)\s*[×x\u00d7]\s*10\s*[\^]?\s*([⁻\u207b\-–\u2013−\u2212]?)(\d+)')
+_RE_SCI_E = re.compile(r'([\d.]+)\s*[eE]\s*([\-−\u2212]?)(\d+)')
+_RE_SCI_BARE = re.compile(r'([\d.]+)\s+10\s*([⁻\u207b\-–\u2013−\u2212]?)(\d+)')
+_RE_SCI_X10_LOOSE = re.compile(r'([\d.]+)\s*[×x\u00d7]?\s*10\s*([⁻\u207b\-–\u2013−\u2212]?)(\d+)')
+_RE_10_MINUS = re.compile(r'10[\s]*[\-\u207b\u2212\u2013]')
+_RE_NON_DIG_MINUS = re.compile(r'[^\d\-\u207b\u2212\u2013]')
+_RE_NON_DIG = re.compile(r'[^\d]')
+_RE_X10_UNIT = re.compile(r'^[×x\u00d7]\s*10\s*[\^]?\s*[\-−–]?\s*\d+$')
+_RE_EXP_DIGITS = re.compile(r'[\-−–]?(\d+)')
+_RE_VMAX_TEXT = re.compile(r'\bV\s*max\b', re.I)
+_RE_VMAX_FULL = re.compile(r'\bmaximum\s+velocity\b', re.I)
+_RE_E_NOTATION = re.compile(r'([\d.]+)\s*[eE]\s*([\-−\u2212]?\d+)')
+_RE_X10_NOTATION = re.compile(r'([\d.]+)\s*[×x\u00d7]\s*10[\u207b\u207a\u2212\u2013\-–]?\s*(\d+)')
+_RE_PLAIN_VM = re.compile(r'(?:was|=|:|≈|~|\u2248)\s*([\d.]+)\s*(?:\u00b1\s*[\d.]+\s*)?(mM\u207b\u00b9|mM\u00b7s\u207b\u00b9|mM/?s|M\u207b\u00b9s\u207b\u00b9|M\u00b7s\u207b\u00b9|M/?s|mM\s*s\u207b\u00b9|M\s*s\u207b\u00b9)', re.I)
+_RE_UPPER_WORD = re.compile(r'[A-Z][a-z]+')
+_RE_COMPOSITE_SEP = re.compile(r'[/\\]\s*\w+\s+')
+_RE_LEADING_DIGITS = re.compile(r'^\d+\s+')
+_RE_RATIO_FORMAT = re.compile(r'^[A-Z]{2,4}/\d+$', re.I)
+_RE_RATIO_FORMAT2 = re.compile(r'^[A-Z]{2,4}\d+/\d+$', re.I)
+_RE_ION_FORMAT = re.compile(r'^[A-Z][a-z]?\d*[+-]$')
+_RE_ELEMENT_FORMAT = re.compile(r'^[A-Z][a-z]?\d+$')
+
 def _normalize_ocr_scientific(text: str) -> str:
     if not text:
         return text
     t = text
-    t = re.sub(r'\bK\s+m\b', 'Km', t, flags=re.I)
-    t = re.sub(r'\bV\s+max\b', 'Vmax', t, flags=re.I)
-    t = re.sub(r'\bV\s+m\b(?!\s*ax)', 'Vmax', t, flags=re.I)
-    t = re.sub(r'\bk\s+cat\b', 'kcat', t, flags=re.I)
+    t = _RE_KM.sub('Km', t)
+    t = _RE_VMAX.sub('Vmax', t)
+    t = _RE_VM_NOAX.sub('Vmax', t)
+    t = _RE_KCAT.sub('kcat', t)
     t = t.replace('\ufffd', '\u25a1')
-    t = re.sub(r'10\s*\u25a1\s*(\d)', lambda m: '10\u207b' + m.group(1), t)
-    t = re.sub(r'([\d.]+)\s*\u25a1\s*10', lambda m: m.group(1) + ' \u00d710', t)
-    t = re.sub(r'([a-zA-Z\u03bc])\s*\u25a1\s*(\d)', lambda m: m.group(1) + '\u207b' + m.group(2), t)
-    t = re.sub(r'(\d)\s*\u25a1\s*(\d)', r'\1-\2', t)
+    t = _RE_10_SQ_NUM.sub(lambda m: '10\u207b' + m.group(1), t)
+    t = _RE_NUM_SQ_10.sub(lambda m: m.group(1) + ' \u00d710', t)
+    t = _RE_ALPHA_SQ_NUM.sub(lambda m: m.group(1) + '\u207b' + m.group(2), t)
+    t = _RE_DIG_SQ_DIG.sub(r'\1-\2', t)
     t = t.replace('\u00bc', '=')
     t = t.replace('\u0006', '\u00b1')
-    t = re.sub(r'([\d.]+)\s*[\u02da\u00b0\u00ba\u25e6]\s*C\b', r'\1 °C', t, flags=re.I)
-    t = re.sub(r'([\d.]+)\s*\u25a1\s*C\b', r'\1 °C', t, flags=re.I)
-    t = re.sub(r'([\d.]+)\s*°\s+C\b', r'\1 °C', t, flags=re.I)
-    t = re.sub(r'(\w)e(\d)', lambda m: m.group(1) + ' \u2248 ' + m.group(2), t)
-    t = re.sub(r'\b([m\u03bcunp]?M)\s+(s)\s*[\u207b\u2212\u2013\-]?\s*1\b', lambda m: m.group(1) + '\u00b7' + m.group(2) + '\u207b\u00b9', t)
-    t = re.sub(r'\b([m\u03bcunp]?M)(s)\s*[\u207b\u2212\u2013\-]?\s*1\b', lambda m: m.group(1) + '\u00b7' + m.group(2) + '\u207b\u00b9', t)
-    t = re.sub(r'\b(s)\s+[\-–—]\s*1\b', lambda m: m.group(1) + '\u207b\u00b9', t, flags=re.I)
-    t = re.sub(r'\b(m)\s+(M)\s*[\u207b\u2212\u2013\-]?\s*1\b', 'mM\u207b\u00b9', t)
-    t = re.sub(r'\b(m)\s+(Ms)\s*[\u207b\u2212\u2013\-]?\s*1\b', 'mM\u00b7s\u207b\u00b9', t, flags=re.I)
-    t = re.sub(r'\b(m)\s+(M)\b', 'mM', t)
-    t = re.sub(r'([\d.]+)\s+10\s*[\u207b\u2212\u2013\-]\s*(\d+)', lambda m: m.group(1) + ' \u00d7 10\u207b' + m.group(2), t)
-    t = re.sub(r'([\d.]+)\s*[x\u00d7]\s*10\s*[\^]?\s*[\u2212\u2013\-]\s*(\d+)', lambda m: m.group(1) + ' \u00d7 10\u207b' + m.group(2), t)
-    t = re.sub(r'([\d.]+)\s*[x\u00d7]\s*10\s*[\^]?\s*(\d+)', lambda m: m.group(1) + ' \u00d7 10' + m.group(2), t)
-    t = re.sub(r'([\d.]+)\s*[x\u00d7]\s*10\s*(\d+)', lambda m: m.group(1) + ' \u00d7 10' + m.group(2), t)
-    t = re.sub(r'(\d+)\s+10\s+(\d+)\s+Ms?\s*[\-–—]?\s*1\b', lambda m: m.group(1) + ' \u00d7 10\u207b' + m.group(2) + ' M/s', t, flags=re.I)
-    t = re.sub(r'(\d+)\s+10\s+(\d+)\s+[Mm]\s*[Ss]\s*[\-–—]?\s*1\b', lambda m: m.group(1) + ' \u00d7 10\u207b' + m.group(2) + ' M/s', t, flags=re.I)
+    t = _RE_DEG_C.sub(r'\1 °C', t)
+    t = _RE_SQ_C.sub(r'\1 °C', t)
+    t = _RE_DEG_SPACE_C.sub(r'\1 °C', t)
+    t = _RE_WE.sub(lambda m: m.group(1) + ' \u2248 ' + m.group(2), t)
+    t = _RE_M_S_NEG1.sub(lambda m: m.group(1) + '\u00b7' + m.group(2) + '\u207b\u00b9', t)
+    t = _RE_MS_NEG1.sub(lambda m: m.group(1) + '\u00b7' + m.group(2) + '\u207b\u00b9', t)
+    t = _RE_S_NEG1.sub(lambda m: m.group(1) + '\u207b\u00b9', t)
+    t = _RE_M_M_NEG1.sub('mM\u207b\u00b9', t)
+    t = _RE_M_MS_NEG1.sub('mM\u00b7s\u207b\u00b9', t)
+    t = _RE_M_M.sub('mM', t)
+    t = _RE_NUM_10_NEG.sub(lambda m: m.group(1) + ' \u00d7 10\u207b' + m.group(2), t)
+    t = _RE_NUM_X10_NEG.sub(lambda m: m.group(1) + ' \u00d7 10\u207b' + m.group(2), t)
+    t = _RE_NUM_X10_POS.sub(lambda m: m.group(1) + ' \u00d7 10' + m.group(2), t)
+    t = _RE_NUM_X10_BARE.sub(lambda m: m.group(1) + ' \u00d7 10' + m.group(2), t)
+    t = _RE_NUM_10_M_S.sub(lambda m: m.group(1) + ' \u00d7 10\u207b' + m.group(2) + ' M/s', t)
+    t = _RE_NUM_10_MS.sub(lambda m: m.group(1) + ' \u00d7 10\u207b' + m.group(2) + ' M/s', t)
     t = t.replace('\u25a1', '')
     return t
 
@@ -412,7 +458,7 @@ def _parse_scientific_notation(s):
     except (ValueError, TypeError):
         pass
     s = s.strip()
-    m = re.match(r'([\d.]+)\s*[×x\u00d7]\s*10\s*[\^]?\s*([⁻\u207b\-–\u2013−\u2212]?)(\d+)', s)
+    m = _RE_SCI_X10.match(s)
     if m:
         base = float(m.group(1))
         sign = m.group(2)
@@ -420,7 +466,7 @@ def _parse_scientific_notation(s):
         if sign in ('\u207b', '-', '\u2013', '\u2212', '⁻'):
             return base * (10 ** -exp)
         return base * (10 ** exp)
-    m = re.match(r'([\d.]+)\s*[eE]\s*([\-−\u2212]?)(\d+)', s)
+    m = _RE_SCI_E.match(s)
     if m:
         base = float(m.group(1))
         sign = m.group(2)
@@ -428,7 +474,7 @@ def _parse_scientific_notation(s):
         if sign in ('-', '\u2212', '\u2212'):
             return base * (10 ** -exp)
         return base * (10 ** exp)
-    m = re.match(r'([\d.]+)\s+10\s*([⁻\u207b\-–\u2013−\u2212]?)(\d+)', s)
+    m = _RE_SCI_BARE.match(s)
     if m:
         base = float(m.group(1))
         sign = m.group(2)
@@ -436,7 +482,7 @@ def _parse_scientific_notation(s):
         if sign in ('\u207b', '-', '\u2013', '\u2212', '⁻'):
             return base * (10 ** -exp)
         return base * (10 ** exp)
-    m = re.match(r'([\d.]+)\s*[×x\u00d7]?\s*10\s*([⁻\u207b\-–\u2013−\u2212]?)(\d+)', s)
+    m = _RE_SCI_X10_LOOSE.match(s)
     if m:
         base = float(m.group(1))
         sign = m.group(2)
@@ -536,14 +582,14 @@ def _extract_vmax_fallback(text: str) -> Optional[Dict[str, Any]]:
         if m:
             groups = m.groups()
             full_match = m.group(0)
-            match_has_minus = bool(re.search(r'10[\s]*[\-\u207b\u2212\u2013]', full_match))
+            match_has_minus = bool(_RE_10_MINUS.search(full_match))
             if len(groups) == 2:
                 base_str, exp_str = groups
                 try:
                     base = float(base_str)
-                    exp_clean = re.sub(r'[^\d\-\u207b\u2212\u2013]', '', exp_str)
+                    exp_clean = _RE_NON_DIG_MINUS.sub('', exp_str)
                     has_minus = match_has_minus or any(c in exp_clean for c in ('-', '\u207b', '\u2212', '\u2013', '⁻'))
-                    exp_digits = re.sub(r'[^\d]', '', exp_clean)
+                    exp_digits = _RE_NON_DIG.sub('', exp_clean)
                     exp_int = int(exp_digits) if exp_digits else 0
                     if has_minus:
                         vmax_val = base * (10 ** -exp_int)
@@ -558,9 +604,9 @@ def _extract_vmax_fallback(text: str) -> Optional[Dict[str, Any]]:
                 base_str, exp_str, unit = groups
                 try:
                     base = float(base_str)
-                    exp_clean = re.sub(r'[^\d\-\u207b\u2212\u2013]', '', exp_str)
+                    exp_clean = _RE_NON_DIG_MINUS.sub('', exp_str)
                     has_minus = match_has_minus or any(c in exp_clean for c in ('-', '\u207b', '\u2212', '\u2013', '⁻'))
-                    exp_digits = re.sub(r'[^\d]', '', exp_clean)
+                    exp_digits = _RE_NON_DIG.sub('', exp_clean)
                     exp_int = int(exp_digits) if exp_digits else 0
                     if has_minus:
                         vmax_val = base * (10 ** -exp_int)
@@ -569,12 +615,12 @@ def _extract_vmax_fallback(text: str) -> Optional[Dict[str, Any]]:
                     return {"value": vmax_val, "unit": unit, "source": "text_ocr_fallback"}
                 except (ValueError, TypeError):
                     continue
-    vm = re.search(r'\bV\s*max\b', norm, re.I)
+    vm = _RE_VMAX_TEXT.search(norm)
     if not vm:
-        vm = re.search(r'\bmaximum\s+velocity\b', norm, re.I)
+        vm = _RE_VMAX_FULL.search(norm)
     if vm:
         after = norm[vm.end():vm.end() + 150]
-        e_notation_m = re.search(r'([\d.]+)\s*[eE]\s*([\-−\u2212]?\d+)', after)
+        e_notation_m = _RE_E_NOTATION.search(after)
         if e_notation_m:
             try:
                 parsed = _parse_scientific_notation(e_notation_m.group(0))
@@ -584,13 +630,13 @@ def _extract_vmax_fallback(text: str) -> Optional[Dict[str, Any]]:
                     return {"value": parsed, "unit": unit, "source": "text_ocr_fallback"}
             except (ValueError, TypeError):
                 pass
-        num_m = re.search(r'([\d.]+)\s*[×x\u00d7]\s*10[\u207b\u207a\u2212\u2013\-–]?\s*(\d+)', after)
+        num_m = _RE_X10_NOTATION.search(after)
         if num_m:
             try:
                 base = float(num_m.group(1))
                 exp_str = num_m.group(2)
                 full_match = num_m.group(0)
-                has_minus = bool(re.search(r'10[\u207b⁻\-–\u2212\u2013]', full_match))
+                has_minus = bool(_RE_10_MINUS.search(full_match))
                 exp_int = int(exp_str)
                 if has_minus:
                     vmax_val = base * (10 ** -exp_int)
@@ -601,7 +647,7 @@ def _extract_vmax_fallback(text: str) -> Optional[Dict[str, Any]]:
                 return {"value": vmax_val, "unit": unit, "source": "text_ocr_fallback"}
             except (ValueError, TypeError):
                 pass
-        plain_m = re.search(r'(?:was|=|:|≈|~|\u2248)\s*([\d.]+)\s*(?:\u00b1\s*[\d.]+\s*)?(mM\u207b\u00b9|mM\u00b7s\u207b\u00b9|mM/?s|M\u207b\u00b9s\u207b\u00b9|M\u00b7s\u207b\u00b9|M/?s|mM\s*s\u207b\u00b9|M\s*s\u207b\u00b9)', after, re.I)
+        plain_m = _RE_PLAIN_VM.search(after)
         if plain_m:
             try:
                 vmax_val = float(plain_m.group(1))
@@ -1252,10 +1298,10 @@ def validate_schema(record: Dict[str, Any]) -> Dict[str, Any]:
         for ukey in ("Km_unit", "Vmax_unit", "kcat_unit", "kcat_Km_unit"):
             raw_u = kinetics.get(ukey)
             if raw_u and isinstance(raw_u, str):
-                if re.match(r'^[×x\u00d7]\s*10\s*[\^]?\s*[\-−–]?\s*\d+$', raw_u):
+                if _RE_X10_UNIT.match(raw_u):
                     val = kinetics.get(ukey.replace("_unit", ""))
                     if val is not None and isinstance(val, (int, float)):
-                        exp_m = re.search(r'[\-−–]?(\d+)', raw_u)
+                        exp_m = _RE_EXP_DIGITS.search(raw_u)
                         if exp_m:
                             exp = int(exp_m.group(0).replace('−', '-').replace('–', '-'))
                             kinetics[ukey.replace("_unit", "")] = val * (10 ** exp)
@@ -1494,7 +1540,7 @@ class PaperMetadataExtractor:
                 continue
             if self._CITE_THIS_RE.search(line) or self._JOURNAL_META_RE.search(line) or self._AFFILIATION_RE.search(line):
                 continue
-            if 8 < len(line) < 300 and ("," in line or " and " in line.lower()) and re.search(r'[A-Z][a-z]+', line):
+            if 8 < len(line) < 300 and ("," in line or " and " in line.lower()) and _RE_UPPER_WORD.search(line):
                 return line
         return ""
 
@@ -1738,8 +1784,8 @@ class CandidateRecaller:
         for _ in range(3):
             prev = cleaned
             cleaned = _LEADING_JUNK_RE.sub("", cleaned).strip()
-            cleaned = re.sub(r'^[/\\]\s*\w+\s+', "", cleaned).strip()
-            cleaned = re.sub(r'^\d+\s+', "", cleaned).strip()
+            cleaned = _RE_COMPOSITE_SEP.sub("", cleaned).strip()
+            cleaned = _RE_LEADING_DIGITS.sub("", cleaned).strip()
             if cleaned == prev:
                 break
         m = _MATERIAL_PATTERN_RE.search(cleaned)
@@ -1831,16 +1877,16 @@ class CandidateRecaller:
             return False
         if _SENTENCE_ID_RE.match(name):
             return False
-        if re.match(r'^[A-Z]{2,4}/\d+$', name, re.I):
+        if _RE_RATIO_FORMAT.match(name):
             return False
-        if re.match(r'^[A-Z]{2,4}\d+/\d+$', name, re.I):
+        if _RE_RATIO_FORMAT2.match(name):
             return False
         if lower.startswith("the ") or lower.startswith("a "):
             return False
-        if re.match(r'^[A-Z][a-z]?\d*[+-]$', name):
+        if _RE_ION_FORMAT.match(name):
             return False
-        if re.match(r'^[A-Z][a-z]?\d+$', name) and not any(w in lower for w in _MORPHOLOGY_WORDS):
-            elem = re.match(r'^([A-Z][a-z]?)\d+$', name)
+        if _RE_ELEMENT_FORMAT.match(name) and not any(w in lower for w in _MORPHOLOGY_WORDS):
+            elem = _RE_ELEMENT_FORMAT.match(name)
             if elem and elem.group(1) in {"Fe", "Co", "Ni", "Mn", "Cu", "Zn", "Ce", "Au",
                                            "Ag", "Pt", "Pd", "Ti", "V", "Cr", "Mo", "W",
                                            "Ru", "Rh", "Ir", "La", "Zr", "Al", "Sn", "Bi",
