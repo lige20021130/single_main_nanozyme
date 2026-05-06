@@ -80,7 +80,69 @@ class KineticsAgent:
             self._extract_kinetics_from_table(record, table_values)
         self._extract_kcat_from_text(record, buckets.get("kinetics", []))
         self._validate_kinetics_units(record)
+        self._fill_kinetics_list(record, buckets.get("kinetics", []))
         return record
+
+    def _fill_kinetics_list(self, record, kinetics_texts):
+        kin = record["main_activity"]["kinetics"]
+        existing_list = record["main_activity"].get("kinetics_list", [])
+        if existing_list:
+            return
+
+        entries = []
+        main_km = kin.get("Km")
+        main_vmax = kin.get("Vmax")
+        main_kcat = kin.get("kcat")
+
+        if main_km is not None or main_vmax is not None:
+            entry = {}
+            if main_km is not None:
+                entry["Km"] = main_km
+                entry["Km_unit"] = kin.get("Km_unit")
+            if main_vmax is not None:
+                entry["Vmax"] = main_vmax
+                entry["Vmax_unit"] = kin.get("Vmax_unit")
+            if main_kcat is not None:
+                entry["kcat"] = main_kcat
+                entry["kcat_unit"] = kin.get("kcat_unit")
+            substrate = kin.get("substrate")
+            if substrate:
+                entry["substrate"] = substrate
+            entries.append(entry)
+
+        _MULTI_KM_RE = re.compile(
+            r'\bKm\s*[\(（]\s*(\w[\w\d\-]*)\s*[\)）]\s*(?:was|=|:|≈|~)\s*([\d.]+)\s*(mM|μM|uM|M)',
+            re.I,
+        )
+        _MULTI_VMAX_RE = re.compile(
+            r'\bVmax\s*[\(（]\s*(\w[\w\d\-]*)\s*[\)）]\s*(?:was|=|:|≈|~)\s*([\d.]+)\s*([^\s,;]+)',
+            re.I,
+        )
+
+        substrate_km = {}
+        for text in kinetics_texts:
+            norm_text = _normalize_ocr_scientific(text)
+            for m in _MULTI_KM_RE.finditer(norm_text):
+                sub_name = m.group(1)
+                km_val = m.group(2)
+                km_unit = m.group(3)
+                substrate_km[sub_name] = {"Km": km_val, "Km_unit": km_unit, "substrate": sub_name}
+
+            for m in _MULTI_VMAX_RE.finditer(norm_text):
+                sub_name = m.group(1)
+                vmax_val = m.group(2)
+                vmax_unit = m.group(3)
+                if sub_name in substrate_km:
+                    substrate_km[sub_name]["Vmax"] = vmax_val
+                    substrate_km[sub_name]["Vmax_unit"] = vmax_unit
+
+        for sub_name, data in substrate_km.items():
+            already = any(e.get("substrate") == sub_name for e in entries)
+            if not already:
+                entries.append(data)
+
+        if entries:
+            record["main_activity"]["kinetics_list"] = entries
 
     def _validate_kinetics_units(self, record):
         kin = record["main_activity"]["kinetics"]
@@ -345,6 +407,54 @@ class KineticsAgent:
 
                 if record["main_activity"]["kinetics"]["Km"] is not None:
                     return
+
+        kin = record["main_activity"]["kinetics"]
+        if kin.get("Km") is None or kin.get("Vmax") is None:
+            for text in all_texts:
+                norm_text = _normalize_ocr_scientific(text)
+                if kin.get("Km") is None:
+                    for pat in _KM_PATTERNS:
+                        m = pat.search(norm_text)
+                        if m:
+                            groups = m.groups()
+                            try:
+                                if len(groups) >= 2:
+                                    km_val = _parse_scientific_notation(str(groups[0]))
+                                    km_unit = groups[-1]
+                                    if isinstance(km_val, (int, float)) and km_val > 0:
+                                        kin["Km"] = km_val
+                                        if km_unit:
+                                            nu = _norm_unit(km_unit)
+                                            kin["Km_unit"] = nu if nu else km_unit
+                                        kin["source"] = "flattened_table_regex"
+                                        break
+                            except (ValueError, TypeError, IndexError):
+                                pass
+                    if kin.get("Km") is not None:
+                        break
+
+            for text in all_texts:
+                norm_text = _normalize_ocr_scientific(text)
+                if kin.get("Vmax") is None:
+                    for pat in _VMAX_PATTERNS:
+                        m = pat.search(norm_text)
+                        if m:
+                            groups = m.groups()
+                            try:
+                                if len(groups) >= 2:
+                                    vmax_val = _parse_scientific_notation(str(groups[0]))
+                                    vmax_unit = groups[-1]
+                                    if isinstance(vmax_val, (int, float)) and vmax_val > 0:
+                                        kin["Vmax"] = vmax_val
+                                        if vmax_unit:
+                                            nu = _norm_unit(vmax_unit)
+                                            kin["Vmax_unit"] = nu if nu else vmax_unit
+                                        kin["source"] = "flattened_table_regex"
+                                        break
+                            except (ValueError, TypeError, IndexError):
+                                pass
+                    if kin.get("Vmax") is not None:
+                        break
 
     def _try_parse_inline_table(self, text, selected_name, record):
         km_header_m = re.search(r'Km\s*[\(（]\s*(mM|μM|uM|M|mmol|umol|nmol)\s*[\)）]', text, re.I)

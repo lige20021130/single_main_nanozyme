@@ -321,6 +321,19 @@ _ENZYME_TYPE_PATTERNS = [
 _SUBSTRATE_KEYWORDS = {
     "TMB", "ABTS", "OPD", "H2O2", "DCFH", "DCFH-DA",
     "guaiacol", "pyrogallol", "catechol",
+    "DAP", "DAPI", "DAF-FM", "Amplex Red", "Resorufin",
+    "NADH", "NADPH", "DHA", "L-DOPA", "dopamine",
+    "4-AAP", "phenol", "4-aminoantipyrine",
+    "Terephthalic acid", "TA", "HPF", "SOSG",
+    "DHE", "dihydroethidium", "NBT", "nitroblue tetrazolium",
+    "X-Gal", "BCIP", "o-nitrophenyl", "ONPG", "p-nitrophenyl", "pNPP",
+    "DTNB", "Ellman", "GSH", "glutathione",
+    "ferrocyanide", "ferricyanide", "K4Fe(CN)6", "K3Fe(CN)6",
+    "methanol", "ethanol", "formaldehyde",
+    "glucose", "cholesterol", "uric acid", "lactate",
+    "ascorbic acid", "cysteine", "bilirubin",
+    "acetylcholine", "choline", "xanthine", "hypoxanthine",
+    "urea", "hydroquinone", "benzoquinone",
 }
 
 _KM_PATTERNS = [
@@ -982,6 +995,12 @@ _SIZE_PATTERNS = [
     re.compile(r'\b(?:d|diameter|size)\s*(?:=|≈|~|was|of)\s*(?:about\s+|ca\.?\s*)?([\d.]+)\s*(nm|μm|um)\b', re.I),
     re.compile(r'\b(?:uniform\s+)?(?:size|diameter)\s*[\(=]\s*[\w.]*\s*[:=]?\s*([\d.]+)\s*(nm|μm|um)\b', re.I),
     re.compile(r'\b([\d.]+)\s*(nm|μm|um)\s*(?:in\s+)?(?:size|diameter|length|thickness|width)\b', re.I),
+    re.compile(r'\blength\s*(?:of|was|=|:|≈|~)\s*(?:about\s+|ca\.?\s*)?([\d.]+)\s*(nm|μm|um|mm)\b', re.I),
+    re.compile(r'\bthickness\s*(?:of|was|=|:|≈|~)\s*(?:about\s+|ca\.?\s*)?([\d.]+)\s*(nm|μm|um|mm|Å)\b', re.I),
+    re.compile(r'\bwidth\s*(?:of|was|=|:|≈|~)\s*(?:about\s+|ca\.?\s*)?([\d.]+)\s*(nm|μm|um|mm)\b', re.I),
+    re.compile(r'\b(?:lattice|crystallite)\s+(?:size|parameter|spacing)\s*(?:of|was|=|:|≈|~)\s*([\d.]+)\s*(nm|Å|Å)\b', re.I),
+    re.compile(r'\baverage\s+([\d.]+)\s*[-–—~]\s*([\d.]+)\s*(nm|μm|um)\b', re.I),
+    re.compile(r'\b(?:approximately|about|around|ca\.?|~|≈)\s*([\d.]+)\s*[-–—~]\s*([\d.]+)\s*(nm|μm|um)\b', re.I),
 ]
 
 _SURFACE_AREA_PATTERNS = [
@@ -1972,6 +1991,46 @@ class CandidateRecaller:
                         candidates.setdefault(name, {"name": name, "sources": set(), "evidence": []})
                         candidates[name]["sources"].add(section)
                         candidates[name]["evidence"].append(ctx)
+
+        for m in re.finditer(
+            r'\b(?:MIL|UiO|HKUST|PCN|NU|NOTT|DUT|MOF|COF|ZIF|ZIF-L|BIF|CPO|FMOF|SOF|HOF)[-\s]?\d+(?:\([A-Z][a-z]?(?:[A-Z][a-z]?\d*)*\))?\b',
+            text, re.I,
+        ):
+            name = m.group(0).strip()
+            if self._is_valid_candidate(name):
+                candidates.setdefault(name, {"name": name, "sources": set(), "evidence": []})
+                candidates[name]["sources"].add(section)
+                candidates[name]["evidence"].append(text[max(0, m.start()-40):m.end()+40])
+
+        for m in re.finditer(
+            r'\b(?:Fe|Co|Ni|Mn|Cu|Zn|Ce|Au|Ag|Pt|Pd|Ti|V|Cr|Mo|W|Ru|Rh|Ir|La|Zr|Al|Sn|Bi|In|Ga|Ge|Sb|Te|Hf|Ta|Re|Os|Y|Sc|Cd|Hg|Tl|Pb|Nb)\d*\s+Single[-\s]?Atom\b',
+            text, re.I,
+        ):
+            name = m.group(0).strip()
+            if self._is_valid_candidate(name):
+                candidates.setdefault(name, {"name": name, "sources": set(), "evidence": []})
+                candidates[name]["sources"].add(section)
+                candidates[name]["evidence"].append(text[max(0, m.start()-40):m.end()+40])
+
+        for m in re.finditer(
+            r'\b(?:Fe|Co|Ni|Mn|Cu|Zn|Ce|Au|Ag|Pt|Pd|Ti|V|Cr|Mo|W|Ru|Rh|Ir|La|Zr|Al|Sn|Bi|In)\d*[-/]?(?:SA|SAN|SAC|SAzyme|SAEs|SACs|SA-N|SAC-N)\b',
+            text, re.I,
+        ):
+            name = m.group(0).strip()
+            if self._is_valid_candidate(name):
+                candidates.setdefault(name, {"name": name, "sources": set(), "evidence": []})
+                candidates[name]["sources"].add(section)
+                candidates[name]["evidence"].append(text[max(0, m.start()-40):m.end()+40])
+
+        for m in re.finditer(
+            r'\b(?:Prussian\s+blue|PB|PBA|PBAs?|LDH|LDHs|MXene|g-C3N4|g-C\dN\d|CN|CNFs?|CNTs?|rGO|GO|N-GO|N-rGO|B,N-GO|S,N-GO)\b',
+            text, re.I,
+        ):
+            name = m.group(0).strip()
+            if self._is_valid_candidate(name):
+                candidates.setdefault(name, {"name": name, "sources": set(), "evidence": []})
+                candidates[name]["sources"].add(section)
+                candidates[name]["evidence"].append(text[max(0, m.start()-40):m.end()+40])
 
     def _is_valid_candidate(self, name: str) -> bool:
         if not name or len(name) < 2:
@@ -2990,9 +3049,12 @@ class RuleExtractor:
 
         if not record["main_activity"]["substrates"]:
             found = set()
-            for text in buckets.get("activity", []):
+            search_buckets = (buckets.get("activity", [])
+                              + buckets.get("kinetics", [])[:10]
+                              + buckets.get("mechanism", [])[:3])
+            for text in search_buckets:
                 for sub in _SUBSTRATE_KEYWORDS:
-                    if sub in text:
+                    if sub.lower() in text.lower():
                         found.add(sub)
             if found:
                 record["main_activity"]["substrates"] = sorted(found)
@@ -3995,6 +4057,19 @@ class RuleExtractor:
         "platelet", "flake", "belt", "ribbon",
         "needle-like", "spindle", "ellipsoid", "ellipsoidal",
         "irregular", "aggregat",
+        "nanoplate", "nanoplates", "nanobelt", "nanobelts",
+        "nanocage", "nanocages", "nanoframe", "nanoframes",
+        "nanobranch", "nanobranches", "nanotripod", "nanotetrapod",
+        "nanopyramid", "nanopyramids", "nanocone", "nanocones",
+        "nanocauliflower", "nanobouquet",
+        "nanocoral", "nanosponge", "nanomesh",
+        "quantum dot", "quantum dots", "QD", "QDs",
+        "2D", "3D", "1D",
+        "hollow", "mesostructured", "hierarchical",
+        "tetrahedr", "hexagonal prism", "bipyramid",
+        "sea-urchin", "sea urchin",
+        "foam-like", "aerogel", "hydrogel",
+        "MOF-derived", "prussian blue analogue",
     ]
 
     def _extract_morphology_from_text(self, record, char_texts):
@@ -4378,6 +4453,22 @@ class RuleExtractor:
         (re.compile(r'\bluminescen', re.I), "luminescence"),
         (re.compile(r'\bphotolumin', re.I), "photoluminescence"),
         (re.compile(r'\belectrochemilumin', re.I), "electrochemiluminescence"),
+        (re.compile(r'\bchemiluminescen', re.I), "chemiluminescence"),
+        (re.compile(r'\braman\b', re.I), "Raman"),
+        (re.compile(r'\bSERS\b', re.I), "SERS"),
+        (re.compile(r'\belectrochem', re.I), "electrochemical"),
+        (re.compile(r'\bamperometric', re.I), "amperometric"),
+        (re.compile(r'\bvoltammetric', re.I), "voltammetric"),
+        (re.compile(r'\bimpedance\b', re.I), "impedance"),
+        (re.compile(r'\bEIS\b', re.I), "impedance"),
+        (re.compile(r'\bUV[-\s]?vis\b', re.I), "UV-vis"),
+        (re.compile(r'\bspectrophotometr', re.I), "absorbance"),
+        (re.compile(r'\bturn[-\s]?on\b', re.I), "fluorescence turn-on"),
+        (re.compile(r'\bturn[-\s]?off\b', re.I), "fluorescence turn-off"),
+        (re.compile(r'\bratiometric\b', re.I), "ratiometric"),
+        (re.compile(r'\bDPV\b', re.I), "DPV"),
+        (re.compile(r'\bCV\b', re.I), "CV"),
+        (re.compile(r'\bchronoamperometr', re.I), "chronoamperometric"),
     ]
 
     def _extract_signal(self, record: Dict[str, Any], texts: List[str]):
