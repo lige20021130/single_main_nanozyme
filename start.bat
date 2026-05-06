@@ -4,6 +4,9 @@ title 纳米酶文献提取系统
 
 cd /d "%~dp0"
 
+set CUDA_VISIBLE_DEVICES=0
+set PYTHONWARNINGS=ignore:.*pin_memory.*:UserWarning
+
 echo ============================================
 echo   纳米酶文献提取系统 - Single Main Nanozyme
 echo ============================================

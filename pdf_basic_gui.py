@@ -13,6 +13,7 @@ from tkinter import filedialog, scrolledtext, messagebox, ttk
 from pathlib import Path
 from typing import Optional, Tuple, List, Dict, Any
 from dataclasses import dataclass, asdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import yaml
 import logging
 
@@ -89,14 +90,18 @@ class PDFBasicGUI:
         "hybrid": "docling-fast",
         "hybrid_mode": "auto",          # 不默认开启 full/enrich_picture
         "hybrid_url": "http://localhost:5002",
-        "hybrid_timeout": "60000",
+        "hybrid_timeout": "120000",
         "hybrid_fallback": True,
         "table_method": "default",
     }
     # ── 服务器启动命令（固定，不再依赖用户勾选）──────────────────────────────
-    SERVER_CMD_DEFAULT = ["opendataloader-pdf-hybrid", "--port=5002"]
+    SERVER_CMD_DEFAULT = ["opendataloader-pdf-hybrid", "--port=5002",
+                          "--device", "cuda",
+                          "--enrich-formula"]
     SERVER_CMD_OCR = ["opendataloader-pdf-hybrid", "--port=5002",
-                      "--force-ocr", "--ocr-lang", "en"]
+                      "--device", "cuda",
+                      "--force-ocr", "--ocr-lang", "en",
+                      "--enrich-formula"]
     # enrich-picture 专用命令留作备用，不放 GUI
     # SERVER_CMD_ENRICH = ["opendataloader-pdf-hybrid", "--port=5002",
     #                      "--enrich-picture-description"]
@@ -559,6 +564,7 @@ class PDFBasicGUI:
             env["JAVA_TOOL_OPTIONS"] = "-Dfile.encoding=UTF-8"
             env["HF_HUB_OFFLINE"] = "1"
             env["PYTHONWARNINGS"] = "ignore:.*pin_memory.*:UserWarning"
+            env["CUDA_VISIBLE_DEVICES"] = "0"
             self.server_process = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
@@ -741,6 +747,7 @@ class PDFBasicGUI:
             env["JAVA_TOOL_OPTIONS"] = "-Dfile.encoding=UTF-8"
             env["HF_HUB_OFFLINE"] = "1"
             env["PYTHONWARNINGS"] = "ignore:.*pin_memory.*:UserWarning"
+            env["CUDA_VISIBLE_DEVICES"] = "0"
             self.server_process = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
@@ -954,18 +961,16 @@ class PDFBasicGUI:
             else:
                 self.log("[OCR Fallback] 无需 OCR fallback")
 
-            # ── 阶段 C：OCR 重跑 ─────────────────────────────────
+            # ── 阶段 C：OCR 重跑（并发） ─────────────────────────
             if needs_ocr_list and not self.stop_event.is_set():
                 self._ensure_server(mode="ocr")
-                for pdf_path, _reason in needs_ocr_list:
-                    if self.stop_event.is_set():
-                        self.log("用户请求停止，跳过剩余文件...")
-                        break
+
+                def _ocr_one(item):
+                    pdf_path, _reason = item
                     r = reports[pdf_path]
                     stem = Path(pdf_path).stem
                     base = Path(output_dir) if output_dir else Path(pdf_path).parent
                     out_json = base / (stem + ".json")
-                    self.log(f"[OCR Fallback] 重跑: {stem}")
                     ocr_buf = io.StringIO()
                     with contextlib.redirect_stdout(ocr_buf):
                         try:
@@ -977,9 +982,9 @@ class PDFBasicGUI:
                             import opendataloader_pdf
                             opendataloader_pdf.convert(**ocr_kwargs)
                         except UnicodeDecodeError:
-                            self.log(f"[OCR Fallback] UnicodeDecodeError，检查输出...")
+                            pass
                         except Exception as e:
-                            self.log(f"[OCR Fallback] 异常: {stem}: {e}")
+                            pass
                         finally:
                             os.environ.pop("PYTHONIOENCODING", None)
                     for line in ocr_buf.getvalue().strip().splitlines():
@@ -992,6 +997,14 @@ class PDFBasicGUI:
                         self.log(f"[OCR Fallback] ✓ OCR 成功: {stem}")
                     else:
                         self.log(f"[OCR Fallback] ✗ OCR 失败: {stem}")
+                    return pdf_path
+
+                ocr_workers = min(2, len(needs_ocr_list))
+                self.log(f"[OCR Fallback] 并发重跑: {len(needs_ocr_list)} 个文件, {ocr_workers} 并发")
+                with ThreadPoolExecutor(max_workers=ocr_workers) as executor:
+                    for pdf_path in executor.map(_ocr_one, needs_ocr_list):
+                        if self.stop_event.is_set():
+                            break
 
                 ocr_ok = sum(1 for pdf_path, _ in needs_ocr_list if reports[pdf_path].ocr_fallback_used)
                 self.log(f"[OCR Fallback] OCR 补跑成功 {ocr_ok} | 失败 {len(needs_ocr_list)-ocr_ok}")
@@ -1412,12 +1425,10 @@ class PDFBasicGUI:
             all_output_paths = []
             failed_files = []
 
+            pending_paths = []
             for idx, mid_path in enumerate(mid_json_paths, 1):
                 if self.extract_stop_event.is_set():
                     break
-                self.root.after(0, lambda i=idx, t=total, p=mid_path: self.extract_status.config(
-                    text=f"状态: 正在提取 ({i}/{t}): {Path(p).name}...", fg="blue"))
-
                 if not force_reextract:
                     mid_stem = Path(mid_path).stem
                     if mid_stem.endswith("_mid_task"):
@@ -1434,20 +1445,49 @@ class PDFBasicGUI:
                             continue
                         except (json.JSONDecodeError, OSError):
                             pass
+                pending_paths.append(mid_path)
 
-                self.log(f"[提取] 处理 {idx}/{total}: {Path(mid_path).name}")
-                try:
-                    out_path = pipeline.process_mid_json_sync(
-                        mid_path,
-                        progress_callback=lambda msg, p=None: progress_callback(msg, idx, total, p),
-                        use_cache=not force_reextract,
-                        extraction_mode=self._extraction_mode,
-                    )
-                    all_output_paths.append(out_path)
-                    self.log(f"[提取] ✓ {Path(mid_path).name} -> {out_path}")
-                except Exception as e:
-                    self.log(f"[提取] ✗ {Path(mid_path).name} 失败: {e}")
-                    failed_files.append((mid_path, str(e)))
+            if pending_paths and not self.extract_stop_event.is_set():
+                max_workers = min(2, len(pending_paths))
+                self.log(f"[提取] 并发提取: {len(pending_paths)} 个文件, {max_workers} 并发")
+                done_count = total - len(pending_paths)
+
+                def _extract_one(mid_path: str) -> Tuple[str, Optional[str], Optional[str]]:
+                    stem = Path(mid_path).stem
+                    try:
+                        out_path = pipeline.process_mid_json_sync(
+                            mid_path,
+                            progress_callback=lambda msg, p=None: progress_callback(msg, 0, 0, p),
+                            use_cache=not force_reextract,
+                            extraction_mode=self._extraction_mode,
+                        )
+                        return (mid_path, out_path, None)
+                    except Exception as e:
+                        return (mid_path, None, str(e))
+
+                with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                    future_map = {
+                        executor.submit(_extract_one, p): p
+                        for p in pending_paths
+                    }
+                    for future in as_completed(future_map):
+                        if self.extract_stop_event.is_set():
+                            break
+                        mid_path = future_map[future]
+                        done_count += 1
+                        self.root.after(0, lambda i=done_count, t=total, p=mid_path: self.extract_status.config(
+                            text=f"状态: 正在提取 ({i}/{t}): {Path(p).name}...", fg="blue"))
+                        try:
+                            src, out_path, err = future.result()
+                            if err:
+                                self.log(f"[提取] ✗ {Path(src).name} 失败: {err}")
+                                failed_files.append((src, err))
+                            else:
+                                all_output_paths.append(out_path)
+                                self.log(f"[提取] ✓ {Path(src).name} -> {out_path}")
+                        except Exception as e:
+                            self.log(f"[提取] ✗ {Path(mid_path).name} 异常: {e}")
+                            failed_files.append((mid_path, str(e)))
 
             if self.extract_stop_event.is_set():
                 self.root.after(0, self.extraction_stopped)
@@ -1830,6 +1870,7 @@ class ResultReviewDialog:
 
 
 if __name__ == "__main__":
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
     try:
         root = tk.Tk()
         app = PDFBasicGUI(root)
