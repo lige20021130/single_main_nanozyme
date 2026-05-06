@@ -439,6 +439,33 @@ class KineticsAgent:
                 except (ValueError, TypeError):
                     pass
 
+        if record["main_activity"]["kinetics"]["Km"] is not None:
+            return
+
+        for val in table_values:
+            raw_text = val.get("raw_text", "") or val.get("text", "")
+            if not raw_text:
+                continue
+            for pat in _KM_PATTERNS:
+                m = pat.search(raw_text)
+                if m:
+                    groups = m.groups()
+                    try:
+                        if len(groups) >= 2:
+                            km_val = _parse_scientific_notation(str(groups[-2] if len(groups) >= 3 else groups[0]))
+                            km_unit = groups[-1] if groups[-1] else None
+                            if isinstance(km_val, (int, float)):
+                                record["main_activity"]["kinetics"]["Km"] = km_val
+                                if km_unit:
+                                    nu = _norm_unit(km_unit)
+                                    record["main_activity"]["kinetics"]["Km_unit"] = nu if nu else km_unit
+                                record["main_activity"]["kinetics"]["source"] = "table_regex"
+                                break
+                    except (ValueError, TypeError, IndexError):
+                        pass
+            if record["main_activity"]["kinetics"]["Km"] is not None:
+                break
+
     def _extract_kcat_from_text(self, record, kinetics_texts):
         for text in kinetics_texts:
             norm_text = _normalize_ocr_scientific(text)
@@ -789,6 +816,10 @@ class ApplicationAgent:
         re.compile(r'\b(?:Hg[\s2]*\+{1,2}|Pb[\s2]*\+{1,2}|Cd[\s2]*\+{1,2}|Cu[\s2]*\+{1,2}|Fe[\s3]*\+{1,2}|Cr\s*[Vv][Ii]+|As\s*[Vv][Ii]+)\b', re.I),
         re.compile(r'\b(?:xanthine|hypoxanthine|acetylcholine|choline|urea|hydrogen\s+peroxide|H2O2|phenol|bisphenol|catechol|hydroquinone)\b', re.I),
         re.compile(r'\b(?:mercury|lead|cadmium|arsenic|chromium)\b', re.I),
+        re.compile(r'\b(?:sensing|detecting|monitoring)\s+(?:of\s+)?([\w\-]+(?:\s[\w\-]+){0,2})', re.I),
+        re.compile(r'\b(?:thrombin|lysozyme|trypsin|urease|horseradish|HRP|BSA|albumin)\b', re.I),
+        re.compile(r'\b(?:nitrofurantoin|chloramphenicol|tetracycline|kanamycin|gentamicin|ampicillin)\b', re.I),
+        re.compile(r'\b(?:malathion|paraoxon|chlorpyrifos|diazinon|atrazine|simazine)\b', re.I),
     ]
 
     _SAMPLE_TYPE_MAP = {
@@ -802,7 +833,10 @@ class ApplicationAgent:
     }
 
     def extract(self, record, buckets, table_values, selected_name, doc=None):
-        self._extract_applications_from_text(record, buckets.get("application", []))
+        app_texts = (buckets.get("application", [])
+                     + buckets.get("kinetics", [])[:5]
+                     + buckets.get("activity", [])[:3])
+        self._extract_applications_from_text(record, app_texts)
         return record
 
     def _is_kinetics_context(self, text):
