@@ -1,6 +1,5 @@
 @echo off
-chcp 65001 >nul 2>&1
-title 纳米酶文献提取系统
+title Nanozyme Extraction System
 
 cd /d "%~dp0"
 
@@ -8,15 +7,15 @@ set CUDA_VISIBLE_DEVICES=0
 set PYTHONWARNINGS=ignore:.*pin_memory.*:UserWarning
 
 echo ============================================
-echo   纳米酶文献提取系统 - Single Main Nanozyme
+echo   Nanozyme Extraction System
 echo ============================================
 echo.
 
 where python >nul 2>&1
 if %ERRORLEVEL% neq 0 (
-    echo [错误] 未找到 Python，请确保 Python 已安装并添加到系统 PATH
+    echo [ERROR] Python not found. Please install Python 3.9+ and add to PATH.
     echo.
-    echo 如果使用 Conda，请先在 Anaconda Prompt 中运行:
+    echo If using Conda, run in Anaconda Prompt:
     echo   conda activate TraeAI-3
     echo   cd /d "%~dp0"
     echo   python nanozyme_gui.py
@@ -27,21 +26,21 @@ if %ERRORLEVEL% neq 0 (
 
 python --version 2>nul
 echo.
-echo 正在启动 GUI 界面...
+echo Starting GUI...
 echo.
 
 python nanozyme_gui.py 2>&1
 
 if %ERRORLEVEL% neq 0 (
     echo.
-    echo [错误] 程序异常退出，错误代码: %ERRORLEVEL%
+    echo [ERROR] Program exited with code: %ERRORLEVEL%
     echo.
-    echo 常见问题排查:
-    echo 1. 请确保已安装 Python 3.9+ 并激活正确的 Conda 环境
-    echo 2. 请确保已安装所有依赖: pip install -r requirements.txt
-    echo 3. 请确保 config.yaml 配置文件存在且正确
+    echo Troubleshooting:
+    echo 1. Make sure Python 3.9+ is installed and Conda env is activated
+    echo 2. Install dependencies: pip install -r requirements.txt
+    echo 3. Make sure config.yaml exists
     echo.
-    echo 如果使用 Conda，请在 Anaconda Prompt 中运行:
+    echo If using Conda, run in Anaconda Prompt:
     echo   conda activate TraeAI-3
     echo   cd /d "%~dp0"
     echo   python nanozyme_gui.py
