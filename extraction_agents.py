@@ -962,8 +962,6 @@ class MorphologyAgent:
         all_relevant = material_texts + char_texts
         self._extract_metal_elements(record, all_relevant, selected_name)
         self._extract_characterization_techniques(record, all_relevant)
-        self._extract_composition_structured(record, all_relevant, selected_name)
-        self._extract_dopants_or_defects(record, all_relevant)
         return record
 
     def _extract_size_properties(self, record, material_texts):
@@ -980,7 +978,6 @@ class MorphologyAgent:
                             low, high, unit = groups
                             sel["size"] = f"{low}-{high} {unit}"
                             sel["size_unit"] = unit
-                            sel["size_distribution"] = f"{low}-{high} {unit}"
                         elif len(groups) == 2:
                             value, unit = groups
                             sel["size"] = f"{value} {unit}"
@@ -1040,24 +1037,6 @@ class MorphologyAgent:
                         break
                 if sel.get("surface_area"):
                     break
-        if sel.get("zeta_potential") is None:
-            for text in char_texts:
-                for pat in _ZETA_POTENTIAL_PATTERNS:
-                    m = pat.search(text)
-                    if m:
-                        sel["zeta_potential"] = f"{m.group(1)} {m.group(2)}"
-                        break
-                if sel.get("zeta_potential"):
-                    break
-        if sel.get("pore_size") is None:
-            for text in char_texts:
-                for pat in _PORE_SIZE_PATTERNS:
-                    m = pat.search(text)
-                    if m:
-                        sel["pore_size"] = f"{m.group(1)} {m.group(2)}"
-                        break
-                if sel.get("pore_size"):
-                    break
 
     def _extract_metal_elements(self, record, texts, selected_name):
         sel = record.get("selected_nanozyme", {})
@@ -1096,103 +1075,11 @@ class MorphologyAgent:
         if found_techniques:
             sel["characterization"] = sorted(list(found_techniques))
 
-    _DOPANT_PATTERNS = [
-        re.compile(r'\b(?:N|B|S|P|F|Cl|Br|I|Se|Si)\s*[-‑–—doped]\b', re.I),
-        re.compile(r'\b(?:N|B|S|P|F|Se|Si)\s*[-‑–]?(?:doped|substituted|incorporated|co[-\s]?doped)\b', re.I),
-        re.compile(r'\b(?:co[-\s]?doped|tri[-\s]?doped)\s+(?:with\s+)?([\w\-]+(?:\s[\w\-]+){0,2})', re.I),
-        re.compile(r'\bdoped\s+(?:with|by)\s+([\w\-]+(?:\s[\w\-]+){0,2})', re.I),
-        re.compile(r'\b(?:N|B|S|P|F|Se|Si|Cl)\s*[-‑–]\s*(?:doped|doping|substitut)', re.I),
-        re.compile(r'\boxygen\s+vacanc', re.I),
-        re.compile(r'\bsulfur\s+vacanc', re.I),
-        re.compile(r'\bnitrogen\s+vacanc', re.I),
-        re.compile(r'\b(?:vacancy|vacancies|defect|defects)\b', re.I),
-        re.compile(r'\b(?:Fe|Co|Ni|Mn|Cu|Zn|Ce|Au|Ag|Pt|Pd|Ti|V|Cr|Mo|W|Ru|Rh|Ir|La|Zr|Al|Sn|Bi|In)\s*[-‑–]\s*(?:doped|substituted|incorporated)\b', re.I),
-    ]
-
-    def _extract_dopants_or_defects(self, record, texts):
-        sel = record.get("selected_nanozyme", {})
-        if not isinstance(sel, dict):
-            return
-        if sel.get("dopants_or_defects") and len(sel["dopants_or_defects"]) > 0:
-            return
-        found = set()
-        for text in texts:
-            for pat in self._DOPANT_PATTERNS:
-                m = pat.search(text)
-                if m:
-                    raw = m.group(0).strip()
-                    if 'vacanc' in raw.lower() or 'defect' in raw.lower():
-                        if 'oxygen' in raw.lower():
-                            found.add("oxygen vacancy")
-                        elif 'sulfur' in raw.lower():
-                            found.add("sulfur vacancy")
-                        elif 'nitrogen' in raw.lower():
-                            found.add("nitrogen vacancy")
-                        else:
-                            found.add(raw.lower())
-                    elif m.lastindex and m.group(1):
-                        found.add(m.group(1).strip().lower())
-                    else:
-                        found.add(raw.lower())
-        if found:
-            sel["dopants_or_defects"] = sorted(list(found))
-
-    _CORE_PATTERN = re.compile(
-        r'\b([A-Z][a-z]?\d*(?:[- ][A-Z][a-z]?\d*)*)\s*@\s*([A-Z][a-z]?\d*(?:[- ][A-Z][a-z]?\d*)*)\b',
-    )
-    _SUPPORT_PATTERN = re.compile(
-        r'\b(?:supported|deposited|loaded|anchored|immobilized)\s+(?:on|onto|over)\s+([\w\-]+(?:\s[\w\-]+){0,2})',
-        re.I,
-    )
-    _ORGANIC_PATTERN = re.compile(
-        r'\b(?:coated|wrapped|capped|functionalized|modified)\s+(?:with|by)\s+([\w\-]+(?:\s[\w\-]+){0,2})',
-        re.I,
-    )
-
-    def _extract_composition_structured(self, record, texts, selected_name):
-        sel = record.get("selected_nanozyme", {})
-        if not isinstance(sel, dict):
-            return
-        comp = sel.get("composition_structured", {})
-        if not isinstance(comp, dict):
-            comp = {"core": None, "dopants": [], "support": None, "organic_component": None}
-            sel["composition_structured"] = comp
-
-        if comp.get("core") is None:
-            for text in texts:
-                m = self._CORE_PATTERN.search(text)
-                if m:
-                    comp["core"] = m.group(1).strip()
-                    comp["support"] = m.group(2).strip()
-                    break
-
-        if comp.get("support") is None:
-            for text in texts:
-                m = self._SUPPORT_PATTERN.search(text)
-                if m:
-                    comp["support"] = m.group(1).strip()
-                    break
-
-        if comp.get("organic_component") is None:
-            for text in texts:
-                m = self._ORGANIC_PATTERN.search(text)
-                if m:
-                    raw = m.group(1).strip().lower()
-                    if raw not in ("the", "a", "an", "its"):
-                        comp["organic_component"] = raw
-                    break
-
-        if not comp.get("dopants"):
-            dopants = sel.get("dopants_or_defects", [])
-            if dopants:
-                comp["dopants"] = dopants
-
 
 class SynthesisAgent:
     def extract(self, record, buckets, table_values, selected_name, doc=None):
         synthesis_texts = buckets.get("synthesis", []) + buckets.get("material", [])[:5] + buckets.get("characterization", [])[:3]
         self._extract_synthesis_method(record, synthesis_texts)
-        self._extract_method_detail(record, synthesis_texts)
         return record
 
     def _extract_synthesis_method(self, record, synthesis_texts):
@@ -1252,46 +1139,6 @@ class SynthesisAgent:
                         break
                 if synth_cond.get("precursors"):
                     break
-
-    _METHOD_DETAIL_PATTERNS = [
-        re.compile(r'\b(?:under|in)\s+(?:a\s+)?(N[2_]|Ar|nitrogen|argon|inert|vacuum|air)\s+(?:atmosphere|flow|environment|condition)', re.I),
-        re.compile(r'\b(?:stirred|stirring)\s+(?:for|at)\s*([\d.]+\s*(?:h|hour|min|s))', re.I),
-        re.compile(r'\baged\s+(?:at|for)\s*([\d.]+\s*(?:h|hour|min|days?|°C))', re.I),
-        re.compile(r'\bdried\s+(?:at|under|in)\s*([\d.]+\s*(?:°C|h|hour|vacuum))', re.I),
-        re.compile(r'\bcalcined\s+(?:at|for)\s*([\d.]+\s*(?:°C|h|hour))', re.I),
-        re.compile(r'\bwashed\s+(?:with|by)\s+([\w\-]+(?:\s[\w\-]+){0,2})', re.I),
-        re.compile(r'\bcentrifuged\s+(?:at|for)\s*([\d.]+\s*(?:rpm|g|min))', re.I),
-        re.compile(r'\b(?:autoclaved|sealed)\s+(?:in|at)\s*([\w\-]+(?:\s[\w\-]+){0,2})', re.I),
-        re.compile(r'\b(?:ground|milled|ball[-\s]?milled)\s+(?:for|at)\s*([\d.]+\s*(?:h|hour|min))', re.I),
-        re.compile(r'\bfreeze[-\s]?dried\b', re.I),
-        re.compile(r'\blyophilized\b', re.I),
-    ]
-
-    def _extract_method_detail(self, record, synthesis_texts):
-        sel = record.get("selected_nanozyme", {})
-        if not isinstance(sel, dict):
-            return
-        synth_cond = sel.get("synthesis_conditions", {})
-        if not isinstance(synth_cond, dict):
-            synth_cond = {}
-            sel["synthesis_conditions"] = synth_cond
-        if synth_cond.get("method_detail"):
-            return
-        details = []
-        for text in synthesis_texts:
-            for pat in self._METHOD_DETAIL_PATTERNS:
-                m = pat.search(text)
-                if m:
-                    raw = m.group(0).strip()
-                    if m.lastindex and m.group(1):
-                        raw = f"{raw.split(m.group(1))[0].strip()} {m.group(1).strip()}"
-                    details.append(raw)
-                    if len(details) >= 3:
-                        break
-            if len(details) >= 3:
-                break
-        if details:
-            synth_cond["method_detail"] = "; ".join(details)
 
 
 class ApplicationAgent:
@@ -1703,16 +1550,6 @@ class RuleExtractorAdapter:
                 if ph_profile.get("pH_range") is not None:
                     break
 
-        if ph_profile.get("pH_stability_range") is None:
-            for text in search_texts:
-                for pat in _PH_PATTERNS["pH_stability"]:
-                    m = pat.search(text)
-                    if m:
-                        ph_profile["pH_stability_range"] = f"{m.group(1)}-{m.group(2)}"
-                        break
-                if ph_profile.get("pH_stability_range") is not None:
-                    break
-
         if ph_profile.get("optimal_pH") is None:
             cond_ph = record.get("main_activity", {}).get("conditions", {}).get("pH")
             if cond_ph:
@@ -1848,18 +1685,6 @@ class RuleExtractorAdapter:
                 if temp_profile.get("temperature_range") is not None:
                     break
 
-        if temp_profile.get("thermal_stability") is None:
-            for text, norm in zip(search_texts, norm_texts):
-                for pat in _TEMPERATURE_PATTERNS["thermal_stability"]:
-                    m = pat.search(text)
-                    if not m:
-                        m = pat.search(norm)
-                    if m:
-                        temp_profile["thermal_stability"] = f"stable up to {m.group(1)} °C"
-                        break
-                if temp_profile.get("thermal_stability") is not None:
-                    break
-
         if temp_profile.get("optimal_temperature") is None:
             cond_temp = record.get("main_activity", {}).get("conditions", {}).get("temperature")
             if cond_temp:
@@ -1909,7 +1734,6 @@ class RuleExtractorAdapter:
         ph_prof = self._context_aware_fallback(
             ph_prof, "optimal_pH", _PH_PATTERNS["optimal_pH"],
             all_text, norm_text, selected_variants, float_converter=lambda v: float(v) if 0 <= float(v) <= 14 else None,
-            field_name="optimal_pH"
         )
 
         if ph_prof.get("optimal_pH") is not None and not act.get("conditions", {}).get("pH"):
@@ -2151,22 +1975,6 @@ class RuleExtractorAdapter:
                     logger.info(f"[SMN] Fulltext fallback: surface_area={sel['surface_area']}")
                     break
 
-        if sel.get("pore_size") is None:
-            for pat in _PORE_SIZE_PATTERNS:
-                m = pat.search(all_text)
-                if m:
-                    sel["pore_size"] = f"{m.group(1)} {m.group(2)}"
-                    logger.info(f"[SMN] Fulltext fallback: pore_size={sel['pore_size']}")
-                    break
-
-        if sel.get("zeta_potential") is None:
-            for pat in _ZETA_POTENTIAL_PATTERNS:
-                m = pat.search(all_text)
-                if m:
-                    sel["zeta_potential"] = f"{m.group(1)} {m.group(2)}"
-                    logger.info(f"[SMN] Fulltext fallback: zeta_potential={sel['zeta_potential']}")
-                    break
-
         if not sel.get("characterization") or len(sel.get("characterization", [])) == 0:
             found_techniques = set()
             for tech_name, pattern in self._CHARACTERIZATION_TECHNIQUES.items():
@@ -2200,21 +2008,6 @@ class RuleExtractorAdapter:
                             break
                     if app.get("sample_type"):
                         break
-
-        if sel.get("composition_structured") is None or not sel.get("composition_structured", {}):
-            comp = sel.get("composition_structured", {})
-            if not isinstance(comp, dict):
-                comp = {}
-            if not comp.get("dopants"):
-                for pat in self._DOPANT_PATTERNS:
-                    m = pat.search(all_text)
-                    if m:
-                        dopant = m.group(1).strip()
-                        if dopant and len(dopant) < 30:
-                            comp["dopants"] = [dopant]
-                            sel["composition_structured"] = comp
-                            logger.info(f"[SMN] Fulltext fallback: dopant={dopant}")
-                            break
 
         if kin.get("Km") is None and kin.get("Vmax") is None:
             si_table_ref = re.search(

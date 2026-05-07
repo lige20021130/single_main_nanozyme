@@ -15,7 +15,6 @@ from single_main_nanozyme_extractor import (
     FigureProcessor,
     RuleExtractor,
     NumericValidator,
-    DiagnosticsBuilder,
     make_empty_record,
     validate_schema,
     EXTRACTION_MODE,
@@ -328,10 +327,15 @@ class TestSchemaNoOldFields:
         assert set(record.keys()) == {"paper", "selected_nanozyme", "main_activity",
                                        "applications", "important_values",
                                        "raw_supporting_text", "diagnostics"}
-        assert set(record["main_activity"]["kinetics"].keys()) == {
+        expected_kinetics_keys = {
             "Km", "Km_unit", "Vmax", "Vmax_unit",
             "kcat", "kcat_unit", "kcat_Km", "kcat_Km_unit",
-            "substrate", "source", "needs_review"}
+            "substrate", "source", "needs_review",
+            "_evidence_Km", "_evidence_Vmax",
+            "_evidence_kcat", "_evidence_kcat_Km",
+        }
+        actual_keys = set(record["main_activity"]["kinetics"].keys())
+        assert actual_keys == expected_kinetics_keys, f"Missing: {expected_kinetics_keys - actual_keys}, Extra: {actual_keys - expected_kinetics_keys}"
 
 
 class TestConfig:

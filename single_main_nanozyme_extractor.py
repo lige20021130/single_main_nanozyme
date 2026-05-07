@@ -31,6 +31,10 @@ FORBIDDEN_OLD_FIELDS = frozenset({
     "nanozyme_systems", "catalytic_activities", "benchmark_records",
     "assay_graph", "systems_count", "activities_count",
     "single_record_assembler", "system_name",
+    "selection_reason", "size_distribution", "dopants_or_defects",
+    "zeta_potential", "pore_size", "stability", "composition_structured",
+    "assay_method", "signal", "buffer", "reaction_time",
+    "pH_stability_range", "thermal_stability", "method_detail",
 })
 
 EMPTY_RECORD = {
@@ -39,33 +43,26 @@ EMPTY_RECORD = {
         "year": None, "doi": None, "source_file": None, "document_kind": None,
     },
     "selected_nanozyme": {
-        "name": None, "selection_reason": None, "composition": None,
+        "name": None, "composition": None,
         "morphology": None, "size": None, "size_unit": None,
-        "size_distribution": None, "metal_elements": [],
-        "dopants_or_defects": [], "synthesis_method": None,
+        "metal_elements": [],
+        "synthesis_method": None,
         "synthesis_conditions": {
             "temperature": None, "time": None, "precursors": [],
-            "method_detail": None,
         },
         "crystal_structure": None, "surface_area": None,
-        "zeta_potential": None, "pore_size": None,
-        "characterization": [], "stability": None,
-        "composition_structured": {
-            "core": None, "dopants": [], "support": None, "organic_component": None,
-        },
+        "characterization": [],
     },
     "main_activity": {
-        "enzyme_like_type": None, "substrates": [], "assay_method": None,
-        "signal": None,
+        "enzyme_like_type": None, "substrates": [],
         "conditions": {
-            "buffer": None, "pH": None, "temperature": None, "reaction_time": None,
+            "pH": None, "temperature": None,
         },
         "pH_profile": {
-            "optimal_pH": None, "pH_range": None, "pH_stability_range": None,
+            "optimal_pH": None, "pH_range": None,
         },
         "temperature_profile": {
             "optimal_temperature": None, "temperature_range": None,
-            "thermal_stability": None,
         },
         "kinetics": {
             "Km": None, "Km_unit": None, "Vmax": None, "Vmax_unit": None,
@@ -1082,15 +1079,6 @@ _PH_PATTERNS = {
         re.compile(r'\b(?:within|over|in)\s+(?:the\s+)?pH\s+(?:range\s+)?(?:of\s+)?([\d.]+)\s*[-–—~to]+\s*([\d.]+)', re.I),
         re.compile(r'\bpH\s+([\d.]+)\s*[-–—]\s*([\d.]+)\s+was\s+(?:the\s+)?(?:optimal|active)', re.I),
     ],
-    "pH_stability": [
-        re.compile(r'\bpH\s+stability\s*(?:range|window)?\s*(?:of|=|:|≈|~|was)?\s*([\d.]+)\s*[-–—~to]+\s*([\d.]+)', re.I),
-        re.compile(r'\bstable\s+(?:over|in|at)\s+pH\s*(?:range\s+)?([\d.]+)\s*[-–—~to]+\s*([\d.]+)', re.I),
-        re.compile(r'\bretained\s+.*?activity\s+(?:over|in)\s+pH\s*([\d.]+)\s*[-–—~to]+\s*([\d.]+)', re.I),
-        re.compile(r'\b(?:maintained|preserved)\s+.*?activity\s+(?:over|in|within)\s+pH\s*([\d.]+)\s*[-–—~to]+\s*([\d.]+)', re.I),
-        re.compile(r'\bpH\s+stability\s+was\s+(?:studied|evaluated|examined)\s+(?:from|over|in)\s*([\d.]+)\s*[-–—~to]+\s*([\d.]+)', re.I),
-        re.compile(r'\b(?:remained|stayed)\s+(?:stable|active)\s+(?:over|in|within|from)\s+pH\s*([\d.]+)\s*[-–—~to]+\s*([\d.]+)', re.I),
-        re.compile(r'\b(?:more\s+than\s+\d+%\s+)?(?:of\s+)?(?:its\s+)?(?:original|initial|catalytic)\s+activity\s+(?:was\s+)?(?:retained|maintained|preserved)\s+(?:over|in|within)\s+pH\s*([\d.]+)\s*[-–—~to]+\s*([\d.]+)', re.I),
-    ],
 }
 
 _TEMPERATURE_PATTERNS = {
@@ -1119,17 +1107,6 @@ _TEMPERATURE_PATTERNS = {
         re.compile(r'\btemperature\s+([\d.]+)\s*[-–—~to]+\s*([\d.]+)\s*°C\s+(?:with|showed)', re.I),
         re.compile(r'\b(?:within|over|in)\s+(?:the\s+)?temperature\s+(?:range\s+)?(?:of\s+)?([\d.]+)\s*[-–—~to]+\s*([\d.]+)\s*°?C', re.I),
         re.compile(r'\b([\d.]+)\s*[-–—]\s*([\d.]+)\s*°C\s+(?:was|were)\s+(?:the\s+)?(?:optimal|active|best)', re.I),
-    ],
-    "thermal_stability": [
-        re.compile(r'\bthermal\s+stability\s*(?:up\s+to|until|≤|<=)\s*([\d.]+)\s*°?C', re.I),
-        re.compile(r'\bstable\s+(?:up\s+to|until|at)\s*([\d.]+)\s*°?C', re.I),
-        re.compile(r'\bretained\s+.*?activity\s+(?:up\s+to|until|at)\s*([\d.]+)\s*°?C', re.I),
-        re.compile(r'\bthermally\s+stable\s+(?:up\s+to|until|at)\s*([\d.]+)\s*°?C', re.I),
-        re.compile(r'\bTGA\s+(?:showed|revealed|indicated)\s+.*?decompos\w+\s+(?:at|above|around)\s*([\d.]+)\s*°?C', re.I),
-        re.compile(r'\b(?:maintained|preserved|retained)\s+.*?(?:activity|structure|stability)\s+(?:up\s+to|until|at)\s*([\d.]+)\s*°?C', re.I),
-        re.compile(r'\bno\s+(?:significant\s+)?(?:loss|decrease|change)\s+in\s+activity\s+(?:up\s+to|until|below)\s*([\d.]+)\s*°?C', re.I),
-        re.compile(r'\b(?:remained|stayed)\s+(?:stable|active)\s+(?:up\s+to|until|at)\s*([\d.]+)\s*°?C', re.I),
-        re.compile(r'\b(?:more\s+than\s+\d+%\s+)?(?:of\s+)?(?:its\s+)?(?:original|initial|catalytic)\s+activity\s+(?:was\s+)?(?:retained|maintained|preserved)\s+(?:up\s+to|until|at)\s*([\d.]+)\s*°?C', re.I),
     ],
 }
 
@@ -1283,20 +1260,19 @@ HARD RULES:
 OUTPUT STRUCTURE:
 {
   "selected_nanozyme": {
-    "name": null, "selection_reason": null, "composition": null,
+    "name": null, "composition": null,
     "morphology": null, "size": null, "size_unit": null,
-    "size_distribution": null, "metal_elements": [],
-    "dopants_or_defects": [], "synthesis_method": null,
-    "synthesis_conditions": {"temperature": null, "time": null, "precursors": [], "method_detail": null},
+    "metal_elements": [],
+    "synthesis_method": null,
+    "synthesis_conditions": {"temperature": null, "time": null, "precursors": []},
     "crystal_structure": null, "surface_area": null,
-    "zeta_potential": null, "pore_size": null,
-    "characterization": [], "stability": null
+    "characterization": []
   },
   "main_activity": {
-    "enzyme_like_type": null, "substrates": [], "assay_method": null, "signal": null,
-    "conditions": {"buffer": null, "pH": null, "temperature": null, "reaction_time": null},
-    "pH_profile": {"optimal_pH": null, "pH_range": null, "pH_stability_range": null},
-    "temperature_profile": {"optimal_temperature": null, "temperature_range": null, "thermal_stability": null},
+    "enzyme_like_type": null, "substrates": [],
+    "conditions": {"pH": null, "temperature": null},
+    "pH_profile": {"optimal_pH": null, "pH_range": null},
+    "temperature_profile": {"optimal_temperature": null, "temperature_range": null},
     "kinetics": {
       "Km": null, "Km_unit": null, "Vmax": null, "Vmax_unit": null,
       "kcat": null, "kcat_unit": null, "kcat_Km": null, "kcat_Km_unit": null,
@@ -1319,16 +1295,15 @@ OUTPUT STRUCTURE:
 KEY EXTRACTION RULES:
 - Kinetics: Extract BOTH Km AND Vmax. source="text"|"table". Look for: "Km = X mM", "Km(TMB) = X", "Vmax = X M/s", "Vmax = X mM/s", "kcat = X s⁻¹", "kcat/Km = X M⁻¹s⁻¹". Vmax often appears as: "Vmax = 30×10⁻⁸ M·s⁻¹", "Vmax = 25.7 mM·s⁻¹", "maximum velocity", "Vmax(TMB)". If multiple substrates, pick primary (TMB/H2O2).
 - Synthesis: method name + conditions (temp/time/precursors). Common: hydrothermal, solvothermal, co-precipitation, sol-gel, calcination, pyrolysis, CVD, self-assembly, carbonization, stripping.
-- pH_profile: optimal_pH = pH at maximum activity. pH_range = active range (e.g. "3-7"). pH_stability_range = range where nanozyme remains stable. Look for "optimal pH", "pH optimum", "maximum activity at pH X", "pH-dependent activity".
-- Temperature_profile: optimal_temperature = temp at maximum activity. temperature_range = active range. thermal_stability = max temp before degradation. Look for "optimal temperature", "TGA", "stable up to X°C".
-- Size: size = number only, size_unit = unit. size_distribution = range (e.g. "50-80 nm"). crystal_structure = phase (spinel/perovskite/amorphous/graphitic). surface_area = BET value. pore_size = diameter.
+- pH_profile: optimal_pH = pH at maximum activity. pH_range = active range (e.g. "3-7"). Look for "optimal pH", "pH optimum", "maximum activity at pH X", "pH-dependent activity".
+- Temperature_profile: optimal_temperature = temp at maximum activity. temperature_range = active range. Look for "optimal temperature", "maximum activity at X°C".
+- Size: size = number only, size_unit = unit. crystal_structure = phase (spinel/perovskite/amorphous/graphitic). surface_area = BET value.
 - Morphology: ONLY physical shape words (cubic, spherical, nanosheet, nanorod, core-shell, etc.). NOT figure captions or descriptions.
 - Applications: Extract EACH distinct application separately. target_analyte ≠ substrate. If none, output [].
 - Important values: capture key numbers not fitting elsewhere (e.g. specific activity, photothermal conversion efficiency, laser wavelength). If none, output []."""
 
 _LLM_USER_TEMPLATE = """\
 Selected main nanozyme material: {selected_material}
-Selection reason: {selection_reason}
 
 Evidence buckets for this material:
 
@@ -1485,22 +1460,10 @@ def validate_schema(record: Dict[str, Any]) -> Dict[str, Any]:
             auto_fixed = True
 
     sel_nano = record.get("selected_nanozyme", {})
-    for new_key in ("size_unit", "size_distribution", "crystal_structure",
-                    "surface_area", "zeta_potential", "pore_size"):
+    for new_key in ("size_unit", "crystal_structure", "surface_area"):
         if new_key not in sel_nano:
             sel_nano[new_key] = None
             auto_fixed = True
-    if "composition_structured" not in sel_nano:
-        sel_nano["composition_structured"] = {"core": None, "dopants": [], "support": None, "organic_component": None}
-        auto_fixed = True
-    elif not isinstance(sel_nano["composition_structured"], dict):
-        sel_nano["composition_structured"] = {"core": None, "dopants": [], "support": None, "organic_component": None}
-        auto_fixed = True
-    else:
-        for ck in ("core", "dopants", "support", "organic_component"):
-            if ck not in sel_nano["composition_structured"]:
-                sel_nano["composition_structured"][ck] = [] if ck == "dopants" else None
-                auto_fixed = True
 
     rst = record.get("raw_supporting_text", {})
     for k in _RST_KEYS:
@@ -3249,11 +3212,8 @@ class TableProcessor:
             col_map = self._find_column_indices(headers, {
                 "surface_area": "surface area",
                 "surface_area_unit": "m²/g",
-                "pore_size": "pore size",
-                "pore_size_unit": "pore size (",
                 "particle_size": "particle size",
                 "particle_size_unit": "particle size (",
-                "zeta_potential": "zeta",
                 "material": "material",
             })
             for row in rows[1:]:
@@ -3267,7 +3227,7 @@ class TableProcessor:
                 )
                 if not is_target:
                     continue
-                for param in ("surface_area", "pore_size", "particle_size", "zeta_potential"):
+                for param in ("surface_area", "particle_size"):
                     if param in col_map and col_map[param] < len(row):
                         val = row[col_map[param]]
                         if val is not None and str(val).strip():
@@ -3490,11 +3450,6 @@ class RuleExtractor:
 
         self._extract_applications_from_text(record, buckets.get("application", []))
 
-        self._extract_assay_method(record, buckets.get("activity", []) + buckets.get("kinetics", []))
-        self._extract_signal(record, buckets.get("activity", []) + buckets.get("kinetics", []))
-        self._extract_buffer(record, buckets.get("activity", []) + buckets.get("kinetics", []))
-        self._extract_reaction_time(record, buckets.get("activity", []) + buckets.get("kinetics", []))
-        self._extract_stability(record, buckets.get("characterization", []) + buckets.get("activity", []) + buckets.get("material", [])[:3])
         self._extract_mechanism(record, buckets.get("mechanism", []) + buckets.get("activity", []) + buckets.get("kinetics", [])[:5] + buckets.get("application", [])[:3])
 
         if doc:
@@ -3609,7 +3564,15 @@ class RuleExtractor:
                         if groups[0] in ("mM", "μM", "uM", "M", "mmol", "umol", "nmol"):
                             value, unit = groups[1], groups[0]
                         else:
-                            value, unit = groups[0], groups[2]
+                            try:
+                                float(groups[0])
+                                value, unit = groups[0], groups[2]
+                            except (ValueError, TypeError):
+                                try:
+                                    float(groups[1])
+                                    value, unit = groups[1], groups[2]
+                                except (ValueError, TypeError):
+                                    continue
                     elif len(groups) == 2:
                         value, unit = groups
                     else:
@@ -4131,16 +4094,6 @@ class RuleExtractor:
                 if ph_profile.get("pH_range") is not None:
                     break
 
-        if ph_profile.get("pH_stability_range") is None:
-            for text in search_texts:
-                for pat in _PH_PATTERNS["pH_stability"]:
-                    m = pat.search(text)
-                    if m:
-                        ph_profile["pH_stability_range"] = f"{m.group(1)}-{m.group(2)}"
-                        break
-                if ph_profile.get("pH_stability_range") is not None:
-                    break
-
     def _extract_temperature_profile(self, record: Dict[str, Any], buckets):
         temp_profile = record["main_activity"].get("temperature_profile", {})
         if not isinstance(temp_profile, dict):
@@ -4251,16 +4204,6 @@ class RuleExtractor:
                 if temp_profile.get("temperature_range") is not None:
                     break
 
-        if temp_profile.get("thermal_stability") is None:
-            for text in search_texts:
-                for pat in _TEMPERATURE_PATTERNS["thermal_stability"]:
-                    m = pat.search(text)
-                    if m:
-                        temp_profile["thermal_stability"] = f"stable up to {m.group(1)} °C"
-                        break
-                if temp_profile.get("thermal_stability") is not None:
-                    break
-
     def _extract_synthesis_method(self, record: Dict[str, Any], synthesis_texts: List[str]):
         sel = record.get("selected_nanozyme", {})
         if not isinstance(sel, dict):
@@ -4357,7 +4300,6 @@ class RuleExtractor:
                             low, high, unit = groups
                             sel["size"] = f"{low}-{high} {unit}"
                             sel["size_unit"] = unit
-                            sel["size_distribution"] = f"{low}-{high} {unit}"
                         elif len(groups) == 2:
                             value, unit = groups
                             sel["size"] = f"{value} {unit}"
@@ -4418,26 +4360,6 @@ class RuleExtractor:
                         sel["surface_area"] = f"{m.group(1)} {m.group(2)}"
                         break
                 if sel.get("surface_area"):
-                    break
-
-        if sel.get("zeta_potential") is None:
-            for text in char_texts:
-                for pat in _ZETA_POTENTIAL_PATTERNS:
-                    m = pat.search(text)
-                    if m:
-                        sel["zeta_potential"] = f"{m.group(1)} {m.group(2)}"
-                        break
-                if sel.get("zeta_potential"):
-                    break
-
-        if sel.get("pore_size") is None:
-            for text in char_texts:
-                for pat in _PORE_SIZE_PATTERNS:
-                    m = pat.search(text)
-                    if m:
-                        sel["pore_size"] = f"{m.group(1)} {m.group(2)}"
-                        break
-                if sel.get("pore_size"):
                     break
 
     _MORPHOLOGY_TERMS = [
@@ -4828,218 +4750,6 @@ class RuleExtractor:
             app["_evidence"] = text[:300]
             record["applications"].append(app)
 
-    _ASSAY_METHOD_PATTERNS = [
-        (re.compile(r'\bUV-vis\b', re.I), "UV-vis"),
-        (re.compile(r'\bUV/vis\b', re.I), "UV-vis"),
-        (re.compile(r'\bUV\s*vis\b', re.I), "UV-vis"),
-        (re.compile(r'\bspectrophotomet', re.I), "spectrophotometric"),
-        (re.compile(r'\babsorbance\b', re.I), "UV-vis"),
-        (re.compile(r'\bfluorescen', re.I), "fluorescence"),
-        (re.compile(r'\bfluoromet', re.I), "fluorometric"),
-        (re.compile(r'\belectrochemilumin', re.I), "electrochemiluminescent"),
-        (re.compile(r'\belectrochem', re.I), "electrochemical"),
-        (re.compile(r'\bcyclic\s+voltammet', re.I), "electrochemical"),
-        (re.compile(r'\bdifferential\s+pulse\s+voltammet', re.I), "electrochemical"),
-        (re.compile(r'\bsquare\s+wave\s+voltammet', re.I), "electrochemical"),
-        (re.compile(r'\bimpedance\s+spectroscop', re.I), "electrochemical"),
-        (re.compile(r'\bEIS\b', re.I), "electrochemical"),
-        (re.compile(r'\bDPV\b', re.I), "electrochemical"),
-        (re.compile(r'\bSWV\b', re.I), "electrochemical"),
-        (re.compile(r'\bCV\b', re.I), "electrochemical"),
-        (re.compile(r'\bamperomet', re.I), "amperometric"),
-        (re.compile(r'\bSERS\b', re.I), "SERS"),
-        (re.compile(r'\bsurface.enhanced\s+Raman', re.I), "SERS"),
-        (re.compile(r'\bcolorimet', re.I), "colorimetric"),
-        (re.compile(r'\bchemilumin', re.I), "chemiluminescent"),
-        (re.compile(r'\bRaman\s+spect', re.I), "Raman"),
-        (re.compile(r'\bphotoelectrochem', re.I), "photoelectrochemical"),
-        (re.compile(r'\bchronoamperomet', re.I), "chronoamperometric"),
-        (re.compile(r'\bpotentiomet', re.I), "potentiometric"),
-        (re.compile(r'\bconductomet', re.I), "conductometric"),
-        (re.compile(r'\bimpedimet', re.I), "impedimetric"),
-        (re.compile(r'\bphotomet', re.I), "photometric"),
-        (re.compile(r'\bturbidimet', re.I), "turbidimetric"),
-        (re.compile(r'\bnephelomet', re.I), "nephelometric"),
-        (re.compile(r'\bthermomet', re.I), "thermometric"),
-        (re.compile(r'\bmagnetomet', re.I), "magnetometric"),
-        (re.compile(r'\bsmartphone[-\s]based', re.I), "smartphone-based colorimetric"),
-        (re.compile(r'\bpaper[-\s]based', re.I), "paper-based colorimetric"),
-        (re.compile(r'\bmicrofluid', re.I), "microfluidic"),
-        (re.compile(r'\blateral\s+flow', re.I), "lateral flow"),
-        (re.compile(r'\bELISA\b', re.I), "ELISA"),
-        (re.compile(r'\bimmunoassay\b', re.I), "immunoassay"),
-        (re.compile(r'\baptasensor\b', re.I), "aptasensor"),
-        (re.compile(r'\bglucose\s+meter\b', re.I), "glucose meter"),
-        (re.compile(r'\bpH\s+meter\b', re.I), "pH meter"),
-        (re.compile(r'\bdissolved\s+oxygen\b', re.I), "dissolved oxygen"),
-        (re.compile(r'\bpolarograph', re.I), "polarographic"),
-    ]
-
-    def _extract_assay_method(self, record: Dict[str, Any], texts: List[str]):
-        if record["main_activity"].get("assay_method"):
-            return
-        for text in texts:
-            for pat, method in self._ASSAY_METHOD_PATTERNS:
-                if pat.search(text):
-                    record["main_activity"]["assay_method"] = method
-                    return
-
-    _SIGNAL_PATTERNS = [
-        (re.compile(r'\babsorbance\b', re.I), "absorbance"),
-        (re.compile(r'\babsorption\b', re.I), "absorbance"),
-        (re.compile(r'\bfluorescen', re.I), "fluorescence"),
-        (re.compile(r'\bcurrent\b', re.I), "current"),
-        (re.compile(r'\bcolor\s*change\b', re.I), "color change"),
-        (re.compile(r'\bcolorimetric\b', re.I), "absorbance"),
-        (re.compile(r'\bluminescen', re.I), "luminescence"),
-        (re.compile(r'\bphotolumin', re.I), "photoluminescence"),
-        (re.compile(r'\belectrochemilumin', re.I), "electrochemiluminescence"),
-        (re.compile(r'\bchemiluminescen', re.I), "chemiluminescence"),
-        (re.compile(r'\braman\b', re.I), "Raman"),
-        (re.compile(r'\bSERS\b', re.I), "SERS"),
-        (re.compile(r'\belectrochem', re.I), "electrochemical"),
-        (re.compile(r'\bamperometric', re.I), "amperometric"),
-        (re.compile(r'\bvoltammetric', re.I), "voltammetric"),
-        (re.compile(r'\bimpedance\b', re.I), "impedance"),
-        (re.compile(r'\bEIS\b', re.I), "impedance"),
-        (re.compile(r'\bUV[-\s]?vis\b', re.I), "UV-vis"),
-        (re.compile(r'\bspectrophotometr', re.I), "absorbance"),
-        (re.compile(r'\bturn[-\s]?on\b', re.I), "fluorescence turn-on"),
-        (re.compile(r'\bturn[-\s]?off\b', re.I), "fluorescence turn-off"),
-        (re.compile(r'\bratiometric\b', re.I), "ratiometric"),
-        (re.compile(r'\bDPV\b', re.I), "DPV"),
-        (re.compile(r'\bCV\b', re.I), "CV"),
-        (re.compile(r'\bchronoamperometr', re.I), "chronoamperometric"),
-        (re.compile(r'\bpotentiomet', re.I), "potential"),
-        (re.compile(r'\bconductomet', re.I), "conductance"),
-        (re.compile(r'\bimpedimet', re.I), "impedance"),
-        (re.compile(r'\breflectan', re.I), "reflectance"),
-        (re.compile(r'\btransmittan', re.I), "transmittance"),
-        (re.compile(r'\bscattering\b', re.I), "scattering"),
-        (re.compile(r'\bDLS\b', re.I), "DLS"),
-        (re.compile(r'\bphosphorescen', re.I), "phosphorescence"),
-        (re.compile(r'\bupconversion\b', re.I), "upconversion"),
-        (re.compile(r'\bdownconversion\b', re.I), "downconversion"),
-        (re.compile(r'\bthermomet', re.I), "temperature"),
-        (re.compile(r'\bmagnetomet', re.I), "magnetic"),
-        (re.compile(r'\bpH\s+(?:change|shift|drop|increase)', re.I), "pH change"),
-        (re.compile(r'\bO2\s+(?:concentration|level|evolution)', re.I), "O2"),
-        (re.compile(r'\bH2\s+(?:concentration|level|evolution)', re.I), "H2"),
-        (re.compile(r'\bdissolved\s+oxygen\b', re.I), "dissolved oxygen"),
-    ]
-
-    def _extract_signal(self, record: Dict[str, Any], texts: List[str]):
-        if record["main_activity"].get("signal"):
-            return
-        for text in texts:
-            for pat, signal in self._SIGNAL_PATTERNS:
-                if pat.search(text):
-                    record["main_activity"]["signal"] = signal
-                    return
-
-    _BUFFER_PATTERNS = [
-        (re.compile(r'\bNaAc[-\s]HAc\b', re.I), "NaAc-HAc"),
-        (re.compile(r'\bsodium\s+acetate\s+buffer\b', re.I), "NaAc-HAc"),
-        (re.compile(r'\bammonium\s+acetate\s+buffer\b', re.I), "ammonium-acetate"),
-        (re.compile(r'\bTris[-\s]acetate\s+buffer\b', re.I), "Tris-acetate"),
-        (re.compile(r'\bacetate\s+buffer\b', re.I), "NaAc-HAc"),
-        (re.compile(r'\bacetate-buffered\b', re.I), "NaAc-HAc"),
-        (re.compile(r'\bNaAc\b(?![-\s]HAc)', re.I), "NaAc-HAc"),
-        (re.compile(r'\bHAc\b', re.I), "NaAc-HAc"),
-        (re.compile(r'\bPBS\b', re.I), "PBS"),
-        (re.compile(r'\bphosphate[-\s]buffer', re.I), "PBS"),
-        (re.compile(r'\bcitrate\s+buffer', re.I), "citrate"),
-        (re.compile(r'\bTris[-\s]HCl\b', re.I), "Tris-HCl"),
-        (re.compile(r'\bTris[-\s]EDTA\b', re.I), "Tris-EDTA"),
-        (re.compile(r'\bTris[-\s]acetate\b', re.I), "Tris-acetate"),
-        (re.compile(r'\bTris\b(?![-\s](?:HCl|EDTA|acetate))', re.I), "Tris-HCl"),
-        (re.compile(r'\bHEPES[-\s]NaOH\b', re.I), "HEPES-NaOH"),
-        (re.compile(r'\bHEPES\b(?![-\s]NaOH)', re.I), "HEPES"),
-        (re.compile(r'\bMES\b', re.I), "MES"),
-        (re.compile(r'\bMOPS\b', re.I), "MOPS"),
-        (re.compile(r'\bBR\b\s+buffer', re.I), "Britton-Robinson"),
-        (re.compile(r'\bBritton[-\s]Robinson\b', re.I), "Britton-Robinson"),
-        (re.compile(r'\bborate\s+buffer', re.I), "borate"),
-        (re.compile(r'\bcarbonate[-\s]bicarbonate\s+buffer', re.I), "carbonate-bicarbonate"),
-        (re.compile(r'\bglycine[-\s]NaOH\s+buffer', re.I), "glycine-NaOH"),
-        (re.compile(r'\bPIPES\s+buffer', re.I), "PIPES"),
-        (re.compile(r'\bCHES\s+buffer', re.I), "CHES"),
-        (re.compile(r'\bCAPS\s+buffer', re.I), "CAPS"),
-        (re.compile(r'\bTAPS\b', re.I), "TAPS"),
-        (re.compile(r'\bTES\b', re.I), "TES"),
-        (re.compile(r'\bBES\b', re.I), "BES"),
-        (re.compile(r'\bBicine\b', re.I), "Bicine"),
-        (re.compile(r'\bTricine\b', re.I), "Tricine"),
-        (re.compile(r'\bHEPPSO\b', re.I), "HEPPSO"),
-        (re.compile(r'\bEPPS\b', re.I), "EPPS"),
-        (re.compile(r'\bADA\b\s+buffer', re.I), "ADA"),
-        (re.compile(r'\bbis[-\s]Tris\b', re.I), "bis-Tris"),
-        (re.compile(r'\bimidazole\s+buffer', re.I), "imidazole"),
-        (re.compile(r'\bsuccinate\s+buffer', re.I), "succinate"),
-        (re.compile(r'\bmalonate\s+buffer', re.I), "malonate"),
-        (re.compile(r'\btartrate\s+buffer', re.I), "tartrate"),
-        (re.compile(r'\bformate\s+buffer', re.I), "formate"),
-        (re.compile(r'\bpropionate\s+buffer', re.I), "propionate"),
-        (re.compile(r'\bphthalate\s+buffer', re.I), "phthalate"),
-    ]
-
-    def _extract_buffer(self, record: Dict[str, Any], texts: List[str]):
-        if record["main_activity"]["conditions"].get("buffer"):
-            return
-        for text in texts:
-            for pat, buf in self._BUFFER_PATTERNS:
-                if pat.search(text):
-                    record["main_activity"]["conditions"]["buffer"] = buf
-                    return
-
-    _REACTION_TIME_PATTERNS = [
-        re.compile(r'\b(?:reaction|incubation|catalytic)\s+time\s*(?:of|was|=|:|≈|~)\s*(?:about\s+|approximately\s+)?([\d.]+)\s*(min|s|sec|h|hour|hr)', re.I),
-        re.compile(r'\bincubated\s+(?:for|at)\s*(?:about\s+)?([\d.]+)\s*(min|s|sec|h|hour|hr)', re.I),
-        re.compile(r'\b(?:after|within)\s*([\d.]+)\s*(min|s|sec|h|hour|hr)\s+(?:of\s+)?(?:reaction|incubation|catalysis)', re.I),
-        re.compile(r'\b(?:reaction|incubation)\s+(?:was\s+)?(?:carried\s+out\s+)?(?:for|during)\s*([\d.]+)\s*(min|s|sec|h|hour|hr)', re.I),
-        re.compile(r'\b([\d.]+)\s*(min|s|sec)\s+(?:of\s+)?(?:reaction|incubation)\s+time\b', re.I),
-        re.compile(r'\btime\s*[\(=]\s*([\d.]+)\s*(min|s|sec|h)\b', re.I),
-    ]
-
-    def _extract_reaction_time(self, record: Dict[str, Any], texts: List[str]):
-        if record["main_activity"]["conditions"].get("reaction_time"):
-            return
-        for text in texts:
-            for pat in self._REACTION_TIME_PATTERNS:
-                m = pat.search(text)
-                if m:
-                    val = m.group(1)
-                    unit = m.group(2)
-                    record["main_activity"]["conditions"]["reaction_time"] = f"{val} {unit}"
-                    return
-
-    _STABILITY_PATTERNS = [
-        re.compile(r'\bstable\s+(?:for|over|during)\s*([\d.]+)\s*(days?|weeks?|months?|hours?|h)\b', re.I),
-        re.compile(r'\bretained\s+(?:more\s+than\s+)?(\d+)\s*%?\s*(?:of\s+(?:its?\s+)?(?:original|initial)\s+activity)?\s*(?:after|for)\s*([\d.]+)\s*(days?|weeks?|months?|hours?|cycles?)', re.I),
-        re.compile(r'\b(?:storage|long[-\s]?term)\s+stability\s*(?::|was|of)\s*(?:stable\s+)?(?:for\s+)?([\d.]+)\s*(days?|weeks?|months?|hours?)', re.I),
-        re.compile(r'\bremained\s+([\d.]+)\s*%?\s*(?:of\s+(?:its?\s+)?(?:original|initial)\s+activity)?\s*(?:after|over)\s*([\d.]+)\s*(days?|weeks?|months?|cycles?)', re.I),
-        re.compile(r'\b(?:good|excellent|high)\s+stability\b', re.I),
-        re.compile(r'\b(?:no\s+)?significant\s+(?:loss|decrease|decline|reduction)\s+in\s+activity\b', re.I),
-    ]
-
-    def _extract_stability(self, record: Dict[str, Any], texts: List[str]):
-        sel = record.get("selected_nanozyme", {})
-        if not isinstance(sel, dict):
-            return
-        if sel.get("stability"):
-            return
-        for text in texts:
-            for pat in self._STABILITY_PATTERNS:
-                m = pat.search(text)
-                if m:
-                    groups = m.groups()
-                    if len(groups) >= 2 and groups[0] and groups[1]:
-                        val = groups[0]
-                        unit = groups[1]
-                        sel["stability"] = f"stable for {val} {unit}"
-                    else:
-                        sel["stability"] = m.group(0).strip().lower()
-                    return
 
     _MECHANISM_PATTERNS = [
         (re.compile(r'\bFenton[-\s]like\b', re.I), "Fenton-like"),
@@ -6051,13 +5761,6 @@ class SingleMainNanozymePipeline:
                 self._agentic_guard = None
 
         record["selected_nanozyme"]["name"] = selected_name
-        selection_reason = (
-            f"score={selected.get('score',0)}, "
-            f"sources={', '.join(sorted(selected.get('sources',set())))}"
-        )
-        if selected.get("ambiguity_resolved_by"):
-            selection_reason += f", resolved_by={selected['ambiguity_resolved_by']}"
-        record["selected_nanozyme"]["selection_reason"] = selection_reason
 
         buckets = self.bucket_builder.build(doc, selected_name, all_candidate_names)
         logger.info(f"[SMN] Buckets: " + ", ".join(f"{k}={len(v)}" for k, v in buckets.items()))
@@ -6154,8 +5857,6 @@ class SingleMainNanozymePipeline:
                 unit = cv.get("unit")
                 if param == "surface_area" and not sel.get("surface_area"):
                     sel["surface_area"] = f"{val} {unit}" if unit else str(val)
-                elif param == "pore_size" and not sel.get("pore_size"):
-                    sel["pore_size"] = f"{val} {unit}" if unit else str(val)
                 elif param == "particle_size" and not sel.get("size"):
                     num_m = re.search(r'[\d.]+', str(val))
                     if num_m:
@@ -6166,8 +5867,6 @@ class SingleMainNanozymePipeline:
                             sel["size"] = f"{val} {unit}" if unit else str(val)
                     else:
                         sel["size"] = f"{val} {unit}" if unit else str(val)
-                elif param == "zeta_potential" and not sel.get("zeta_potential"):
-                    sel["zeta_potential"] = f"{val} {unit}" if unit else str(val)
             logger.info(f"[SMN] Table characterization values applied: {len(table_characterization_values)}")
 
         if self._agentic_guard and self.config.enable_agentic_guard:
@@ -6185,12 +5884,12 @@ class SingleMainNanozymePipeline:
         if self.config.enable_llm and self.client:
             if self.config.enable_llm_refinement:
                 llm_result = await self._call_llm_with_refinement(
-                    selected_name, record["selected_nanozyme"]["selection_reason"],
+                    selected_name,
                     buckets, table_classified, figure_summ,
                 )
             else:
                 llm_result = await self._call_llm(
-                    selected_name, record["selected_nanozyme"]["selection_reason"],
+                    selected_name,
                     buckets, table_classified, figure_summ,
                 )
             if llm_result:
@@ -6446,12 +6145,6 @@ class SingleMainNanozymePipeline:
         record = validate_schema(record)
 
         sel_name = record.get("selected_nanozyme", {}).get("name")
-        sel_comp = record.get("selected_nanozyme", {}).get("composition")
-        cs = record.get("selected_nanozyme", {}).get("composition_structured", {})
-        if isinstance(cs, dict) and cs.get("core") is None and (sel_name or sel_comp):
-            parsed = self._parse_composition_structured(sel_name, sel_comp)
-            if parsed.get("core"):
-                record["selected_nanozyme"]["composition_structured"] = parsed
 
         record = self._sync_kinetics_list(record)
 
@@ -6461,7 +6154,7 @@ class SingleMainNanozymePipeline:
 
         return record
 
-    async def _call_llm(self, selected_name: str, selection_reason: str,
+    async def _call_llm(self, selected_name: str,
                         buckets: Dict[str, List[str]],
                         table_classified: Dict, figure_summ: Dict) -> Optional[Dict]:
         if not self.client:
@@ -6481,7 +6174,6 @@ class SingleMainNanozymePipeline:
 
         user_prompt = _LLM_USER_TEMPLATE.format(
             selected_material=selected_name,
-            selection_reason=selection_reason,
             material_evidence="\n".join(buckets.get("material", [])[:8]) or "(none)",
             synthesis_evidence="\n".join(buckets.get("synthesis", [])[:5]) or "(none)",
             characterization_evidence="\n".join(buckets.get("characterization", [])[:5]) or "(none)",
@@ -6516,7 +6208,6 @@ class SingleMainNanozymePipeline:
     async def _call_llm_with_refinement(
         self,
         selected_name: str,
-        selection_reason: str,
         buckets: Dict[str, List[str]],
         table_classified: Dict,
         figure_summ: Dict,
@@ -6538,7 +6229,6 @@ class SingleMainNanozymePipeline:
 
         user_prompt = _LLM_USER_TEMPLATE.format(
             selected_material=selected_name,
-            selection_reason=selection_reason,
             material_evidence="\n".join(buckets.get("material", [])[:8]) or "(none)",
             synthesis_evidence="\n".join(buckets.get("synthesis", [])[:5]) or "(none)",
             characterization_evidence="\n".join(buckets.get("characterization", [])[:5]) or "(none)",
@@ -6587,7 +6277,7 @@ class SingleMainNanozymePipeline:
         else:
             logger.warning("[SMN] llm_refinement not available, falling back to _call_llm")
             return await self._call_llm(
-                selected_name, selection_reason, buckets, table_classified, figure_summ,
+                selected_name, buckets, table_classified, figure_summ,
             )
 
     _LLM_NAME_FIXES = [
@@ -6909,16 +6599,6 @@ class SingleMainNanozymePipeline:
                 if pH_prof.get("pH_range") is not None:
                     break
 
-        if pH_prof.get("pH_stability_range") is None:
-            for sentence in buckets.get("activity", []):
-                for pat in self._PH_STABILITY_PATTERNS:
-                    m = pat.search(sentence)
-                    if m:
-                        pH_prof["pH_stability_range"] = f"{m.group(1)}-{m.group(2)}"
-                        break
-                if pH_prof.get("pH_stability_range") is not None:
-                    break
-
         if temp_prof.get("optimal_temperature") is None:
             for sentence in buckets.get("activity", []):
                 for pat in self._TEMP_OPTIMAL_PATTERNS:
@@ -6938,16 +6618,6 @@ class SingleMainNanozymePipeline:
                         temp_prof["temperature_range"] = f"{m.group(1)}-{m.group(2)} °C"
                         break
                 if temp_prof.get("temperature_range") is not None:
-                    break
-
-        if temp_prof.get("thermal_stability") is None:
-            for sentence in buckets.get("activity", []):
-                for pat in self._THERMAL_STABILITY_PATTERNS:
-                    m = pat.search(sentence)
-                    if m:
-                        temp_prof["thermal_stability"] = f"stable up to {m.group(1)} °C"
-                        break
-                if temp_prof.get("thermal_stability") is not None:
                     break
 
         act["pH_profile"] = pH_prof

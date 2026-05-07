@@ -251,7 +251,7 @@ class CrossValidationAgent:
             llm_sel = llm_result.get("selected_nanozyme", {})
             if isinstance(llm_sel, dict):
                 sel = record["selected_nanozyme"]
-                for key in ("morphology", "composition", "stability", "dopants_or_defects", "characterization"):
+                for key in ("morphology", "composition", "characterization"):
                     if sel.get(key) is None and llm_sel.get(key) is not None:
                         sel[key] = llm_sel[key]
                 llm_synth = llm_sel.get("synthesis_conditions", {})
@@ -260,7 +260,7 @@ class CrossValidationAgent:
                     if not isinstance(synth, dict):
                         synth = {}
                         sel["synthesis_conditions"] = synth
-                    for key in ("temperature", "time", "method_detail"):
+                    for key in ("temperature", "time"):
                         if synth.get(key) is None and llm_synth.get(key) is not None:
                             synth[key] = llm_synth[key]
                     if not synth.get("precursors") and llm_synth.get("precursors"):
@@ -273,26 +273,24 @@ class CrossValidationAgent:
                     act["enzyme_like_type"] = llm_act["enzyme_like_type"]
                 if not act.get("substrates") and llm_act.get("substrates"):
                     act["substrates"] = llm_act["substrates"]
-                if act.get("assay_method") is None and llm_act.get("assay_method") is not None:
-                    act["assay_method"] = llm_act["assay_method"]
                 if act.get("mechanism") is None and llm_act.get("mechanism") is not None:
                     act["mechanism"] = llm_act["mechanism"]
                 llm_cond = llm_act.get("conditions", {})
                 if isinstance(llm_cond, dict):
                     cond = act.get("conditions", {})
-                    for key in ("buffer", "pH", "temperature", "reaction_time"):
+                    for key in ("pH", "temperature"):
                         if cond.get(key) is None and llm_cond.get(key) is not None:
                             cond[key] = llm_cond[key]
                 llm_ph = llm_act.get("pH_profile", {})
                 if isinstance(llm_ph, dict):
                     ph = act.get("pH_profile", {})
-                    for key in ("optimal_pH", "pH_range", "pH_stability_range"):
+                    for key in ("optimal_pH", "pH_range"):
                         if ph.get(key) is None and llm_ph.get(key) is not None:
                             ph[key] = llm_ph[key]
                 llm_temp = llm_act.get("temperature_profile", {})
                 if isinstance(llm_temp, dict):
                     tp = act.get("temperature_profile", {})
-                    for key in ("optimal_temperature", "temperature_range", "thermal_stability"):
+                    for key in ("optimal_temperature", "temperature_range"):
                         if tp.get(key) is None and llm_temp.get(key) is not None:
                             tp[key] = llm_temp[key]
 

@@ -4659,7 +4659,6 @@ class NanozymePreprocessor:
         ],
         "material_surface_properties": [
             "material", "BET_surface_area", "BET_unit",
-            "pore_size", "pore_size_unit",
             "particle_size", "particle_size_unit",
             "source_table_id", "source_page",
         ],
