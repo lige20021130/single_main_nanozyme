@@ -110,6 +110,23 @@ _GENERIC_PHRASES = frozenset({
     "s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10",
     "ppis", "api", "gsh", "ros", "rns", "h2o2", "oh",
     "a/ablank", "a/a", "blank",
+    "nanocluster", "nanoclusters", "nanodot", "nanodots",
+    "nanosheet", "nanosheets", "nanorod", "nanorods",
+    "nanowire", "nanowires", "nanotube", "nanotubes",
+    "nanofiber", "nanofibers", "nanoflower", "nanoflowers",
+    "nanosphere", "nanospheres", "nanocage", "nanocages",
+    "nanocube", "nanocubes", "nanostar", "nanostars",
+    "nanoprism", "nanoprisms", "nanoring", "nanorings",
+    "nanobelt", "nanobelts", "nanoplate", "nanoplates",
+    "nanocapsule", "nanocapsules", "nanovehicle", "nanovehicles",
+    "nanocontainer", "nanocontainers", "nanoreactor", "nanoreactors",
+    "core-shell", "core@shell", "yolk-shell", "yolk@shell",
+    "hollow sphere", "hollow spheres", "mesoporous",
+    "the probe", "the sensor", "the biosensor", "the platform",
+    "the assay", "the method", "the approach", "the strategy",
+    "the product", "the precursor", "the reactant",
+    "catalyst system", "enzyme mimic", "artificial enzyme",
+    "mimic enzyme", "enzyme model",
 })
 
 _SHORT_GENERIC_RE = re.compile(r'^[A-Z]{1,3}\d{0,2}$')
@@ -133,6 +150,34 @@ _TECHNIQUE_ABBREVIATIONS = frozenset({
 _SUBSTRATE_NAMES = frozenset({
     "H2O2", "TMB", "ABTS", "OPD", "DCFH", "DCFH-DA",
     "guaiacol", "pyrogallol", "catechol", "AR",
+    "TMB-H2O2", "ABTS-H2O2", "OPD-H2O2",
+    "DAPI", "Amplex Red", "Resorufin", "DHR123", "DHE",
+    "L-012", "Luminol", "Isoluminol",
+    "NADH", "NADPH", "NAD+", "NADP+",
+    "4-AAP", "4-Aminoantipyrine", "Phenol",
+    "o-phenylenediamine", "p-phenylenediamine",
+    "3,3'-diaminobenzidine", "DAB",
+    "o-tolidine", "Leucomalachite green",
+    "Terephthalic acid", "TA", "PTA",
+    "Coumarin", "HPF", "SOSG", "DPBF",
+    "NBT", "Nitroblue tetrazolium",
+    "XTT", "MTT", "WST-1", "WST-8",
+    "BCIP", "NPP", "pNPP", "p-Nitrophenyl phosphate",
+    "ONPG", "o-Nitrophenyl-β-D-galactopyranoside",
+    "MU-Glc", "4-MU", "4-Methylumbelliferyl",
+    "pNA", "BAPNA", "SAAPFpNA",
+    "Ferrocyanide", "Ferricyanide",
+    "L-DOPA", "L-tyrosine", "Epinephrine",
+    "Tyr", "DOPA",
+    "Pyrogallol", "Gallic acid", "Syringaldazine",
+    "Veratryl alcohol", "ABTS radical", "ABTS+",
+    "Ruthenium complex", "Ru(bpy)3",
+    "Methylene blue", "Rhodamine B", "Rhodamine 6G",
+    "Crystal violet", "Malachite green",
+    "Indigo carmine", "Congo red", "Methyl orange",
+    "Methyl red", "Phenol red",
+    "Bromophenol blue", "Bromocresol green",
+    "Thymol blue", "Bromothymol blue",
 })
 
 _SMALL_MOLECULE_NAMES = frozenset({
@@ -161,6 +206,17 @@ _NON_MATERIAL_PHRASES = frozenset({
     "sazs", "sae", "sanes", "sanzs",
     "in our system", "our system", "the system",
     "this work", "the present work",
+    "as-prepared", "as-synthesized", "as-prepared nanozyme",
+    "the as-prepared", "the as-synthesized",
+    "proposed nanozyme", "proposed catalyst",
+    "newly developed", "newly synthesized", "newly prepared",
+    "the catalyst", "the nanozyme", "the material",
+    "our nanozyme", "our catalyst", "our material",
+    "the present study", "this study", "present work",
+    "the synthesized", "the prepared",
+    "bare", "pristine", "pure",
+    "free enzyme", "natural enzyme", "native enzyme",
+    "commercial enzyme", "free HRP",
 })
 
 _RATIO_PATTERN = re.compile(r'^[A-Za-z]/[A-Za-z]', re.I)
@@ -172,6 +228,19 @@ _REAGENT_NAMES = frozenset({
     "DMF", "DMSO", "THF", "EtOH", "CH3OH",
     "Na2CO3", "NaHCO3", "CaCl2", "MgCl2",
     "Na2SO4", "NaNO3", "KNO3", "NH4Cl",
+    "K2Cr2O7", "KMnO4", "K3Fe(CN)6", "K4Fe(CN)6",
+    "Na2S2O3", "Na2S2O8", "K2S2O8", "(NH4)2S2O8",
+    "NaBH4", "KBH4", "LiAlH4", "Na2WO4",
+    "FeCl3", "FeCl2", "FeSO4", "Fe(NO3)3",
+    "CuSO4", "CuCl2", "Cu(NO3)2",
+    "CoCl2", "Co(NO3)2", "NiCl2", "Ni(NO3)2",
+    "ZnCl2", "Zn(NO3)2", "ZnSO4",
+    "MnCl2", "MnSO4", "Mn(OAc)2",
+    "Ce(NO3)3", "CeCl3", "Ce(SO4)2",
+    "HAuCl4", "AgNO3", "H2PtCl6", "PdCl2",
+    "TiCl4", "Ti(OBu)4", "ZrOCl2", "ZrCl4",
+    "AlCl3", "SnCl2", "SnCl4", "Bi(NO3)3",
+    "La(NO3)3", "Cr(NO3)3", "CrCl3",
     "HRP", "GOx", "SOD", "CAT",
     "AChE", "ChOx", "LOx", "UOx", "GalOx", "AOx", "XOD", "Xanthine oxidase",
     "Acetylcholinesterase", "Choline oxidase", "Lactate oxidase", "Uricase",
@@ -186,6 +255,18 @@ _REAGENT_NAMES = frozenset({
     "Triton", "Tween-20", "Tween-80", "Triton X-100",
     "CH3CN", "Acetonitrile", "Ethanol", "Methanol", "Isopropanol",
     "E coli", "E. coli", "S aureus", "S. aureus",
+    "TEA", "Triethylamine", "DIPEA", "Pyridine",
+    "TEOS", "APTES", "MTMS", "CTAB",
+    "Oleic acid", "Oleylamine", "1-Octadecene",
+    "Ethylene glycol", "Glycerol", "Propylene glycol",
+    "Sodium citrate", "Citrate", "Urea", "Thiourea",
+    "Dopamine hydrochloride", "Melamine", "Cyanuric acid",
+    "Glucose", "Fructose", "Sucrose", "Maltose",
+    "Starch", "Cellulose", "Chitosan", "Alginate",
+    "Pectin", "Gelatin", "Collagen", "Agarose",
+    "PAA", "PMAA", "PSS", "PDDA", "PEI",
+    "PF127", "F127", "P123", "CTAB",
+    "SDBS", "SDS", "Tween", "Span",
 })
 
 _SUBSTRATE_PLUS_RE = re.compile(
@@ -2387,6 +2468,20 @@ class NanozymeScorer:
                         score += 4
                     elif len(at_parts) >= 2:
                         score += 2
+                if re.search(r'\b(?:MIL|UiO|HKUST|PCN|NU|NOTT|DUT|ZIF|MOF|COF)[-\s]?\d+', cand["name"], re.I):
+                    score += 6
+                if re.search(r'\b(?:Fe|Co|Ni|Mn|Cu|Zn|Ce|Au|Ag|Pt|Pd)\s*-\s*(?:N|C|NC|S|P|B)\b', cand["name"], re.I):
+                    score += 4
+                if re.search(r'\b(?:Fe|Co|Ni|Mn|Cu|Zn|Ce)\d*O\d+', cand["name"]):
+                    score += 4
+                if re.search(r'\b(?:Prussian\s+blue|PB|PBA|LDH|MXene|g-C\dN\d|rGO|GO)\b', cand["name"], re.I):
+                    score += 5
+                if re.search(r'\b(?:CDs?|CQDs?|GQDs?|CNFs?|CNTs?)\b', cand["name"], re.I):
+                    score += 3
+                if re.search(r'\b\w+@\w+(?:@\w+)?\b', cand["name"]):
+                    score += 3
+                if re.search(r'\b\w+[-/]\w+(?:[-/]\w+)*\b', cand["name"]) and not re.search(r'^[A-Z]/[A-Z]$', cand["name"]):
+                    score += 2
 
             score += self._score_data_richness(cand, doc)
             score += self._score_narrative_importance(cand, title, abstract_text)
@@ -2804,10 +2899,56 @@ class TableProcessor:
     def _filter_this_work(self, tbl: Dict, selected_name: str) -> List[Dict]:
         this_work_rows = []
         name_lower = selected_name.lower()
-        for row in tbl.get("rows", []):
+        name_variants = [name_lower]
+        if "@" in name_lower:
+            name_variants.extend(p.strip() for p in name_lower.split("@") if p.strip())
+        if "/" in name_lower:
+            name_variants.extend(p.strip() for p in name_lower.split("/") if p.strip())
+        for suffix in (" nanoparticles", " nanosheets", " nanorods",
+                       " nanotubes", " nanospheres", " nanozyme",
+                       " nanocomposite", " nanocatalyst"):
+            if name_lower.endswith(suffix):
+                name_variants.append(name_lower[:-len(suffix)])
+        name_variants = [v for v in name_variants if len(v) >= 2]
+
+        rows = tbl.get("rows", [])
+        if not rows:
+            return this_work_rows
+
+        headers = [str(h).lower() for h in rows[0]] if rows else []
+        material_col = None
+        for i, h in enumerate(headers):
+            if any(kw in h for kw in ("material", "catalyst", "nanozyme", "sample", "compound")):
+                material_col = i
+                break
+
+        for row in rows[1:] if len(rows) > 1 else []:
+            if not isinstance(row, (list, tuple)):
+                continue
             row_text = " ".join(str(cell) for cell in row).lower()
-            if _THIS_WORK_RE.search(row_text) or name_lower in row_text:
+            row_compact = row_text.replace(" ", "").replace("-", "")
+
+            if _THIS_WORK_RE.search(row_text):
                 this_work_rows.append({"cells": row, "source": "this_work"})
+                continue
+
+            if any(v in row_compact for v in [nv.replace(" ", "").replace("-", "") for nv in name_variants]):
+                this_work_rows.append({"cells": row, "source": "name_match"})
+                continue
+
+            if material_col is not None and material_col < len(row):
+                cell_text = str(row[material_col]).lower().strip()
+                cell_compact = cell_text.replace(" ", "").replace("-", "")
+                if any(nv.replace(" ", "").replace("-", "") in cell_compact for nv in name_variants):
+                    this_work_rows.append({"cells": row, "source": "material_col_match"})
+                    continue
+
+            if material_col is not None and material_col < len(row):
+                cell_text = str(row[material_col]).lower().strip()
+                if cell_text in ("1", "1a", "a") and len(rows) <= 5:
+                    this_work_rows.append({"cells": row, "source": "first_entry_guess"})
+                    continue
+
         return this_work_rows
 
     def _find_column_indices(self, headers: List[str], keywords_map: Dict[str, str]) -> Dict[str, int]:
@@ -2928,6 +3069,33 @@ class TableProcessor:
             if structured:
                 values.extend(structured)
 
+        if not values:
+            for tbl in (classified.get("kinetics_tables", [])
+                        + classified.get("comparison_tables", [])
+                        + classified.get("general_tables", [])):
+                rows = tbl.get("rows", [])
+                for row in rows:
+                    if not isinstance(row, (list, tuple)):
+                        continue
+                    row_text = " ".join(str(c) for c in row)
+                    row_lower = row_text.lower()
+                    if any(kw in row_lower for kw in ("km", "vmax", "kcat")):
+                        self._extract_kinetics_from_row(row_text, values)
+                if values:
+                    break
+                content_text = tbl.get("content_text", "")
+                markdown = tbl.get("markdown", "")
+                for text_source in [content_text, markdown]:
+                    if text_source and any(kw in text_source.lower() for kw in ("km", "vmax", "kcat")):
+                        for line in text_source.split("\n"):
+                            line = line.strip()
+                            if line and not line.startswith("|---") and not line.startswith("| ---"):
+                                self._extract_kinetics_from_row(line, values)
+                        if values:
+                            break
+                if values:
+                    break
+
         return values
 
     def _extract_kinetics_from_row(self, row_text: str, values: List[Dict]) -> None:
@@ -2964,19 +3132,30 @@ class TableProcessor:
                                        "substrate": g0, "source": "table"})
                 break
 
-    def get_sensing_values(self, classified: Dict[str, Any]) -> List[Dict]:
+    def get_sensing_values(self, classified: Dict[str, Any], selected_name: str = "") -> List[Dict]:
         values = []
+        name_lower = selected_name.lower() if selected_name else ""
         for tbl in classified.get("sensing_tables", []) + classified.get("general_tables", []):
             rows = tbl.get("rows", [])
             if rows and len(rows) >= 2:
                 headers = [str(h) for h in rows[0]]
                 col_map = self._find_column_indices(headers, {
                     "LOD": "lod", "LOD_unit": "lod(", "linear_range_low": "linear",
+                    "linear_range_high": "linear", "linear_range_unit": "unit",
                     "target_analyte": "analyte", "material": "material",
+                    "method": "method", "sample": "sample",
                 })
                 if "LOD" in col_map or "linear_range_low" in col_map:
                     for row in rows[1:]:
                         if not isinstance(row, (list, tuple)):
+                            continue
+                        row_text = " ".join(str(c) for c in row).lower()
+                        is_target = (
+                            _THIS_WORK_RE.search(row_text) or
+                            (name_lower and name_lower in row_text) or
+                            ("material" not in col_map)
+                        )
+                        if not is_target:
                             continue
                         if "LOD" in col_map and col_map["LOD"] < len(row):
                             lod_val = row[col_map["LOD"]]
@@ -2989,9 +3168,28 @@ class TableProcessor:
                             lr_val = row[col_map["linear_range_low"]]
                             lr_unit = row[col_map["linear_range_unit"]] if "linear_range_unit" in col_map and col_map["linear_range_unit"] < len(row) else None
                             if lr_val is not None and str(lr_val).strip():
-                                values.append({"parameter": "linear_range", "value": str(lr_val).strip(),
+                                lr_high = row[col_map["linear_range_high"]] if "linear_range_high" in col_map and col_map["linear_range_high"] < len(row) else None
+                                lr_str = str(lr_val).strip()
+                                if lr_high is not None and str(lr_high).strip():
+                                    lr_str = f"{lr_val}–{lr_high}"
+                                values.append({"parameter": "linear_range", "value": lr_str,
                                                "unit": str(lr_unit).strip() if lr_unit else None,
                                                "source": "table_structured"})
+                        if "target_analyte" in col_map and col_map["target_analyte"] < len(row):
+                            analyte_val = row[col_map["target_analyte"]]
+                            if analyte_val is not None and str(analyte_val).strip():
+                                values.append({"parameter": "target_analyte", "value": str(analyte_val).strip(),
+                                               "unit": None, "source": "table_structured"})
+                        if "method" in col_map and col_map["method"] < len(row):
+                            method_val = row[col_map["method"]]
+                            if method_val is not None and str(method_val).strip():
+                                values.append({"parameter": "method", "value": str(method_val).strip(),
+                                               "unit": None, "source": "table_structured"})
+                        if "sample" in col_map and col_map["sample"] < len(row):
+                            sample_val = row[col_map["sample"]]
+                            if sample_val is not None and str(sample_val).strip():
+                                values.append({"parameter": "sample_type", "value": str(sample_val).strip(),
+                                               "unit": None, "source": "table_structured"})
                     continue
             for row_dict in tbl.get("this_work_rows", []):
                 cells = row_dict.get("cells", [])
@@ -3006,6 +3204,38 @@ class TableProcessor:
                     if lr_m:
                         values.append({"parameter": "linear_range", "value": lr_m.group(1), "unit": lr_m.group(2), "source": "table"})
                         break
+                for pat in _ANALYTE_PATTERNS:
+                    an_m = pat.search(row_text)
+                    if an_m:
+                        candidate = an_m.group(1).strip() if an_m.lastindex else an_m.group(0).strip()
+                        if len(candidate) > 2:
+                            values.append({"parameter": "target_analyte", "value": candidate, "unit": None, "source": "table"})
+                            break
+
+        if not values:
+            for tbl in classified.get("sensing_tables", []) + classified.get("general_tables", []):
+                content_text = tbl.get("content_text", "")
+                markdown = tbl.get("markdown", "")
+                for text_source in [content_text, markdown]:
+                    if text_source and any(kw in text_source.lower() for kw in ("lod", "detection limit", "linear range")):
+                        for line in text_source.split("\n"):
+                            line = line.strip()
+                            if line and not line.startswith("|---") and not line.startswith("| ---"):
+                                for pat in _LOD_PATTERNS:
+                                    m = pat.search(line)
+                                    if m:
+                                        values.append({"parameter": "LOD", "value": m.group(1), "unit": m.group(2), "source": "table_fallback"})
+                                        break
+                                for pat in _LINEAR_RANGE_PATTERNS:
+                                    m = pat.search(line)
+                                    if m:
+                                        values.append({"parameter": "linear_range", "value": m.group(1), "unit": m.group(2), "source": "table_fallback"})
+                                        break
+                        if values:
+                            break
+                if values:
+                    break
+
         return values
 
     def get_characterization_values(self, classified: Dict[str, Any], selected_name: str) -> List[Dict]:
@@ -4502,6 +4732,27 @@ class RuleExtractor:
         re.compile(r'\b(?:miRNA|microRNA|DNA|mRNA|aptamer)\b', re.I),
         re.compile(r'\b(?:E\.?\s*coli|S\.?\s*aureus|Salmonella|Listeria|Staphylococcus)\b', re.I),
         re.compile(r'\b(?:cancer\s+cell|tumor\s+cell|HeLa|MCF[-\s]?7|HepG2|A549)\b', re.I),
+        re.compile(r'\b(?:sucrose|maltose|fructose|lactose|galactose)\b', re.I),
+        re.compile(r'\b(?:ethanol|methanol|formaldehyde|acetaldehyde)\b', re.I),
+        re.compile(r'\b(?:nitrite|nitrate|ammonia|ammonium|phosphate)\b', re.I),
+        re.compile(r'\b(?:sulfide|sulfite|sulfate|thiosulfate)\b', re.I),
+        re.compile(r'\b(?:hypochlorite|chlorite|chlorate|perchlorate)\b', re.I),
+        re.compile(r'\b(?:iodide|bromide|fluoride)\b', re.I),
+        re.compile(r'\b(?:iron|zinc|cobalt|nickel|manganese|aluminum|silver|gold|platinum|palladium)\s+(?:ion|I{0,2}V{0,2})\b', re.I),
+        re.compile(r'\b(?:Fe|Zn|Co|Ni|Mn|Al|Ag|Au|Pt|Pd|Cu|Cr|Ce|Ti|Sn|Pb|Hg|Cd)\s*[\d]*\s*\+{1,2}\b', re.I),
+        re.compile(r'\b(?:BPA|bisphenol\s*A|endocrine\s+disruptor)\b', re.I),
+        re.compile(r'\b(?:organophosph(?:ate|orus)|pesticide|insecticide|herbicide|fungicide)\b', re.I),
+        re.compile(r'\b(?:antibiotic|drug|pharmaceutical)\b', re.I),
+        re.compile(r'\b(?:ciprofloxacin|ofloxacin|norfloxacin|enrofloxacin)\b', re.I),
+        re.compile(r'\b(?:rifampicin|isoniazid|pyrazinamide|ethambutol)\b', re.I),
+        re.compile(r'\b(?:doxorubicin|daunorubicin|epirubicin)\b', re.I),
+        re.compile(r'\b(?:hydrogen\s+sulfide|H2S|carbon\s+monoxide|CO|nitric\s+oxide|NO)\b', re.I),
+        re.compile(r'\b(?:superoxide|O2|singlet\s+oxygen|hydroxyl\s+radical)\b', re.I),
+        re.compile(r'\b(?:pH|dissolved\s+oxygen|DO|ORP|redox\s+potential)\b', re.I),
+        re.compile(r'\b(?:creatine|creatinine|urea|BUN)\b', re.I),
+        re.compile(r'\b(?:progesterone|testosterone|estradiol|estrogen|cortisol)\b', re.I),
+        re.compile(r'\b(?:vitamin\s+[A-Z]|thiamine|riboflavin|niacin|folate|folic\s+acid)\b', re.I),
+        re.compile(r'\b(?:mycotoxin|aflatoxin|ochratoxin|deoxynivalenol|fumonisin|zearalenone|T-2)\b', re.I),
     ]
 
     _SAMPLE_TYPE_MAP = {
@@ -5819,7 +6070,7 @@ class SingleMainNanozymePipeline:
         tables = doc.table_task.get("tables", [])
         table_classified = self.table_proc.classify_and_summarize(tables, selected_name)
         table_kinetics_values = self.table_proc.get_kinetics_values(table_classified, selected_name)
-        table_sensing_values = self.table_proc.get_sensing_values(table_classified)
+        table_sensing_values = self.table_proc.get_sensing_values(table_classified, selected_name)
         table_characterization_values = self.table_proc.get_characterization_values(table_classified, selected_name)
         logger.info(f"[SMN] Tables: kinetics={len(table_classified.get('kinetics_tables',[]))}, "
                      f"comparison={len(table_classified.get('comparison_tables',[]))}, "

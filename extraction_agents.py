@@ -1316,12 +1316,70 @@ class ApplicationAgent:
 
     _SAMPLE_TYPE_MAP = {
         "serum": "serum", "plasma": "plasma", "urine": "urine", "blood": "blood",
-        "saliva": "saliva", "tear": "tear", "water": "water", "food": "food",
-        "milk": "food", "juice": "food", "wine": "food", "beer": "food",
-        "cell": "cell_culture", "tissue": "tissue", "river": "environmental_water",
-        "lake": "environmental_water", "tap water": "environmental_water",
-        "sea water": "environmental_water", "waste water": "environmental_water",
-        "drinking water": "environmental_water",
+        "saliva": "saliva", "tear": "tear", "tears": "tear", "water": "water",
+        "food": "food", "milk": "food", "juice": "food", "wine": "food", "beer": "food",
+        "honey": "food", "tea": "food", "coffee": "food", "fruit": "food",
+        "vegetable": "food", "meat": "food", "fish": "food", "egg": "food",
+        "cell": "cell_culture", "cells": "cell_culture", "tissue": "tissue",
+        "river": "environmental_water", "lake": "environmental_water",
+        "tap water": "environmental_water", "sea water": "environmental_water",
+        "seawater": "environmental_water", "waste water": "environmental_water",
+        "wastewater": "environmental_water", "drinking water": "environmental_water",
+        "groundwater": "environmental_water", "surface water": "environmental_water",
+        "pond": "environmental_water", "spring": "environmental_water",
+        "rainwater": "environmental_water", "industrial water": "environmental_water",
+        "swimming pool": "environmental_water",
+        "soil": "soil", "sediment": "soil", "sludge": "soil",
+        "air": "air", "atmosphere": "air", "gas": "air",
+        "sweat": "sweat", "perspiration": "sweat",
+        "cerebrospinal fluid": "csf", "csf": "csf",
+        "synovial fluid": "synovial_fluid",
+        "amniotic fluid": "amniotic_fluid",
+        "interstitial fluid": "interstitial_fluid",
+        "lymph": "lymph", "lymphatic fluid": "lymph",
+        "pleural fluid": "pleural_fluid",
+        "peritoneal fluid": "peritoneal_fluid",
+        "bile": "bile",
+        "semen": "semen", "seminal fluid": "semen",
+        "vaginal fluid": "vaginal_fluid",
+        "breast milk": "breast_milk",
+        "feces": "feces", "faeces": "feces", "stool": "feces",
+        "sputum": "sputum",
+        "nasal swab": "nasal_swab", "throat swab": "throat_swab",
+        "saliva swab": "saliva_swab",
+        "urine sample": "urine", "blood sample": "blood",
+        "serum sample": "serum", "plasma sample": "plasma",
+        "pharmaceutical": "pharmaceutical", "drug": "pharmaceutical",
+        "medicine": "pharmaceutical", "tablet": "pharmaceutical",
+        "capsule": "pharmaceutical", "injection": "pharmaceutical",
+        "cosmetic": "cosmetic", "skincare": "cosmetic",
+        "textile": "textile", "fabric": "textile", "cloth": "textile",
+        "paint": "paint", "coating": "paint",
+        "paper": "paper", "cardboard": "paper",
+        "plastic": "plastic", "polymer": "plastic",
+        "metal": "metal", "alloy": "metal",
+        "glass": "glass", "ceramic": "ceramic",
+        "biological fluid": "biological_fluid",
+        "biofluid": "biological_fluid",
+        "body fluid": "biological_fluid",
+        "clinical sample": "clinical_sample",
+        "patient sample": "clinical_sample",
+        "human sample": "clinical_sample",
+        "animal sample": "clinical_sample",
+        "environmental sample": "environmental_sample",
+        "environmental": "environmental_sample",
+        "industrial": "industrial_sample",
+        "agricultural": "agricultural_sample",
+        "crop": "agricultural_sample", "plant": "agricultural_sample",
+        "grain": "agricultural_sample", "seed": "agricultural_sample",
+        "feed": "agricultural_sample", "fodder": "agricultural_sample",
+        "effluent": "industrial_effluent",
+        "leachate": "industrial_effluent",
+        "extract": "extract", "solution": "solution",
+        "buffer": "buffer", "medium": "medium",
+        "culture medium": "medium", "broth": "medium",
+        "dmem": "medium", "rpmi": "medium",
+        "pbs": "buffer", "tris": "buffer",
     }
 
     def extract(self, record, buckets, table_values, selected_name, doc=None):
@@ -2108,6 +2166,55 @@ class RuleExtractorAdapter:
                     sel["zeta_potential"] = f"{m.group(1)} {m.group(2)}"
                     logger.info(f"[SMN] Fulltext fallback: zeta_potential={sel['zeta_potential']}")
                     break
+
+        if not sel.get("characterization") or len(sel.get("characterization", [])) == 0:
+            found_techniques = set()
+            for tech_name, pattern in self._CHARACTERIZATION_TECHNIQUES.items():
+                if pattern.search(all_text):
+                    found_techniques.add(tech_name)
+            if found_techniques:
+                sel["characterization"] = sorted(list(found_techniques))
+                logger.info(f"[SMN] Fulltext fallback: characterization={sorted(list(found_techniques))}")
+
+        apps = record.get("applications", [])
+        if apps:
+            for app in apps:
+                if app.get("target_analyte") is None and app.get("application_type") in ("sensing", "detection"):
+                    for pat in _ANALYTE_PATTERNS:
+                        m = pat.search(all_text)
+                        if m:
+                            candidate = m.group(1).strip() if m.lastindex else m.group(0).strip()
+                            if len(candidate) > 2 and candidate.lower() not in ("the", "this", "that", "it", "our", "a", "an"):
+                                app["target_analyte"] = candidate
+                                logger.info(f"[SMN] Fulltext fallback: target_analyte={candidate}")
+                                break
+                    if app.get("target_analyte"):
+                        break
+
+                if app.get("sample_type") is None and app.get("application_type") in ("sensing", "detection"):
+                    tl = all_text.lower()
+                    for sample_kw, sample_type in self._SAMPLE_TYPE_MAP.items():
+                        if sample_kw in tl:
+                            app["sample_type"] = sample_type
+                            logger.info(f"[SMN] Fulltext fallback: sample_type={sample_type}")
+                            break
+                    if app.get("sample_type"):
+                        break
+
+        if sel.get("composition_structured") is None or not sel.get("composition_structured", {}):
+            comp = sel.get("composition_structured", {})
+            if not isinstance(comp, dict):
+                comp = {}
+            if not comp.get("dopants"):
+                for pat in self._DOPANT_PATTERNS:
+                    m = pat.search(all_text)
+                    if m:
+                        dopant = m.group(1).strip()
+                        if dopant and len(dopant) < 30:
+                            comp["dopants"] = [dopant]
+                            sel["composition_structured"] = comp
+                            logger.info(f"[SMN] Fulltext fallback: dopant={dopant}")
+                            break
 
         if kin.get("Km") is None and kin.get("Vmax") is None:
             si_table_ref = re.search(
