@@ -145,6 +145,10 @@ class NanozymeGUI:
         self.update_log()
         self.load_model_config()
         self.setup_logging_handler()
+        # 初始化时直接标记服务器为就绪（使用 Python API 无需外部服务器）
+        self.server_ready = True
+        self.server_status.config(text="● 就绪", foreground="green")
+        self.set_phase_status("server", "ok")
 
     def create_widgets(self):
         style = ttk.Style()
@@ -569,99 +573,15 @@ class NanozymeGUI:
             self.log(f"[配置] 提取结果输出目录: {folder}")
 
     def start_server(self):
-        if self.server_process and self.server_process.poll() is None:
-            messagebox.showinfo("提示", "服务器已在运行中")
-            return
-        if self.server_ready:
-            self.log("[服务器] 服务器已就绪，无需重启")
-            return
-        self.log("[服务器] 启动中...")
-        self.server_status.config(text="● 启动中", foreground="orange")
-        self.set_phase_status("server", "running")
-        threading.Thread(target=self._server_worker, daemon=True).start()
-
-    def _server_worker(self):
-        cmd = self.SERVER_CMD_DEFAULT
-        try:
-            env = os.environ.copy()
-            env["PYTHONIOENCODING"] = "gbk"
-            env["JAVA_TOOL_OPTIONS"] = "-Dfile.encoding=UTF-8"
-            env["HF_HUB_OFFLINE"] = "1"
-            env["PYTHONWARNINGS"] = "ignore:.*pin_memory.*:UserWarning"
-            env["CUDA_VISIBLE_DEVICES"] = "0"
-            self.server_process = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                encoding='gbk',
-                errors='replace',
-                env=env,
-            )
-            self.log(f"[服务器] 进程已启动 PID={self.server_process.pid}")
-
-            def read_output():
-                for line in self.server_process.stdout:
-                    self.log(f"[服务器] {line.strip()}")
-
-            threading.Thread(target=read_output, daemon=True).start()
-
-            import urllib.request
-            for attempt in range(60):
-                if self.server_process.poll() is not None:
-                    self.log(f"[服务器] 进程意外退出，返回码={self.server_process.returncode}")
-                    self.root.after(0, lambda: self._on_server_stopped())
-                    return
-                try:
-                    r = urllib.request.urlopen("http://localhost:5002/health", timeout=2)
-                    if r.status == 200:
-                        self.server_ready = True
-                        self.root.after(0, lambda: self._on_server_ready())
-                        return
-                except Exception:
-                    pass
-                time.sleep(1)
-
-            self.log("[服务器] 等待超时(60s)，服务器可能未正常启动")
-            self.root.after(0, lambda: self._on_server_timeout())
-
-        except Exception as e:
-            self.log(f"[服务器] 启动失败: {e}")
-            self.server_process = None
-            self.root.after(0, lambda: self._on_server_error(str(e)))
-
-    def _on_server_ready(self):
-        self.server_status.config(text="● 运行中", foreground="green")
+        self.log("[提示] 无需启动外部服务器，直接使用 Python API 处理 PDF")
+        self.server_ready = True
+        self.server_status.config(text="● 就绪", foreground="green")
         self.set_phase_status("server", "ok")
-        self.log("[服务器] ✓ 服务器已就绪")
-
-    def _on_server_stopped(self):
-        self.server_ready = False
-        self.server_process = None
-        self.server_status.config(text="● 已停止", foreground="red")
-        self.set_phase_status("server", "error")
-        self.log("[服务器] ✗ 服务器进程已退出")
-
-    def _on_server_timeout(self):
-        self.server_status.config(text="● 启动超时", foreground="orange")
-        self.set_phase_status("server", "error")
-        self.log("[服务器] ⚠ 启动超时，请检查日志")
-
-    def _on_server_error(self, msg):
-        self.server_ready = False
-        self.server_process = None
-        self.server_status.config(text="● 启动失败", foreground="red")
-        self.set_phase_status("server", "error")
-        self.log(f"[服务器] ✗ 启动失败: {msg}")
 
     def stop_server(self):
-        if self.server_process and self.server_process.poll() is None:
-            self.server_process.terminate()
-            self.log("已发送终止信号")
-            self.server_status.config(text="● 停止中", foreground="orange")
-            self.server_mode = None
-        else:
-            self.log("服务器未运行")
+        self.log("[提示] 无外部服务器需要停止")
+        self.server_ready = True
+        self.server_status.config(text="● 就绪", foreground="green")
 
     def _needs_ocr_fallback(self, json_path: str) -> Tuple[bool, str]:
         try:
@@ -737,68 +657,11 @@ class NanozymeGUI:
         return False, ""
 
     def _ensure_server(self, mode: str = "standard"):
-        if self.server_ready:
-            return
-        if self.server_process and self.server_process.poll() is None:
-            import urllib.request
-            try:
-                r = urllib.request.urlopen("http://localhost:5002/health", timeout=3)
-                if r.status == 200:
-                    self.server_ready = True
-                    self.server_status.config(text="● 运行中", foreground="green")
-                    self.set_phase_status("server", "ok")
-                    self.log("[服务器] 已有服务器在运行")
-                    return
-            except Exception:
-                pass
-        self.log("[服务器] 服务器未就绪，正在启动...")
-        self.server_status.config(text="● 启动中", foreground="orange")
-        self.set_phase_status("server", "running")
-        import urllib.request
-        cmd = self.SERVER_CMD_DEFAULT
-        try:
-            env = os.environ.copy()
-            env["PYTHONIOENCODING"] = "gbk"
-            env["JAVA_TOOL_OPTIONS"] = "-Dfile.encoding=UTF-8"
-            env["HF_HUB_OFFLINE"] = "1"
-            env["PYTHONWARNINGS"] = "ignore:.*pin_memory.*:UserWarning"
-            env["CUDA_VISIBLE_DEVICES"] = "0"
-            self.server_process = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                encoding='gbk',
-                errors='replace',
-                env=env,
-            )
-            self.log(f"[服务器] 进程已启动 PID={self.server_process.pid}")
-
-            def read_output():
-                for line in self.server_process.stdout:
-                    self.log(f"[服务器] {line.strip()}")
-
-            threading.Thread(target=read_output, daemon=True).start()
-
-            for attempt in range(60):
-                if self.server_process.poll() is not None:
-                    raise RuntimeError(f"服务器进程意外退出，返回码={self.server_process.returncode}")
-                try:
-                    r = urllib.request.urlopen("http://localhost:5002/health", timeout=2)
-                    if r.status == 200:
-                        self.server_ready = True
-                        self.root.after(0, lambda: self._on_server_ready())
-                        self.log("[服务器] ✓ 服务器已就绪")
-                        return
-                except Exception:
-                    pass
-                time.sleep(1)
-            self.log("[服务器] ⚠ 启动超时")
-        except Exception as e:
-            self.log(f"[服务器] 启动失败: {e}")
-            self.server_process = None
-            self.root.after(0, lambda: self._on_server_error(str(e)))
-            raise
+        if not self.server_ready:
+            self.server_ready = True
+            self.server_status.config(text="● 就绪", foreground="green")
+            self.set_phase_status("server", "ok")
+            self.log("[提示] 已就绪，使用 Python API 处理 PDF")
 
     def start_conversion(self):
         input_path = self.input_path.get().strip()
