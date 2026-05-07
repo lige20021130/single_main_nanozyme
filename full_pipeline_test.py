@@ -166,7 +166,6 @@ def evaluate_result(result_path: Path) -> dict:
         "file": Path(result_path).name,
         "title": (paper.get("title") or "")[:80],
         "selected_name": nano.get("name"),
-        "selection_reason": nano.get("selection_reason"),
         "enzyme_type": activity.get("enzyme_like_type"),
         "substrates": activity.get("substrates"),
         "Km": kinetics.get("Km"),

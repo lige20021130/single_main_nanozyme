@@ -2638,7 +2638,6 @@ class EvidenceBucketBuilder:
         "kinetics": ["kinetics", "kinetic analysis", "michaelis-menten", "steady-state kinetics", "enzyme kinetics", "kinetic study", "kinetic parameters"],
         "application": ["application", "sensing", "detection", "biosensor", "analytical application", "practical application", "real sample"],
         "mechanism": ["mechanism", "catalytic mechanism", "reaction mechanism", "mechanistic", "mechanism study", "mechanism investigation"],
-        "stability": ["stability", "reusability", "recyclability", "storage stability", "operational stability", "thermal stability", "ph stability"],
         "results": ["results and discussion", "results", "discussion", "results & discussion"],
     }
 
@@ -5205,57 +5204,6 @@ class SingleMainNanozymePipeline:
                 cleaned[key] = cv
         return cleaned
 
-    _METAL_ELEMENTS_RE = re.compile(
-        r'(?:^|[\s\-/(])(Fe|Co|Ni|Cu|Mn|Cr|Zn|Ce|Au|Ag|Pt|Pd|Ru|Rh|Ir|Ti|V|Mo|W|La|Zr|Al|Sn|Bi|In|Mg|Ca|Ba|Sr|Hf|Nb|Ta|Re|Os)(?![a-z])'
-    )
-    _SUPPORT_MATERIALS = frozenset({
-        "carbon", "graphene", "rGO", "GO", "CNT", "MWCNT", "SWCNT",
-        "g-C3N4", "C3N4", "graphitic carbon nitride",
-        "MOF", "ZIF-8", "ZIF-67", "UiO-66", "MIL-101", "HKUST-1",
-        "SiO2", "silica", "mesoporous silica",
-        "N-C", "P-C", "S-C", "B-C",
-        "carbon cloth", "carbon fiber", "activated carbon", "mesoporous carbon",
-        "biochar", "COF",
-    })
-    _DOPANT_PATTERN = re.compile(
-        r'\b(N|P|S|B|F|Cl|Br|I|Se|Te)\s*(?:doped|doping|dopant)',
-        re.I
-    )
-    _ORGANIC_COMPONENTS = frozenset({
-        "PVP", "PEG", "PVA", "PEI", "PDA", "PANI", "PPy", "chitosan",
-        "cellulose", "starch", "alginate", "gelatin", "BSA", "HSA",
-    })
-
-    def _parse_composition_structured(self, name: str, composition: str = None) -> Dict[str, Any]:
-        result = {"core": None, "dopants": [], "support": None, "organic_component": None}
-        if not name and not composition:
-            return result
-        text = f"{name or ''} {composition or ''}"
-        metals = self._METAL_ELEMENTS_RE.findall(text)
-        if metals:
-            result["core"] = metals[0]
-            for m in metals[1:]:
-                if m not in result["dopants"]:
-                    result["dopants"].append(m)
-        for sup in sorted(self._SUPPORT_MATERIALS, key=lambda x: -len(x)):
-            sup_pattern = re.compile(r'(?:^|[\s\-/(])' + re.escape(sup) + r'(?:[\s\-/,).]|$)',
-                                     re.I)
-            if sup_pattern.search(text):
-                result["support"] = sup
-                break
-        dopant_matches = self._DOPANT_PATTERN.findall(text)
-        for d in dopant_matches:
-            d_clean = d.strip().split()[0].upper()
-            if d_clean not in result["dopants"] and d_clean not in (result["core"],):
-                result["dopants"].append(d_clean)
-        for org in self._ORGANIC_COMPONENTS:
-            org_pattern = re.compile(r'(?:^|[\s\-/(])' + re.escape(org) + r'(?:[\s\-/,).]|$)',
-                                     re.I)
-            if org_pattern.search(text):
-                result["organic_component"] = org
-                break
-        return result
-
     def _sync_kinetics_list(self, record: Dict[str, Any]) -> Dict[str, Any]:
         kin = record.get("main_activity", {}).get("kinetics", {})
         kin_list = record.get("main_activity", {}).get("kinetics_list", [])
@@ -5830,8 +5778,6 @@ class SingleMainNanozymePipeline:
                                             cond["temperature"] = float(assay["temperature"])
                                         except (ValueError, TypeError):
                                             cond["temperature"] = str(assay["temperature"])
-                                    if assay.get("buffer") and not cond.get("buffer"):
-                                        cond["buffer"] = str(assay["buffer"])
                         logger.info(f"[SMN] TableExtractor: {len(table_llm_results)} tables processed, "
                                      f"kinetics_values now={len(table_kinetics_values)}")
                 except Exception as e:

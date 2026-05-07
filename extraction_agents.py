@@ -28,20 +28,6 @@ def _norm_unit(unit):
     return unit
 
 
-_FULLTEXT_STABILITY_PATTERNS = [
-    re.compile(r'\bstable\s+(?:for|over|during)\s*([\d.]+)\s*(days?|weeks?|months?|hours?|h)\b', re.I),
-    re.compile(r'\bretained\s+(?:more\s+than\s+)?(\d+)\s*%?\s*(?:of\s+(?:its?\s+)?(?:original|initial)\s+activity)?\s*(?:after|for)\s*([\d.]+)\s*(days?|weeks?|months?|hours?|cycles?)', re.I),
-    re.compile(r'\b(?:storage|long[-\s]?term)\s+stability\s*(?::|was|of)\s*(?:stable\s+)?(?:for\s+)?([\d.]+)\s*(days?|weeks?|months?|hours?)', re.I),
-    re.compile(r'\bremained\s+([\d.]+)\s*%?\s*(?:of\s+(?:its?\s+)?(?:original|initial)\s+activity)?\s*(?:after|over)\s*([\d.]+)\s*(days?|weeks?|months?|cycles?)', re.I),
-    re.compile(r'\b(?:good|excellent|high)\s+stability\b', re.I),
-]
-
-_FULLTEXT_REACTION_TIME_PATTERNS = [
-    re.compile(r'\b(?:reaction|incubation|catalytic)\s+time\s*(?:of|was|=|:|≈|~)\s*(?:about\s+|approximately\s+)?([\d.]+)\s*(min|s|sec|h|hour|hr)', re.I),
-    re.compile(r'\bincubated\s+(?:for|at)\s*(?:about\s+)?([\d.]+)\s*(min|s|sec|h|hour|hr)', re.I),
-    re.compile(r'\b(?:after|within)\s*([\d.]+)\s*(min|s|sec|h|hour|hr)\s+(?:of\s+)?(?:reaction|incubation|catalysis)', re.I),
-]
-
 _FULLTEXT_MECHANISM_PATTERNS = [
     re.compile(r'\b(?:electron|radical|Fenton|Haber[-\s]?Weiss|Schottky|piezo|photo|sono|electro)cataly', re.I),
     re.compile(r'\bROS\s+(?:generation|production|mediat)', re.I),
@@ -1945,26 +1931,6 @@ class RuleExtractorAdapter:
                 if m:
                     act["mechanism"] = m.group(0).strip()[:200]
                     logger.info(f"[SMN] Fulltext fallback: mechanism found")
-                    break
-
-        if sel.get("stability") is None:
-            for pat in _FULLTEXT_STABILITY_PATTERNS:
-                m = pat.search(all_text)
-                if m:
-                    groups = m.groups()
-                    if len(groups) >= 2 and groups[0] and groups[1]:
-                        sel["stability"] = f"stable for {groups[0]} {groups[1]}"
-                    else:
-                        sel["stability"] = m.group(0).strip().lower()
-                    logger.info(f"[SMN] Fulltext fallback: stability={sel['stability']}")
-                    break
-
-        if act.get("conditions", {}).get("reaction_time") is None:
-            for pat in _FULLTEXT_REACTION_TIME_PATTERNS:
-                m = pat.search(all_text)
-                if m:
-                    act["conditions"]["reaction_time"] = f"{m.group(1)} {m.group(2)}"
-                    logger.info(f"[SMN] Fulltext fallback: reaction_time={m.group(1)} {m.group(2)}")
                     break
 
         if sel.get("surface_area") is None:

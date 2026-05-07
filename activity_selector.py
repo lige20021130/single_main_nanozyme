@@ -14,38 +14,6 @@ VALID_ENZYME_TYPES = {
     "haloperoxidase_like", "other", "unknown",
 }
 
-ASSAY_METHOD_NORMALIZATION = {
-    "uv-vis": "UV-vis",
-    "uv-vis spectroscopy": "UV-vis",
-    "uv/vis": "UV-vis",
-    "uv vis": "UV-vis",
-    "colorimetric": "colorimetric",
-    "colorimetry": "colorimetric",
-    "fluorescence": "fluorescence",
-    "fluorometric": "fluorescence",
-    "fluorimetric": "fluorescence",
-    "sers": "SERS",
-    "surface-enhanced raman": "SERS",
-    "electrochemical": "electrochemical",
-    "amperometric": "electrochemical",
-    "voltammetric": "electrochemical",
-    "chemiluminescence": "chemiluminescence",
-    "cl": "chemiluminescence",
-    "epr": "EPR",
-    "esr": "EPR",
-}
-
-VALID_ASSAY_METHODS = {
-    "UV-vis", "colorimetric", "fluorescence", "SERS",
-    "electrochemical", "chemiluminescence", "EPR", "other",
-}
-
-SIGNAL_TYPES = {
-    "absorbance", "fluorescence intensity", "raman intensity",
-    "current", "color change", "chemiluminescence intensity",
-    "EPR signal", "voltage", "impedance",
-}
-
 
 def normalize_enzyme_type(raw: Optional[str]) -> str:
     if not raw:
@@ -54,18 +22,6 @@ def normalize_enzyme_type(raw: Optional[str]) -> str:
     if canonical and canonical != raw:
         return canonical.replace("-", "_")
     return "unknown"
-
-
-def normalize_assay_method(raw: Optional[str]) -> str:
-    if not raw:
-        return "other"
-    key = raw.strip().lower()
-    if key in ASSAY_METHOD_NORMALIZATION:
-        return ASSAY_METHOD_NORMALIZATION[key]
-    for pattern, normalized in ASSAY_METHOD_NORMALIZATION.items():
-        if pattern in key:
-            return normalized
-    return "other"
 
 
 class ActivitySelector:
@@ -168,20 +124,6 @@ class ActivitySelector:
         raw_type = act.get("enzyme_like_type", "") or act.get("enzyme_type", "")
         norm_type = normalize_enzyme_type(raw_type)
 
-        raw_assay = act.get("assay_method", "")
-        norm_assay = normalize_assay_method(raw_assay)
-
-        signal = None
-        signal_raw = act.get("signal", "") or act.get("detection_signal", "")
-        if signal_raw:
-            sig_lower = signal_raw.lower().strip()
-            for st in SIGNAL_TYPES:
-                if st in sig_lower or sig_lower in st:
-                    signal = st
-                    break
-            if not signal:
-                signal = signal_raw
-
         substrates = act.get("substrates", [])
         if isinstance(substrates, str):
             substrates = [s.strip() for s in substrates.split(",") if s.strip()]
@@ -219,8 +161,6 @@ class ActivitySelector:
 
         return {
             "enzyme_like_type": norm_type,
-            "assay_method": norm_assay,
-            "signal": signal,
             "substrates": substrates,
             "kinetics_candidates": kinetics_candidates,
             "conditions": act.get("conditions"),
