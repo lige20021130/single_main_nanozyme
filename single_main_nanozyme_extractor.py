@@ -3095,6 +3095,8 @@ class RuleExtractor:
         self._extract_assay_method(record, buckets.get("activity", []) + buckets.get("kinetics", []))
         self._extract_signal(record, buckets.get("activity", []) + buckets.get("kinetics", []))
         self._extract_buffer(record, buckets.get("activity", []) + buckets.get("kinetics", []))
+        self._extract_reaction_time(record, buckets.get("activity", []) + buckets.get("kinetics", []))
+        self._extract_stability(record, buckets.get("characterization", []) + buckets.get("activity", []) + buckets.get("material", [])[:3])
         self._extract_mechanism(record, buckets.get("mechanism", []) + buckets.get("activity", []) + buckets.get("kinetics", [])[:5] + buckets.get("application", [])[:3])
 
         if doc:
@@ -4518,6 +4520,55 @@ class RuleExtractor:
             for pat, buf in self._BUFFER_PATTERNS:
                 if pat.search(text):
                     record["main_activity"]["conditions"]["buffer"] = buf
+                    return
+
+    _REACTION_TIME_PATTERNS = [
+        re.compile(r'\b(?:reaction|incubation|catalytic)\s+time\s*(?:of|was|=|:|≈|~)\s*(?:about\s+|approximately\s+)?([\d.]+)\s*(min|s|sec|h|hour|hr)', re.I),
+        re.compile(r'\bincubated\s+(?:for|at)\s*(?:about\s+)?([\d.]+)\s*(min|s|sec|h|hour|hr)', re.I),
+        re.compile(r'\b(?:after|within)\s*([\d.]+)\s*(min|s|sec|h|hour|hr)\s+(?:of\s+)?(?:reaction|incubation|catalysis)', re.I),
+        re.compile(r'\b(?:reaction|incubation)\s+(?:was\s+)?(?:carried\s+out\s+)?(?:for|during)\s*([\d.]+)\s*(min|s|sec|h|hour|hr)', re.I),
+        re.compile(r'\b([\d.]+)\s*(min|s|sec)\s+(?:of\s+)?(?:reaction|incubation)\s+time\b', re.I),
+        re.compile(r'\btime\s*[\(=]\s*([\d.]+)\s*(min|s|sec|h)\b', re.I),
+    ]
+
+    def _extract_reaction_time(self, record: Dict[str, Any], texts: List[str]):
+        if record["main_activity"]["conditions"].get("reaction_time"):
+            return
+        for text in texts:
+            for pat in self._REACTION_TIME_PATTERNS:
+                m = pat.search(text)
+                if m:
+                    val = m.group(1)
+                    unit = m.group(2)
+                    record["main_activity"]["conditions"]["reaction_time"] = f"{val} {unit}"
+                    return
+
+    _STABILITY_PATTERNS = [
+        re.compile(r'\bstable\s+(?:for|over|during)\s*([\d.]+)\s*(days?|weeks?|months?|hours?|h)\b', re.I),
+        re.compile(r'\bretained\s+(?:more\s+than\s+)?(\d+)\s*%?\s*(?:of\s+(?:its?\s+)?(?:original|initial)\s+activity)?\s*(?:after|for)\s*([\d.]+)\s*(days?|weeks?|months?|hours?|cycles?)', re.I),
+        re.compile(r'\b(?:storage|long[-\s]?term)\s+stability\s*(?::|was|of)\s*(?:stable\s+)?(?:for\s+)?([\d.]+)\s*(days?|weeks?|months?|hours?)', re.I),
+        re.compile(r'\bremained\s+([\d.]+)\s*%?\s*(?:of\s+(?:its?\s+)?(?:original|initial)\s+activity)?\s*(?:after|over)\s*([\d.]+)\s*(days?|weeks?|months?|cycles?)', re.I),
+        re.compile(r'\b(?:good|excellent|high)\s+stability\b', re.I),
+        re.compile(r'\b(?:no\s+)?significant\s+(?:loss|decrease|decline|reduction)\s+in\s+activity\b', re.I),
+    ]
+
+    def _extract_stability(self, record: Dict[str, Any], texts: List[str]):
+        sel = record.get("selected_nanozyme", {})
+        if not isinstance(sel, dict):
+            return
+        if sel.get("stability"):
+            return
+        for text in texts:
+            for pat in self._STABILITY_PATTERNS:
+                m = pat.search(text)
+                if m:
+                    groups = m.groups()
+                    if len(groups) >= 2 and groups[0] and groups[1]:
+                        val = groups[0]
+                        unit = groups[1]
+                        sel["stability"] = f"stable for {val} {unit}"
+                    else:
+                        sel["stability"] = m.group(0).strip().lower()
                     return
 
     _MECHANISM_PATTERNS = [

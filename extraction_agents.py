@@ -714,6 +714,8 @@ class MorphologyAgent:
         all_relevant = material_texts + char_texts
         self._extract_metal_elements(record, all_relevant, selected_name)
         self._extract_characterization_techniques(record, all_relevant)
+        self._extract_composition_structured(record, all_relevant, selected_name)
+        self._extract_dopants_or_defects(record, all_relevant)
         return record
 
     def _extract_size_properties(self, record, material_texts):
@@ -846,6 +848,97 @@ class MorphologyAgent:
         if found_techniques:
             sel["characterization"] = sorted(list(found_techniques))
 
+    _DOPANT_PATTERNS = [
+        re.compile(r'\b(?:N|B|S|P|F|Cl|Br|I|Se|Si)\s*[-‑–—doped]\b', re.I),
+        re.compile(r'\b(?:N|B|S|P|F|Se|Si)\s*[-‑–]?(?:doped|substituted|incorporated|co[-\s]?doped)\b', re.I),
+        re.compile(r'\b(?:co[-\s]?doped|tri[-\s]?doped)\s+(?:with\s+)?([\w\-]+(?:\s[\w\-]+){0,2})', re.I),
+        re.compile(r'\bdoped\s+(?:with|by)\s+([\w\-]+(?:\s[\w\-]+){0,2})', re.I),
+        re.compile(r'\b(?:N|B|S|P|F|Se|Si|Cl)\s*[-‑–]\s*(?:doped|doping|substitut)', re.I),
+        re.compile(r'\boxygen\s+vacanc', re.I),
+        re.compile(r'\bsulfur\s+vacanc', re.I),
+        re.compile(r'\bnitrogen\s+vacanc', re.I),
+        re.compile(r'\b(?:vacancy|vacancies|defect|defects)\b', re.I),
+        re.compile(r'\b(?:Fe|Co|Ni|Mn|Cu|Zn|Ce|Au|Ag|Pt|Pd|Ti|V|Cr|Mo|W|Ru|Rh|Ir|La|Zr|Al|Sn|Bi|In)\s*[-‑–]\s*(?:doped|substituted|incorporated)\b', re.I),
+    ]
+
+    def _extract_dopants_or_defects(self, record, texts):
+        sel = record.get("selected_nanozyme", {})
+        if not isinstance(sel, dict):
+            return
+        if sel.get("dopants_or_defects") and len(sel["dopants_or_defects"]) > 0:
+            return
+        found = set()
+        for text in texts:
+            for pat in self._DOPANT_PATTERNS:
+                m = pat.search(text)
+                if m:
+                    raw = m.group(0).strip()
+                    if 'vacanc' in raw.lower() or 'defect' in raw.lower():
+                        if 'oxygen' in raw.lower():
+                            found.add("oxygen vacancy")
+                        elif 'sulfur' in raw.lower():
+                            found.add("sulfur vacancy")
+                        elif 'nitrogen' in raw.lower():
+                            found.add("nitrogen vacancy")
+                        else:
+                            found.add(raw.lower())
+                    elif m.lastindex and m.group(1):
+                        found.add(m.group(1).strip().lower())
+                    else:
+                        found.add(raw.lower())
+        if found:
+            sel["dopants_or_defects"] = sorted(list(found))
+
+    _CORE_PATTERN = re.compile(
+        r'\b([A-Z][a-z]?\d*(?:[- ][A-Z][a-z]?\d*)*)\s*@\s*([A-Z][a-z]?\d*(?:[- ][A-Z][a-z]?\d*)*)\b',
+    )
+    _SUPPORT_PATTERN = re.compile(
+        r'\b(?:supported|deposited|loaded|anchored|immobilized)\s+(?:on|onto|over)\s+([\w\-]+(?:\s[\w\-]+){0,2})',
+        re.I,
+    )
+    _ORGANIC_PATTERN = re.compile(
+        r'\b(?:coated|wrapped|capped|functionalized|modified)\s+(?:with|by)\s+([\w\-]+(?:\s[\w\-]+){0,2})',
+        re.I,
+    )
+
+    def _extract_composition_structured(self, record, texts, selected_name):
+        sel = record.get("selected_nanozyme", {})
+        if not isinstance(sel, dict):
+            return
+        comp = sel.get("composition_structured", {})
+        if not isinstance(comp, dict):
+            comp = {"core": None, "dopants": [], "support": None, "organic_component": None}
+            sel["composition_structured"] = comp
+
+        if comp.get("core") is None:
+            for text in texts:
+                m = self._CORE_PATTERN.search(text)
+                if m:
+                    comp["core"] = m.group(1).strip()
+                    comp["support"] = m.group(2).strip()
+                    break
+
+        if comp.get("support") is None:
+            for text in texts:
+                m = self._SUPPORT_PATTERN.search(text)
+                if m:
+                    comp["support"] = m.group(1).strip()
+                    break
+
+        if comp.get("organic_component") is None:
+            for text in texts:
+                m = self._ORGANIC_PATTERN.search(text)
+                if m:
+                    raw = m.group(1).strip().lower()
+                    if raw not in ("the", "a", "an", "its"):
+                        comp["organic_component"] = raw
+                    break
+
+        if not comp.get("dopants"):
+            dopants = sel.get("dopants_or_defects", [])
+            if dopants:
+                comp["dopants"] = dopants
+
 
 class SynthesisAgent:
     def extract(self, record, buckets, table_values, selected_name, doc=None):
@@ -947,6 +1040,9 @@ class ApplicationAgent:
                      + buckets.get("kinetics", [])[:5]
                      + buckets.get("activity", [])[:3])
         self._extract_applications_from_text(record, app_texts)
+        self._extract_selectivity(record, app_texts)
+        self._extract_response_time(record, app_texts)
+        self._extract_reusability(record, app_texts)
         return record
 
     def _is_kinetics_context(self, text):
@@ -1008,6 +1104,105 @@ class ApplicationAgent:
             for key in ("application_type", "target_analyte", "method", "linear_range", "detection_limit", "sample_type", "notes"):
                 app.setdefault(key, None)
             record["applications"].append(app)
+
+    _SELECTIVITY_PATTERNS = [
+        re.compile(r'\bselectivit', re.I),
+        re.compile(r'\binterfer', re.I),
+        re.compile(r'\banti.interfer', re.I),
+        re.compile(r'\bspecificit', re.I),
+        re.compile(r'\bno\s+(?:significant\s+)?interfer', re.I),
+        re.compile(r'\b(?:high|excellent|good|remarkable)\s+selectivit', re.I),
+    ]
+
+    _SELECTIVITY_DETAIL_PATTERNS = [
+        re.compile(r'\bselectiv(?:e|ity)\s+(?:toward|for|to|over|against)\s+([\w\-]+(?:\s[\w\-]+){0,3})', re.I),
+        re.compile(r'\bno\s+(?:significant\s+|obvious\s+)?interfer(?:ence)?\s+(?:from|by)\s+([\w\-]+(?:\s[\w\-]+){0,3})', re.I),
+        re.compile(r'\binterfer(?:ence)?\s+(?:from|by)\s+([\w\-]+(?:\s[\w\-]+){0,3})\s+was\s+(?:negligible|minimal|not\s+observed)', re.I),
+    ]
+
+    def _extract_selectivity(self, record, app_texts):
+        apps = record.get("applications", [])
+        if not apps:
+            return
+        app = apps[0]
+        if app.get("notes") and "selectivity" in str(app["notes"]).lower():
+            return
+        for text in app_texts:
+            for pat in self._SELECTIVITY_PATTERNS:
+                if pat.search(text):
+                    detail = None
+                    for dpat in self._SELECTIVITY_DETAIL_PATTERNS:
+                        dm = dpat.search(text)
+                        if dm:
+                            detail = dm.group(1).strip()
+                            break
+                    note = "selective"
+                    if detail:
+                        note = f"selective toward {detail}"
+                    if app.get("notes"):
+                        app["notes"] = f"{app['notes']}; {note}"
+                    else:
+                        app["notes"] = note
+                    return
+
+    _RESPONSE_TIME_PATTERNS = [
+        re.compile(r'\bresponse\s+time\s*(?:of|was|=|:|≈|~)\s*(?:about\s+|approximately\s+)?([\d.]+)\s*(s|sec|min)', re.I),
+        re.compile(r'\bdetection\s+time\s*(?:of|was|=|:|≈|~)\s*(?:about\s+|approximately\s+)?([\d.]+)\s*(s|sec|min)', re.I),
+        re.compile(r'\b(?:within|in)\s*([\d.]+)\s*(s|sec|min)\s+(?:of\s+)?(?:response|detection)', re.I),
+        re.compile(r'\b(?:rapid|fast|quick)\s+(?:response|detection)\s+(?:within|in)\s*([\d.]+)\s*(s|sec|min)', re.I),
+        re.compile(r'\bresult\s+(?:was\s+)?obtained\s+(?:within|in)\s*([\d.]+)\s*(s|sec|min)', re.I),
+    ]
+
+    def _extract_response_time(self, record, app_texts):
+        apps = record.get("applications", [])
+        if not apps:
+            return
+        app = apps[0]
+        if app.get("notes") and "response time" in str(app["notes"]).lower():
+            return
+        for text in app_texts:
+            for pat in self._RESPONSE_TIME_PATTERNS:
+                m = pat.search(text)
+                if m:
+                    val = m.group(1)
+                    unit = m.group(2)
+                    note = f"response time: {val} {unit}"
+                    if app.get("notes"):
+                        app["notes"] = f"{app['notes']}; {note}"
+                    else:
+                        app["notes"] = note
+                    return
+
+    _REUSABILITY_PATTERNS = [
+        re.compile(r'\bretained\s+(?:more\s+than\s+)?(\d+)\s*%?\s*(?:of\s+(?:its?\s+)?(?:original|initial)\s+activity)?\s*(?:after|for)\s*([\d.]+)\s*cycles?', re.I),
+        re.compile(r'\breusab', re.I),
+        re.compile(r'\brecyclab', re.I),
+        re.compile(r'\b(?:good|excellent|high)\s+reusab', re.I),
+        re.compile(r'\b(?:reused|recycled)\s+(?:for\s+)?([\d.]+)\s*cycles?', re.I),
+        re.compile(r'\bremained\s+([\d.]+)\s*%?\s*(?:of\s+(?:its?\s+)?(?:original|initial)\s+activity)?\s*(?:after|over)\s*([\d.]+)\s*cycles?', re.I),
+    ]
+
+    def _extract_reusability(self, record, app_texts):
+        apps = record.get("applications", [])
+        if not apps:
+            return
+        app = apps[0]
+        if app.get("notes") and "reusab" in str(app["notes"]).lower():
+            return
+        for text in app_texts:
+            for pat in self._REUSABILITY_PATTERNS:
+                m = pat.search(text)
+                if m:
+                    groups = m.groups()
+                    if len(groups) >= 2 and groups[0] and groups[1]:
+                        note = f"reusable: {groups[0]}% after {groups[1]} cycles"
+                    else:
+                        note = "reusable"
+                    if app.get("notes"):
+                        app["notes"] = f"{app['notes']}; {note}"
+                    else:
+                        app["notes"] = note
+                    return
 
 
 class RuleExtractorAdapter:
