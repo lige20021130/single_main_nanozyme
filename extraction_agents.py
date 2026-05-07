@@ -28,6 +28,32 @@ def _norm_unit(unit):
     return unit
 
 
+_FULLTEXT_STABILITY_PATTERNS = [
+    re.compile(r'\bstable\s+(?:for|over|during)\s*([\d.]+)\s*(days?|weeks?|months?|hours?|h)\b', re.I),
+    re.compile(r'\bretained\s+(?:more\s+than\s+)?(\d+)\s*%?\s*(?:of\s+(?:its?\s+)?(?:original|initial)\s+activity)?\s*(?:after|for)\s*([\d.]+)\s*(days?|weeks?|months?|hours?|cycles?)', re.I),
+    re.compile(r'\b(?:storage|long[-\s]?term)\s+stability\s*(?::|was|of)\s*(?:stable\s+)?(?:for\s+)?([\d.]+)\s*(days?|weeks?|months?|hours?)', re.I),
+    re.compile(r'\bremained\s+([\d.]+)\s*%?\s*(?:of\s+(?:its?\s+)?(?:original|initial)\s+activity)?\s*(?:after|over)\s*([\d.]+)\s*(days?|weeks?|months?|cycles?)', re.I),
+    re.compile(r'\b(?:good|excellent|high)\s+stability\b', re.I),
+]
+
+_FULLTEXT_REACTION_TIME_PATTERNS = [
+    re.compile(r'\b(?:reaction|incubation|catalytic)\s+time\s*(?:of|was|=|:|≈|~)\s*(?:about\s+|approximately\s+)?([\d.]+)\s*(min|s|sec|h|hour|hr)', re.I),
+    re.compile(r'\bincubated\s+(?:for|at)\s*(?:about\s+)?([\d.]+)\s*(min|s|sec|h|hour|hr)', re.I),
+    re.compile(r'\b(?:after|within)\s*([\d.]+)\s*(min|s|sec|h|hour|hr)\s+(?:of\s+)?(?:reaction|incubation|catalysis)', re.I),
+]
+
+_FULLTEXT_MECHANISM_PATTERNS = [
+    re.compile(r'\b(?:electron|radical|Fenton|Haber[-\s]?Weiss|Schottky|piezo|photo|sono|electro)cataly', re.I),
+    re.compile(r'\bROS\s+(?:generation|production|mediat)', re.I),
+    re.compile(r'\b(?:hydroxyl|superoxide|singlet\s+oxygen)\s+radical', re.I),
+    re.compile(r'\b(?:oxygen\s+)?vacancy[-\s]*(?:mediated|induced|driven|catalyzed|promoted)', re.I),
+    re.compile(r'\b(?:active\s+)?(?:site|center)s?\s+(?:for|of)\s+(?:cataly|oxid)', re.I),
+    re.compile(r'\b(?:charge|electron)\s+transfer\b', re.I),
+    re.compile(r'\b(?:catalytic|reaction)\s+mechanism\b', re.I),
+    re.compile(r'\b(?:peroxidase|oxidase|catalase|SOD)\s*[-\s]*(?:like\s+)?(?:mechanism|pathway|process)', re.I),
+]
+
+
 def _is_concentration_unit(unit):
     if _is_concentration_unit_fn and unit:
         return _is_concentration_unit_fn(unit)
@@ -80,8 +106,39 @@ class KineticsAgent:
             self._extract_kinetics_from_table(record, table_values)
         self._extract_kcat_from_text(record, buckets.get("kinetics", []))
         self._validate_kinetics_units(record)
+        self._extract_specific_activity(record, buckets.get("activity", []) + buckets.get("kinetics", []))
         self._fill_kinetics_list(record, buckets.get("kinetics", []))
         return record
+
+    _SPECIFIC_ACTIVITY_PATTERNS = [
+        re.compile(r'\bspecific\s+activity\s*(?:of|was|=|:|≈|~)\s*(?:about\s+|approximately\s+)?([\d.]+)\s*([μu]?[MmNn]\s*[/·]\s*(?:min|s|hr|h))', re.I),
+        re.compile(r'\bspecific\s+activity\s*(?:of|was|=|:|≈|~)\s*(?:about\s+|approximately\s+)?([\d.]+)\s*(U\s*/\s*(?:mg|g|mL))', re.I),
+        re.compile(r'\b([\d.]+)\s*(U\s*/\s*(?:mg|g|mL))\s*(?:of\s+)?specific\s+activity', re.I),
+        re.compile(r'\bspecific\s+activity\s*(?:reached|achieved|exhibited|showed)\s*(?:a\s+)?(?:value\s+)?(?:of\s+)?([\d.]+)\s*([μu]?[MmNn]\s*[/·]\s*(?:min|s|hr|h))', re.I),
+        re.compile(r'\b([\d.]+)\s*(U\s*/\s*mg)\b', re.I),
+    ]
+
+    def _extract_specific_activity(self, record, texts):
+        ivs = record.get("important_values", [])
+        for iv in ivs:
+            if iv.get("name", "").lower() == "specific activity":
+                return
+        for text in texts:
+            for pat in self._SPECIFIC_ACTIVITY_PATTERNS:
+                m = pat.search(text)
+                if m:
+                    val = m.group(1)
+                    unit = m.group(2).replace(" ", "")
+                    ivs.append({
+                        "name": "specific activity",
+                        "value": val,
+                        "unit": unit,
+                        "context": m.group(0)[:100],
+                        "source": "rule",
+                        "needs_review": False,
+                    })
+                    record["important_values"] = ivs
+                    return
 
     def _fill_kinetics_list(self, record, kinetics_texts):
         kin = record["main_activity"]["kinetics"]
@@ -944,6 +1001,7 @@ class SynthesisAgent:
     def extract(self, record, buckets, table_values, selected_name, doc=None):
         synthesis_texts = buckets.get("synthesis", []) + buckets.get("material", [])[:5] + buckets.get("characterization", [])[:3]
         self._extract_synthesis_method(record, synthesis_texts)
+        self._extract_method_detail(record, synthesis_texts)
         return record
 
     def _extract_synthesis_method(self, record, synthesis_texts):
@@ -1003,6 +1061,46 @@ class SynthesisAgent:
                         break
                 if synth_cond.get("precursors"):
                     break
+
+    _METHOD_DETAIL_PATTERNS = [
+        re.compile(r'\b(?:under|in)\s+(?:a\s+)?(N[2_]|Ar|nitrogen|argon|inert|vacuum|air)\s+(?:atmosphere|flow|environment|condition)', re.I),
+        re.compile(r'\b(?:stirred|stirring)\s+(?:for|at)\s*([\d.]+\s*(?:h|hour|min|s))', re.I),
+        re.compile(r'\baged\s+(?:at|for)\s*([\d.]+\s*(?:h|hour|min|days?|°C))', re.I),
+        re.compile(r'\bdried\s+(?:at|under|in)\s*([\d.]+\s*(?:°C|h|hour|vacuum))', re.I),
+        re.compile(r'\bcalcined\s+(?:at|for)\s*([\d.]+\s*(?:°C|h|hour))', re.I),
+        re.compile(r'\bwashed\s+(?:with|by)\s+([\w\-]+(?:\s[\w\-]+){0,2})', re.I),
+        re.compile(r'\bcentrifuged\s+(?:at|for)\s*([\d.]+\s*(?:rpm|g|min))', re.I),
+        re.compile(r'\b(?:autoclaved|sealed)\s+(?:in|at)\s*([\w\-]+(?:\s[\w\-]+){0,2})', re.I),
+        re.compile(r'\b(?:ground|milled|ball[-\s]?milled)\s+(?:for|at)\s*([\d.]+\s*(?:h|hour|min))', re.I),
+        re.compile(r'\bfreeze[-\s]?dried\b', re.I),
+        re.compile(r'\blyophilized\b', re.I),
+    ]
+
+    def _extract_method_detail(self, record, synthesis_texts):
+        sel = record.get("selected_nanozyme", {})
+        if not isinstance(sel, dict):
+            return
+        synth_cond = sel.get("synthesis_conditions", {})
+        if not isinstance(synth_cond, dict):
+            synth_cond = {}
+            sel["synthesis_conditions"] = synth_cond
+        if synth_cond.get("method_detail"):
+            return
+        details = []
+        for text in synthesis_texts:
+            for pat in self._METHOD_DETAIL_PATTERNS:
+                m = pat.search(text)
+                if m:
+                    raw = m.group(0).strip()
+                    if m.lastindex and m.group(1):
+                        raw = f"{raw.split(m.group(1))[0].strip()} {m.group(1).strip()}"
+                    details.append(raw)
+                    if len(details) >= 3:
+                        break
+            if len(details) >= 3:
+                break
+        if details:
+            synth_cond["method_detail"] = "; ".join(details)
 
 
 class ApplicationAgent:
@@ -1705,6 +1803,98 @@ class RuleExtractorAdapter:
         if not isinstance(kin, dict):
             kin = {}
             act["kinetics"] = kin
+
+        if act.get("enzyme_like_type") is None:
+            for pat, etype in _ENZYME_TYPE_PATTERNS:
+                if pat.search(all_text):
+                    act["enzyme_like_type"] = etype
+                    logger.info(f"[SMN] Fulltext fallback: enzyme_like_type={etype}")
+                    break
+
+        if kin.get("Km") is None:
+            for pat in _KM_PATTERNS:
+                m = pat.search(all_text)
+                if not m:
+                    m = pat.search(norm_text)
+                if m:
+                    val = m.group(1)
+                    unit = m.group(2) if m.lastindex and m.lastindex >= 2 else ""
+                    parsed = _parse_scientific_notation(val.strip())
+                    if isinstance(parsed, (int, float)):
+                        kin["Km"] = parsed
+                        kin["Km_unit"] = _norm_unit(unit) if unit else unit
+                        kin["source"] = "fulltext_fallback"
+                        logger.info(f"[SMN] Fulltext fallback: Km={parsed} {unit}")
+                    break
+
+        if kin.get("Vmax") is None:
+            for pat in _VMAX_PATTERNS:
+                m = pat.search(all_text)
+                if not m:
+                    m = pat.search(norm_text)
+                if m:
+                    val = m.group(1)
+                    unit = m.group(2) if m.lastindex and m.lastindex >= 2 else ""
+                    parsed = _parse_scientific_notation(val.strip())
+                    if isinstance(parsed, (int, float)):
+                        kin["Vmax"] = parsed
+                        kin["Vmax_unit"] = _norm_unit(unit) if unit else unit
+                        kin["source"] = "fulltext_fallback"
+                        logger.info(f"[SMN] Fulltext fallback: Vmax={parsed} {unit}")
+                    break
+
+        if act.get("mechanism") is None:
+            for pat in _FULLTEXT_MECHANISM_PATTERNS:
+                m = pat.search(all_text)
+                if m:
+                    act["mechanism"] = m.group(0).strip()[:200]
+                    logger.info(f"[SMN] Fulltext fallback: mechanism found")
+                    break
+
+        if sel.get("stability") is None:
+            for pat in _FULLTEXT_STABILITY_PATTERNS:
+                m = pat.search(all_text)
+                if m:
+                    groups = m.groups()
+                    if len(groups) >= 2 and groups[0] and groups[1]:
+                        sel["stability"] = f"stable for {groups[0]} {groups[1]}"
+                    else:
+                        sel["stability"] = m.group(0).strip().lower()
+                    logger.info(f"[SMN] Fulltext fallback: stability={sel['stability']}")
+                    break
+
+        if act.get("conditions", {}).get("reaction_time") is None:
+            for pat in _FULLTEXT_REACTION_TIME_PATTERNS:
+                m = pat.search(all_text)
+                if m:
+                    act["conditions"]["reaction_time"] = f"{m.group(1)} {m.group(2)}"
+                    logger.info(f"[SMN] Fulltext fallback: reaction_time={m.group(1)} {m.group(2)}")
+                    break
+
+        if sel.get("surface_area") is None:
+            for pat in _SURFACE_AREA_PATTERNS:
+                m = pat.search(all_text)
+                if m:
+                    sel["surface_area"] = f"{m.group(1)} {m.group(2)}"
+                    logger.info(f"[SMN] Fulltext fallback: surface_area={sel['surface_area']}")
+                    break
+
+        if sel.get("pore_size") is None:
+            for pat in _PORE_SIZE_PATTERNS:
+                m = pat.search(all_text)
+                if m:
+                    sel["pore_size"] = f"{m.group(1)} {m.group(2)}"
+                    logger.info(f"[SMN] Fulltext fallback: pore_size={sel['pore_size']}")
+                    break
+
+        if sel.get("zeta_potential") is None:
+            for pat in _ZETA_POTENTIAL_PATTERNS:
+                m = pat.search(all_text)
+                if m:
+                    sel["zeta_potential"] = f"{m.group(1)} {m.group(2)}"
+                    logger.info(f"[SMN] Fulltext fallback: zeta_potential={sel['zeta_potential']}")
+                    break
+
         if kin.get("Km") is None and kin.get("Vmax") is None:
             si_table_ref = re.search(
                 r'(?:Table\s+S\d+|Supplementary\s+Table\s+\d+)\s+(?:displays?|shows?|presents?|lists?|summarizes?)\s+.*?(?:Km|Vmax|kinetic)',
