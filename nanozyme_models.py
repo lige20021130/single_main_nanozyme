@@ -187,6 +187,77 @@ ENZYME_REGISTRY: Dict[EnzymeType, Dict[str, Any]] = {
         "substrates": [],
         "assay_keywords": ["cascade assay", "sequential reaction"],
     },
+    EnzymeType.MULTI_ENZYME: {
+        "keywords": ["multi-enzyme-like", "dual-enzyme-like", "triple-enzyme-like", "multi-enzyme activity"],
+        "substrates": ["TMB", "H2O2", "ABTS", "OPD"],
+        "assay_keywords": ["multi-enzyme assay", "dual-enzyme activity"],
+    },
+    EnzymeType.RIBOZYME: {
+        "keywords": ["ribozyme-like", "ribozyme mimetic", "ribozyme activity"],
+        "substrates": ["RNA", "DNA", "oligonucleotides"],
+        "assay_keywords": ["ribozyme assay", "RNA cleavage"],
+    },
+    EnzymeType.CELLULASE: {
+        "keywords": ["cellulase-like", "cellulase mimetic", "cellulase activity"],
+        "substrates": ["CMC", "carboxymethyl cellulose", "cellulose", "filter paper"],
+        "assay_keywords": ["cellulase assay", "CMC hydrolysis", "DNS assay"],
+    },
+    EnzymeType.AMYLASE: {
+        "keywords": ["amylase-like", "amylase mimetic", "amylase activity", "α-amylase-like"],
+        "substrates": ["starch", "amylose", "amylopectin", "soluble starch"],
+        "assay_keywords": ["amylase assay", "starch hydrolysis", "DNS method"],
+    },
+    EnzymeType.PROTEASE: {
+        "keywords": ["protease-like", "protease mimetic", "protease activity"],
+        "substrates": ["casein", "BSA", "gelatin", "peptide"],
+        "assay_keywords": ["protease assay", "casein hydrolysis"],
+    },
+    EnzymeType.LIPASE: {
+        "keywords": ["lipase-like", "lipase mimetic", "lipase activity"],
+        "substrates": ["p-NPB", "p-nitrophenyl butyrate", "triolein", "olive oil"],
+        "assay_keywords": ["lipase assay", "p-NPB hydrolysis", "ester hydrolysis"],
+    },
+    EnzymeType.UREASE: {
+        "keywords": ["urease-like", "urease mimetic", "urease activity"],
+        "substrates": ["urea"],
+        "assay_keywords": ["urease assay", "urea hydrolysis", "phenol red method"],
+    },
+    EnzymeType.ASCORBATE_OXIDASE: {
+        "keywords": ["ascorbate oxidase-like", "AAO-like", "ascorbate oxidase mimetic", "ascorbate oxidase activity"],
+        "substrates": ["ascorbic acid", "AA", "vitamin C"],
+        "assay_keywords": ["ascorbate oxidase assay", "AA oxidation"],
+    },
+    EnzymeType.DEHYDROGENASE: {
+        "keywords": ["dehydrogenase-like", "dehydrogenase mimetic", "dehydrogenase activity",
+                     "formate dehydrogenase-like", "alcohol dehydrogenase-like", "glucose dehydrogenase-like"],
+        "substrates": ["NADH", "NAD+", "formate", "ethanol", "glucose"],
+        "assay_keywords": ["dehydrogenase assay", "NADH oxidation"],
+    },
+    EnzymeType.NUCLEASE: {
+        "keywords": ["nuclease-like", "nuclease mimetic", "DNA cleavage", "RNA cleavage", "DNase-like", "RNase-like"],
+        "substrates": ["DNA", "RNA", "oligonucleotides", "plasmid DNA"],
+        "assay_keywords": ["nuclease assay", "DNA cleavage assay", "gel electrophoresis"],
+    },
+    EnzymeType.TYROSINASE: {
+        "keywords": ["tyrosinase-like", "tyrosinase mimetic", "polyphenol oxidase-like", "tyrosinase activity"],
+        "substrates": ["L-DOPA", "tyrosine", "phenol", "catechol"],
+        "assay_keywords": ["tyrosinase assay", "L-DOPA oxidation"],
+    },
+    EnzymeType.INVERTASE: {
+        "keywords": ["invertase-like", "invertase mimetic", "invertase activity", "sucrase-like"],
+        "substrates": ["sucrose", "saccharose"],
+        "assay_keywords": ["invertase assay", "sucrose hydrolysis", "DNS method"],
+    },
+    EnzymeType.CHITINASE: {
+        "keywords": ["chitinase-like", "chitinase mimetic", "chitinase activity"],
+        "substrates": ["chitin", "colloidal chitin", "CM-chitin"],
+        "assay_keywords": ["chitinase assay", "chitin hydrolysis"],
+    },
+    EnzymeType.XYLANASE: {
+        "keywords": ["xylanase-like", "xylanase mimetic", "xylanase activity"],
+        "substrates": ["xylan", "beechwood xylan", "birchwood xylan"],
+        "assay_keywords": ["xylanase assay", "xylan hydrolysis", "DNS method"],
+    },
 }
 
 

@@ -760,6 +760,26 @@ _LOD_PATTERNS = [
         r'(?:could\s+detect|can\s+detect|able\s+to\s+detect)\s+(?:down\s+to\s+)?([\d.]+)\s*(nM|μM|uM|mM|M|pg/mL|ng/mL|μg/mL|mg/L|ppb|ppm)',
         re.I,
     ),
+    re.compile(
+        r'(?:LOD|detection\s+limit)\s*(?:of|was|is|=|:|≈|~)\s*([\d.]+)\s*[×x\u00d7]\s*10[\u207b\u2212\u2013\-](\d+)\s*(nM|μM|uM|mM|M|pg/mL|ng/mL|μg/mL|mg/L|ppb|ppm|pM|fM)',
+        re.I,
+    ),
+    re.compile(
+        r'(?:detectable|determined|achieved)\s+(?:at|down\s+to|as\s+low\s+as)\s*([\d.]+)\s*(nM|μM|uM|mM|M|pg/mL|ng/mL|μg/mL|mg/L|ppb|ppm|pM|fM)',
+        re.I,
+    ),
+    re.compile(
+        r'(?:LOD|detection\s+limit)\s*(?:reached|obtained|calculated)\s*(?:was\s+)?([\d.]+)\s*(nM|μM|uM|mM|M|pg/mL|ng/mL|μg/mL|mg/L|ppb|ppm|pM|fM)',
+        re.I,
+    ),
+    re.compile(
+        r'(?:limit\s+of\s+quantitation|LOQ)\s*(?:of|=|:|≈|~|was|is)\s*([\d.]+)\s*(nM|μM|uM|mM|M|pg/mL|ng/mL|μg/mL|mg/L|ppb|ppm|pM|fM)',
+        re.I,
+    ),
+    re.compile(
+        r'(?:the\s+)?(?:lowest\s+)?(?:detect(?:able|ed))\s+(?:concentration|level|amount)\s*(?:was|is|=|:)\s*([\d.]+)\s*(nM|μM|uM|mM|M|pg/mL|ng/mL|μg/mL|mg/L|ppb|ppm)',
+        re.I,
+    ),
 ]
 _LINEAR_RANGE_PATTERNS = [
     re.compile(
@@ -790,6 +810,18 @@ _LINEAR_RANGE_PATTERNS = [
         r'(?:linear|calibration)\s+(?:from|between)\s*([\d.]+)\s*(?:to|[-–—~])\s*([\d.]+)\s*(nM|μM|uM|mM|M|pg/mL|ng/mL|μg/mL|mg/L)',
         re.I,
     ),
+    re.compile(
+        r'(?:linear\s+)?(?:response|relationship|calibration)\s+(?:from|between|in\s+the\s+range\s+of)\s*([\d.]+)\s*(?:to|[-–—~])\s*([\d.]+)\s*(nM|μM|uM|mM|M|pg/mL|ng/mL|μg/mL|mg/L|U/L|mU/L|U/mL)',
+        re.I,
+    ),
+    re.compile(
+        r'(?:concentration\s+range|range\s+of\s+concentration)\s*(?:of|=|:|was|from)\s*([\d.]+)\s*(?:to|[-–—~])\s*([\d.]+)\s*(nM|μM|uM|mM|M|pg/mL|ng/mL|μg/mL|mg/L)',
+        re.I,
+    ),
+    re.compile(
+        r'(?:quantif|determin|measur)\s+(?:from|between|in\s+the\s+range)\s*([\d.]+)\s*(?:to|[-–—~])\s*([\d.]+)\s*(nM|μM|uM|mM|M|pg/mL|ng/mL|μg/mL|mg/L)',
+        re.I,
+    ),
 ]
 
 _BUCKET_KEYWORDS = {
@@ -798,29 +830,56 @@ _BUCKET_KEYWORDS = {
         r"synthes|prepar|fabricat|nanoparticle|nanosheet|nanotube|nanorod|"
         r"core-shell|yolk-shell|hollow|mesoporous|"
         r"crystal|amorphous|spinel|perovskite|anatase|rutile|"
-        r"calcination|annealing|carbonization|pyrolysis)", re.I),
+        r"calcination|annealing|carbonization|pyrolysis|"
+        r"dopan|incorporat|substitut|alloy|bimetal|trimetal|"
+        r"composite|hybrid|heterostructur|core@shell|"
+        r"nanocluster|nanoflower|nanowire|nanocube|nanoprism|"
+        r"nanodot|quantum\s+dot|nanoframe|nanocage)", re.I),
     "synthesis": re.compile(
         r"(?:synthes|prepar|fabricat|hydrothermal|calcination|annealing|"
         r"solvothermal|co-precipitation|sol-gel|precursor|"
         r"temperature|heated|furnace|reaction\s+time|"
-        r"one-pot|two-step|in-situ|ex-situ)", re.I),
+        r"one-pot|two-step|in-situ|ex-situ|"
+        r"microwave|ultrasoni|electrospinn|sputter|"
+        r"magnetron|plasma|laser\s+ablat|ball\s+mil|"
+        r"freeze-dry|lyophiliz|solvent|atmosphere|"
+        r"aging|stirring|centrifug|washed|dried|"
+        r"carboniz|pyrolyz|calcined|annealed|"
+        r"impregnat|graft|immobiliz|load)", re.I),
     "characterization": re.compile(
         r"(?:SEM|TEM|XRD|XPS|Raman|FTIR|EPR|AFM|EDX|EDS|SAED|"
         r"HAADF|HRTEM|XAFS|XANES|EXAFS|BET|TG|DTA|ICP|"
         r"zeta\s+potential|surface\s+area|pore\s+size|BJH|"
-        r"lattice|d-spacing|crystallite)", re.I),
+        r"lattice|d-spacing|crystallite|"
+        r"XRF|ICP-MS|TGA|DSC|DTG|Mössbauer|"
+        r"UV-vis|PL|FL|photoluminesc|fluorescen|"
+        r"ESR|ENDOR|NMR|MALDI|TOF|"
+        r"mapping|elemental\s+map|line\s+scan|"
+        r"selected\s+area|diffraction|fringe)", re.I),
     "activity": re.compile(
         r"(?:peroxidase-like|oxidase-like|catalase-like|SOD-like|"
         r"enzyme-like|catalytic\s+activ|substrate|assay|TMB|ABTS|OPD|"
         r"DCFH|pH|buffer|reaction\s+time|temperature|"
         r"optimal\s+pH|optimal\s+temperature|pH\s+dependent|temperature\s+dependent|"
-        r"pH\s+range|pH\s+stability|thermal\s+stability)", re.I),
+        r"pH\s+range|pH\s+stability|thermal\s+stability|"
+        r"enzyme-mimick|enzyme\s+mimet|nanozyme\s+activ|"
+        r"catalytic\s+perform|catalytic\s+efficien|"
+        r"specific\s+activ|turnover|TOF|TOFN|"
+        r"Michaelis|Mentent|steady.state|"
+        r"colorimetric|spectrophotometr|absorbance|"
+        r"oxidat|reduct|degrad|decomposit)", re.I),
     "kinetics": re.compile(
         r"(?:Km|K\s*m|Vmax|V\s*m|Michaelis|Lineweaver|"
         r"mM|M\s*s[−\-–]1|Ms[⁻\-–]1|M[·\s]s[⁻\-–]1|M/?s|"
         r"[mμunp]?M/?s[⁻\-–]?1|[mμunp]?M[·\s]s[⁻\-–]¹|"
         r"×10|kinetic|kcat|specificity\s+constant|"
-        r"steady\s+state|catalytic\s+efficiency)", re.I),
+        r"steady\s+state|catalytic\s+efficiency|"
+        r"affinity|binding\s+constant|Kd|"
+        r"Lineweaver.Burk|double.reciprocal|Eadie.Hofstee|"
+        r"Hanes.Woolf|Scatchard|Hill\s+plot|"
+        r"substrate\s+concentr|initial\s+rate|V0|v0|"
+        r"apparent\s+Km|apparent\s+Vmax|"
+        r"Km\s*value|Vmax\s*value|Kcat\s*value)", re.I),
     "application": re.compile(
         r"(?:detection|sensing|sensor|LOD|linear\s+range|recovery|"
         r"sample|serum|water|food|limit\s+of\s+detection|calibrat|"
@@ -834,11 +893,23 @@ _BUCKET_KEYWORDS = {
         r"cancer|tumor|xenograft|in\s+vivo|in\s+vitro|"
         r"cell\s+viabil|apoptosis|ROS.?scaveng|oxidative\s+stress|"
         r"environmental|drinking\s+water|waste\s+water|"
-        r"river|lake|tap\s+water|sea\s+water)", re.I),
+        r"river|lake|tap\s+water|sea\s+water|"
+        r"selectiv|interfer|real\s+sample|spike|recover|"
+        r"RSD|reproducib|reusab|recycl|"
+        r"point.of.care|POCT|paper.based|microfluid|"
+        r"wearab|implant|stent|coating)", re.I),
     "mechanism": re.compile(
         r"(?:ROS|O2[•\-\*]|•OH|1O2|electron\s+transfer|oxygen\s+vacancy|"
         r"active\s+site|radical|scaveng|mechanism|Fenton|Haber-Weiss|"
-        r"superoxide|hydroxyl|singlet\s+oxygen)", re.I),
+        r"superoxide|hydroxyl|singlet\s+oxygen|"
+        r"photocataly|sonocataly|piezocataly|electrocataly|"
+        r"Schottky|band\s+gap|conduction\s+band|valence\s+band|"
+        r"charge\s+separat|recombinat|exciton|"
+        r"catalytic\s+mechan|reaction\s+pathway|"
+        r"radical\s+trapp|EPR\s+signal|DMPO|TEMP|"
+        r"quench|scavenger|isopropanol|p-benzoquinone|EDTA|"
+        r"density\s+functional|DFT|computational|adsorption\s+energy|"
+        r"d.band|charge\s+density|density\s+of\s+states)", re.I),
 }
 
 _SYNTHESIS_METHODS = {
@@ -1105,7 +1176,11 @@ _PREPROCESSOR_TO_SMN_TYPE = {
 }
 
 _THIS_WORK_RE = re.compile(
-    r'\bthis\s+work\b|\bcurrent\s+work\b|\bpresent\s+work\b|\bour\s+(?:nanozyme|catalyst|material|system)\b',
+    r'\bthis\s+work\b|\bcurrent\s+work\b|\bpresent\s+work\b|\bour\s+(?:nanozyme|catalyst|material|system)\b'
+    r'|\bthis\s+study\b|\bpresent\s+study\b|\bcurrent\s+study\b'
+    r'|\bas[-\s]?prepared\b|\bas[-\s]?synthesized\b|\bherein\b'
+    r'|\bproposed\s+(?:nanozyme|catalyst|material|sensor|system)\b'
+    r'|\bnewly\s+(?:synthesized|prepared|developed|designed)\b',
     re.I,
 )
 
@@ -2032,6 +2107,56 @@ class CandidateRecaller:
                 candidates[name]["sources"].add(section)
                 candidates[name]["evidence"].append(text[max(0, m.start()-40):m.end()+40])
 
+        for m in re.finditer(
+            r'\b(?:Fe|Co|Ni|Mn|Cu|Zn|Ce|Au|Ag|Pt|Pd|Ti|V|Cr|Mo|W|Ru|Rh|Ir|La|Zr|Al|Sn|Bi|In|Ga|Ge|Sb|Te|Hf|Ta|Re|Os|Y|Sc|Cd|Hg|Tl|Pb|Nb)\d*(?:[-/](?:Fe|Co|Ni|Mn|Cu|Zn|Ce|Au|Ag|Pt|Pd|Ti|V|Cr|Mo|W|Ru|Rh|Ir|La|Zr|Al|Sn|Bi|In)\d*)+\s+(?:alloy|alloyed|bimetal|intermetal)\b',
+            text, re.I,
+        ):
+            name = m.group(0).strip()
+            if self._is_valid_candidate(name):
+                candidates.setdefault(name, {"name": name, "sources": set(), "evidence": []})
+                candidates[name]["sources"].add(section)
+                candidates[name]["evidence"].append(text[max(0, m.start()-40):m.end()+40])
+
+        for m in re.finditer(
+            r'\b(?:N|B|S|P|F|Cl|Br|I|Se|Si|P|As)\s*,\s*(?:N|B|S|P|F|Cl|Br|I|Se|Si|P|As)(?:\s*,\s*(?:N|B|S|P|F|Cl|Br|I|Se|Si|P|As))*[-\s]*(?:co-?)?doped\s+(?:C|carbon|graphene|CNT|rGO|NC|BC)\b',
+            text, re.I,
+        ):
+            name = m.group(0).strip()
+            if self._is_valid_candidate(name):
+                candidates.setdefault(name, {"name": name, "sources": set(), "evidence": []})
+                candidates[name]["sources"].add(section)
+                candidates[name]["evidence"].append(text[max(0, m.start()-40):m.end()+40])
+
+        for m in re.finditer(
+            r'\b(?:N|B|S|P|F|Se|Si)\s*[-–]\s*(?:C|carbon|CN|C\dN\d|NC|graphene|rGO|CNT|carbon\s+dot)\b',
+            text, re.I,
+        ):
+            name = m.group(0).strip()
+            if self._is_valid_candidate(name):
+                candidates.setdefault(name, {"name": name, "sources": set(), "evidence": []})
+                candidates[name]["sources"].add(section)
+                candidates[name]["evidence"].append(text[max(0, m.start()-40):m.end()+40])
+
+        for m in re.finditer(
+            r'\b(?:PPy|PANI|PEDOT|PDA|polydopamine|polypyrrole|polyaniline|chitosan|CS|cellulose|starch|alginate|gelatin|PVA|PVP|PEG|PCL|PLGA)\b',
+            text, re.I,
+        ):
+            name = m.group(0).strip()
+            if self._is_valid_candidate(name):
+                candidates.setdefault(name, {"name": name, "sources": set(), "evidence": []})
+                candidates[name]["sources"].add(section)
+                candidates[name]["evidence"].append(text[max(0, m.start()-40):m.end()+40])
+
+        for m in re.finditer(
+            r'\b(?:CDs?|CQDs?|GQDs?|carbon\s+dots?|carbon\s+quantum\s+dots?|graphene\s+quantum\s+dots?|NDs?|nanodiamond)\b',
+            text, re.I,
+        ):
+            name = m.group(0).strip()
+            if self._is_valid_candidate(name):
+                candidates.setdefault(name, {"name": name, "sources": set(), "evidence": []})
+                candidates[name]["sources"].add(section)
+                candidates[name]["evidence"].append(text[max(0, m.start()-40):m.end()+40])
+
     def _is_valid_candidate(self, name: str) -> bool:
         if not name or len(name) < 2:
             return False
@@ -2448,6 +2573,17 @@ class EvidenceBucketBuilder:
         self.consistency_guard = consistency_guard
         self.warnings = []
 
+    _SECTION_KEYWORDS_PRIORITY = {
+        "synthesis": ["synthesis", "preparation", "fabrication", "experimental", "materials and methods", "materials & methods", "methodology", "chemicals and reagents"],
+        "characterization": ["characterization", "instrumentation", "measurements", "analytical methods", "apparatus"],
+        "activity": ["catalytic activity", "enzyme-like activity", "enzyme activity", "activity assay", "catalytic performance", "activity evaluation"],
+        "kinetics": ["kinetics", "kinetic analysis", "michaelis-menten", "steady-state kinetics", "enzyme kinetics", "kinetic study", "kinetic parameters"],
+        "application": ["application", "sensing", "detection", "biosensor", "analytical application", "practical application", "real sample"],
+        "mechanism": ["mechanism", "catalytic mechanism", "reaction mechanism", "mechanistic", "mechanism study", "mechanism investigation"],
+        "stability": ["stability", "reusability", "recyclability", "storage stability", "operational stability", "thermal stability", "ph stability"],
+        "results": ["results and discussion", "results", "discussion", "results & discussion"],
+    }
+
     def build(self, doc: PreprocessedDocument, selected_name: str,
               all_candidates: Optional[List[str]] = None) -> Dict[str, List[str]]:
         if self.consistency_guard is None:
@@ -2457,11 +2593,14 @@ class EvidenceBucketBuilder:
         buckets: Dict[str, List[str]] = {k: [] for k in _BUCKET_KEYWORDS}
 
         all_sentences: List[Tuple[str, str]] = []
+        chunk_sections: Dict[int, str] = {}
         for idx, chunk in enumerate(doc.chunks):
+            section = self._infer_section(doc.chunk_contexts, idx, chunk)
+            chunk_sections[idx] = section
             for line in chunk.split("\n"):
                 line = line.strip()
                 if line:
-                    all_sentences.append((line, self._infer_section(doc.chunk_contexts, idx, chunk)))
+                    all_sentences.append((line, section))
         for vlm_task in doc.vlm_tasks:
             caption = vlm_task.get("caption", "")
             if caption:
@@ -2477,9 +2616,13 @@ class EvidenceBucketBuilder:
             if name_lower.startswith(prefix):
                 variants.add(name_lower[len(prefix):])
 
+        self.consistency_guard._discover_aliases([c for c in doc.chunks[:30]])
+        alias_set = self.consistency_guard.aliases if hasattr(self.consistency_guard, 'aliases') else set()
+        all_name_variants = variants | {a.lower() for a in alias_set if len(a) >= 2}
+
         for text, section in all_sentences:
             text_lower = text.lower()
-            name_matched = any(v in text_lower for v in variants)
+            name_matched = any(v in text_lower for v in all_name_variants)
             for bucket_name, pattern in _BUCKET_KEYWORDS.items():
                 if not pattern.search(text):
                     continue
@@ -2489,7 +2632,9 @@ class EvidenceBucketBuilder:
                     attr = self.consistency_guard.check_sentence_attribution(text)
                     if attr["belongs_to_selected"]:
                         buckets[bucket_name].append(text)
-                    elif section in ("results", "discussion") and attr["confidence"] != "high":
+                    elif section in ("results", "discussion", "kinetics", "application", "mechanism") and attr["confidence"] != "high":
+                        buckets[bucket_name].append(text)
+                    elif self._nearby_name_mention(text, all_sentences, all_name_variants):
                         buckets[bucket_name].append(text)
                 elif bucket_name in ("activity", "synthesis", "characterization"):
                     attr = self.consistency_guard.check_sentence_attribution(text)
@@ -2504,6 +2649,8 @@ class EvidenceBucketBuilder:
                         ):
                             buckets[bucket_name].append(text)
                     elif bucket_name == "synthesis" and attr["confidence"] == "low":
+                        buckets[bucket_name].append(text)
+                    elif self._nearby_name_mention(text, all_sentences, all_name_variants):
                         buckets[bucket_name].append(text)
 
         for key in buckets:
@@ -2521,7 +2668,7 @@ class EvidenceBucketBuilder:
                 continue
             for text, section in all_sentences:
                 text_lower = text.lower()
-                name_matched = any(v in text_lower for v in variants)
+                name_matched = any(v in text_lower for v in all_name_variants)
                 pattern = _BUCKET_KEYWORDS.get(fb_bucket)
                 if not pattern or not pattern.search(text):
                     continue
@@ -2561,6 +2708,22 @@ class EvidenceBucketBuilder:
 
         return buckets
 
+    def _nearby_name_mention(self, text: str, all_sentences: List[Tuple[str, str]],
+                              name_variants: set, window: int = 3) -> bool:
+        target_norm = text.strip().lower()[:80]
+        for i, (sent, sec) in enumerate(all_sentences):
+            if sent.strip().lower()[:80] == target_norm:
+                start = max(0, i - window)
+                end = min(len(all_sentences), i + window + 1)
+                for j in range(start, end):
+                    if j == i:
+                        continue
+                    nearby_lower = all_sentences[j][0].lower()
+                    if any(v in nearby_lower for v in name_variants if len(v) >= 2):
+                        return True
+                break
+        return False
+
     def _infer_section(self, contexts: List[Dict], idx: int, chunk: str) -> str:
         if idx < len(contexts):
             ctx = contexts[idx]
@@ -2579,11 +2742,16 @@ class EvidenceBucketBuilder:
                     return "synthesis"
             elif section_type == "abstract":
                 return "activity"
-        cl = chunk.lower()[:500]
-        if any(kw in cl for kw in ["synthesis", "preparation"]):
-            return "synthesis"
-        if any(kw in cl for kw in ["characteriz", "sem ", "tem ", "xrd"]):
-            return "characterization"
+        cl = chunk.lower()[:800]
+        best_section = "unknown"
+        best_count = 0
+        for section_name, keywords in self._SECTION_KEYWORDS_PRIORITY.items():
+            count = sum(1 for kw in keywords if kw in cl)
+            if count > best_count:
+                best_count = count
+                best_section = section_name
+        if best_count > 0:
+            return best_section
         if any(kw in cl for kw in ["peroxidase-like", "oxidase-like", "catalytic activity"]):
             return "activity"
         if any(kw in cl for kw in ["michaelis", "kinetic", "km ", "vmax"]):
@@ -4434,6 +4602,26 @@ class RuleExtractor:
         (re.compile(r'\bchemilumin', re.I), "chemiluminescent"),
         (re.compile(r'\bRaman\s+spect', re.I), "Raman"),
         (re.compile(r'\bphotoelectrochem', re.I), "photoelectrochemical"),
+        (re.compile(r'\bchronoamperomet', re.I), "chronoamperometric"),
+        (re.compile(r'\bpotentiomet', re.I), "potentiometric"),
+        (re.compile(r'\bconductomet', re.I), "conductometric"),
+        (re.compile(r'\bimpedimet', re.I), "impedimetric"),
+        (re.compile(r'\bphotomet', re.I), "photometric"),
+        (re.compile(r'\bturbidimet', re.I), "turbidimetric"),
+        (re.compile(r'\bnephelomet', re.I), "nephelometric"),
+        (re.compile(r'\bthermomet', re.I), "thermometric"),
+        (re.compile(r'\bmagnetomet', re.I), "magnetometric"),
+        (re.compile(r'\bsmartphone[-\s]based', re.I), "smartphone-based colorimetric"),
+        (re.compile(r'\bpaper[-\s]based', re.I), "paper-based colorimetric"),
+        (re.compile(r'\bmicrofluid', re.I), "microfluidic"),
+        (re.compile(r'\blateral\s+flow', re.I), "lateral flow"),
+        (re.compile(r'\bELISA\b', re.I), "ELISA"),
+        (re.compile(r'\bimmunoassay\b', re.I), "immunoassay"),
+        (re.compile(r'\baptasensor\b', re.I), "aptasensor"),
+        (re.compile(r'\bglucose\s+meter\b', re.I), "glucose meter"),
+        (re.compile(r'\bpH\s+meter\b', re.I), "pH meter"),
+        (re.compile(r'\bdissolved\s+oxygen\b', re.I), "dissolved oxygen"),
+        (re.compile(r'\bpolarograph', re.I), "polarographic"),
     ]
 
     def _extract_assay_method(self, record: Dict[str, Any], texts: List[str]):
@@ -4471,6 +4659,22 @@ class RuleExtractor:
         (re.compile(r'\bDPV\b', re.I), "DPV"),
         (re.compile(r'\bCV\b', re.I), "CV"),
         (re.compile(r'\bchronoamperometr', re.I), "chronoamperometric"),
+        (re.compile(r'\bpotentiomet', re.I), "potential"),
+        (re.compile(r'\bconductomet', re.I), "conductance"),
+        (re.compile(r'\bimpedimet', re.I), "impedance"),
+        (re.compile(r'\breflectan', re.I), "reflectance"),
+        (re.compile(r'\btransmittan', re.I), "transmittance"),
+        (re.compile(r'\bscattering\b', re.I), "scattering"),
+        (re.compile(r'\bDLS\b', re.I), "DLS"),
+        (re.compile(r'\bphosphorescen', re.I), "phosphorescence"),
+        (re.compile(r'\bupconversion\b', re.I), "upconversion"),
+        (re.compile(r'\bdownconversion\b', re.I), "downconversion"),
+        (re.compile(r'\bthermomet', re.I), "temperature"),
+        (re.compile(r'\bmagnetomet', re.I), "magnetic"),
+        (re.compile(r'\bpH\s+(?:change|shift|drop|increase)', re.I), "pH change"),
+        (re.compile(r'\bO2\s+(?:concentration|level|evolution)', re.I), "O2"),
+        (re.compile(r'\bH2\s+(?:concentration|level|evolution)', re.I), "H2"),
+        (re.compile(r'\bdissolved\s+oxygen\b', re.I), "dissolved oxygen"),
     ]
 
     def _extract_signal(self, record: Dict[str, Any], texts: List[str]):
@@ -4507,10 +4711,25 @@ class RuleExtractor:
         (re.compile(r'\bborate\s+buffer', re.I), "borate"),
         (re.compile(r'\bcarbonate[-\s]bicarbonate\s+buffer', re.I), "carbonate-bicarbonate"),
         (re.compile(r'\bglycine[-\s]NaOH\s+buffer', re.I), "glycine-NaOH"),
-        (re.compile(r'\bammonium\s+acetate\s+buffer', re.I), "ammonium-acetate"),
         (re.compile(r'\bPIPES\s+buffer', re.I), "PIPES"),
         (re.compile(r'\bCHES\s+buffer', re.I), "CHES"),
         (re.compile(r'\bCAPS\s+buffer', re.I), "CAPS"),
+        (re.compile(r'\bTAPS\b', re.I), "TAPS"),
+        (re.compile(r'\bTES\b', re.I), "TES"),
+        (re.compile(r'\bBES\b', re.I), "BES"),
+        (re.compile(r'\bBicine\b', re.I), "Bicine"),
+        (re.compile(r'\bTricine\b', re.I), "Tricine"),
+        (re.compile(r'\bHEPPSO\b', re.I), "HEPPSO"),
+        (re.compile(r'\bEPPS\b', re.I), "EPPS"),
+        (re.compile(r'\bADA\b\s+buffer', re.I), "ADA"),
+        (re.compile(r'\bbis[-\s]Tris\b', re.I), "bis-Tris"),
+        (re.compile(r'\bimidazole\s+buffer', re.I), "imidazole"),
+        (re.compile(r'\bsuccinate\s+buffer', re.I), "succinate"),
+        (re.compile(r'\bmalonate\s+buffer', re.I), "malonate"),
+        (re.compile(r'\btartrate\s+buffer', re.I), "tartrate"),
+        (re.compile(r'\bformate\s+buffer', re.I), "formate"),
+        (re.compile(r'\bpropionate\s+buffer', re.I), "propionate"),
+        (re.compile(r'\bphthalate\s+buffer', re.I), "phthalate"),
     ]
 
     def _extract_buffer(self, record: Dict[str, Any], texts: List[str]):

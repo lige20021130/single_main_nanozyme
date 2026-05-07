@@ -68,6 +68,9 @@ class ConsistencyGuard:
         self._discover_sazyyme_aliases(fl)
         self._discover_suffix_aliases(fl)
         self._discover_co_occurrence_aliases(fl, text_chunks)
+        self._discover_unicode_formula_aliases(fl)
+        self._discover_hereafter_aliases(fl, full_text)
+        self._discover_pronoun_aliases(text_chunks)
 
         if self.aliases:
             logger.info(f"[ConsistencyGuard] Discovered aliases for '{self.selected_name}': {self.aliases}")
@@ -178,6 +181,82 @@ class ConsistencyGuard:
                     self.aliases.add(combined)
                 if combined_compact in text_lower:
                     self.aliases.add(combined_compact)
+
+    _UNICODE_SUBSCRIPT_MAP = str.maketrans("₀₁₂₃₄₅₆₇₈₉", "0123456789")
+
+    def _discover_unicode_formula_aliases(self, text_lower: str) -> None:
+        ascii_name = self.selected_lower
+        unicode_name = ""
+        for ch in ascii_name:
+            if ch.isdigit():
+                unicode_name += "₀₁₂₃₄₅₆₇₈₉"[int(ch)]
+            else:
+                unicode_name += ch
+        if unicode_name != ascii_name and unicode_name in text_lower:
+            self.aliases.add(unicode_name)
+            self.aliases.add(unicode_name.translate(self._UNICODE_SUBSCRIPT_MAP))
+        for variant in list(self.selected_variants):
+            if len(variant) < 2:
+                continue
+            unicode_variant = ""
+            for ch in variant:
+                if ch.isdigit():
+                    unicode_variant += "₀₁₂₃₄₅₆₇₈₉"[int(ch)]
+                else:
+                    unicode_variant += ch
+            if unicode_variant != variant and unicode_variant in text_lower:
+                self.aliases.add(unicode_variant)
+                ascii_from_unicode = unicode_variant.translate(self._UNICODE_SUBSCRIPT_MAP)
+                if ascii_from_unicode != variant:
+                    self.aliases.add(ascii_from_unicode)
+
+    _HEREAFTER_PATTERNS = [
+        re.compile(r'\b(\S+)\s*\([^)]*(?:hereafter|herein(?:after)?|referred\s+to\s+as|denoted\s+as|abbreviated\s+as|named\s+as)\s*:?\s*([^)]+)\)', re.I),
+        re.compile(r'\b(\S+)\s*(?:hereafter|herein(?:after)?|referred\s+to\s+as|denoted\s+as|abbreviated\s+as|named\s+as)\s+([A-Z][A-Za-z\d]*(?:[-/][A-Z][A-Za-z\d]*)*)', re.I),
+        re.compile(r'\b([A-Z][A-Za-z\d]*(?:[-/][A-Z][A-Za-z\d]*)*)\s*\([^)]*(?:hereafter|herein(?:after)?|referred\s+to\s+as|denoted\s+as)\s*:?\s*([^)]+)\)', re.I),
+    ]
+
+    def _discover_hereafter_aliases(self, text_lower: str, full_text: str) -> None:
+        for pat in self._HEREAFTER_PATTERNS:
+            for m in pat.finditer(full_text):
+                group1 = m.group(1).strip().lower()
+                group2 = m.group(2).strip().lower()
+                for variant in self.selected_variants:
+                    if len(variant) < 2:
+                        continue
+                    if variant in group1 and self._is_valid_alias(group2):
+                        self.aliases.add(group2)
+                        logger.info(f"[ConsistencyGuard] Alias via hereafter: '{group2}' for '{variant}'")
+                    if variant in group2 and self._is_valid_alias(group1):
+                        self.aliases.add(group1)
+                        logger.info(f"[ConsistencyGuard] Alias via hereafter: '{group1}' for '{variant}'")
+
+    _PRONOUN_PHRASES = [
+        re.compile(r'\bthe\s+(?:as[-\s]?prepared|as[-\s]?synthesized|synthesized|prepared|obtained|resulting|proposed|developed|present|current|above-mentioned)\s+(?:nanozyme|catalyst|material|nanomaterial|nanoparticle|system|sample|composite|product)\b', re.I),
+        re.compile(r'\b(?:our|this)\s+(?:nanozyme|catalyst|material|nanomaterial|nanoparticle|system|sample|composite)\b', re.I),
+        re.compile(r'\bthe\s+nanozyme\b', re.I),
+        re.compile(r'\bthe\s+catalyst\b', re.I),
+    ]
+
+    def _discover_pronoun_aliases(self, text_chunks: List[str]) -> None:
+        pronoun_aliases = set()
+        for chunk in text_chunks[:20]:
+            cl = chunk.lower()
+            lines = cl.split(".")
+            for line in lines:
+                line = line.strip()
+                if not line:
+                    continue
+                has_selected = any(v in line for v in self.selected_variants if len(v) >= 2)
+                if not has_selected:
+                    continue
+                for pat in self._PRONOUN_PHRASES:
+                    if pat.search(line):
+                        match_text = pat.search(line).group(0)
+                        pronoun_aliases.add(match_text)
+        if pronoun_aliases:
+            self.aliases.update(pronoun_aliases)
+            logger.info(f"[ConsistencyGuard] Pronoun aliases discovered: {pronoun_aliases}")
 
     def _discover_co_occurrence_aliases(self, text_lower: str, text_chunks: List[str]) -> None:
         if not self.other_candidates:

@@ -140,6 +140,47 @@ class KineticsAgent:
                     record["important_values"] = ivs
                     return
 
+    _MULTI_KM_PATTERNS = [
+        re.compile(r'\bKm\s*[\(（]\s*([\w\d\-/]+(?:\s[\w\d\-/]+){0,1})\s*[\)）]\s*(?:was|=|:|≈|~)\s*([\d.]+)\s*(mM|μM|uM|M|nM|pM)', re.I),
+        re.compile(r'\bKm\s*(?:for|of)\s+([\w\d\-/]+(?:\s[\w\d\-/]+){0,1})\s*(?:was|=|:|≈|~)\s*([\d.]+)\s*(mM|μM|uM|M|nM|pM)', re.I),
+        re.compile(r'\bKm\s*[\(（]\s*([\w\d\-/]+)\s*[\)）]\s*([\d.]+)\s*(mM|μM|uM|M|nM|pM)', re.I),
+        re.compile(r'\b([\w\d\-/]+)\s*[-–]?\s*Km\s*(?:was|=|:|≈|~)\s*([\d.]+)\s*(mM|μM|uM|M|nM|pM)', re.I),
+        re.compile(r'\baffinity\s*(?:for|toward|to)\s+([\w\d\-/]+(?:\s[\w\d\-/]+){0,1})\s*(?:was|=|:|≈|~)\s*([\d.]+)\s*(mM|μM|uM|M|nM|pM)', re.I),
+    ]
+
+    _MULTI_VMAX_PATTERNS = [
+        re.compile(r'\bVmax\s*[\(（]\s*([\w\d\-/]+(?:\s[\w\d\-/]+){0,1})\s*[\)）]\s*(?:was|=|:|≈|~)\s*([\d.]+)\s*([^\s,;)]+)', re.I),
+        re.compile(r'\bVmax\s*(?:for|of)\s+([\w\d\-/]+(?:\s[\w\d\-/]+){0,1})\s*(?:was|=|:|≈|~)\s*([\d.]+)\s*([^\s,;)]+)', re.I),
+        re.compile(r'\bVmax\s*[\(（]\s*([\w\d\-/]+)\s*[\)）]\s*([\d.]+)\s*([^\s,;)]+)', re.I),
+        re.compile(r'\b([\w\d\-/]+)\s*[-–]?\s*Vmax\s*(?:was|=|:|≈|~)\s*([\d.]+)\s*([^\s,;)]+)', re.I),
+    ]
+
+    _MULTI_KCAT_PATTERNS = [
+        re.compile(r'\bkcat\s*[\(（]\s*([\w\d\-/]+(?:\s[\w\d\-/]+){0,1})\s*[\)）]\s*(?:was|=|:|≈|~)\s*([\d.]+)\s*([^\s,;)]+)', re.I),
+        re.compile(r'\bkcat\s*(?:for|of)\s+([\w\d\-/]+(?:\s[\w\d\-/]+){0,1})\s*(?:was|=|:|≈|~)\s*([\d.]+)\s*([^\s,;)]+)', re.I),
+        re.compile(r'\bturnover\s+(?:frequency|number)\s*(?:for|of)\s+([\w\d\-/]+(?:\s[\w\d\-/]+){0,1})\s*(?:was|=|:|≈|~)\s*([\d.]+)\s*([^\s,;)]+)', re.I),
+    ]
+
+    _MULTI_KCAT_KM_PATTERNS = [
+        re.compile(r'\bkcat/Km\s*[\(（]\s*([\w\d\-/]+(?:\s[\w\d\-/]+){0,1})\s*[\)）]\s*(?:was|=|:|≈|~)\s*([\d.]+)\s*([^\s,;)]+)', re.I),
+        re.compile(r'\bcatalytic\s+efficiency\s*(?:for|of)\s+([\w\d\-/]+(?:\s[\w\d\-/]+){0,1})\s*(?:was|=|:|≈|~)\s*([\d.]+)\s*([^\s,;)]+)', re.I),
+    ]
+
+    _JOINT_KM_VMAX_PATTERNS = [
+        re.compile(r'\bKm\s*[\(（]\s*([\w\d\-/]+)\s*[\)）]\s*(?:was|=|:|≈|~)\s*([\d.]+)\s*(mM|μM|uM|M|nM|pM)\s*[;,]\s*Vmax\s*[\(（]\s*([\w\d\-/]+)\s*[\)）]\s*(?:was|=|:|≈|~)\s*([\d.]+)\s*([^\s,;)]+)', re.I),
+        re.compile(r'\bKm\s*(?:for|of)\s+([\w\d\-/]+)\s*(?:was|=|:|≈|~)\s*([\d.]+)\s*(mM|μM|uM|M|nM|pM)\s*[;,]\s*Vmax\s*(?:for|of)\s+([\w\d\-/]+)\s*(?:was|=|:|≈|~)\s*([\d.]+)\s*([^\s,;)]+)', re.I),
+    ]
+
+    _ENZYME_TYPE_KM_PATTERNS = [
+        re.compile(r'\bKm\s*[\(（]\s*(peroxidase|oxidase|catalase|SOD|GPx|GOx|laccase|phosphatase|esterase|haloperoxidase|NTR|hydrolase|nuclease|tyrosinase|catalytic)\s*[-\s]?\s*like\s*[\)）]\s*(?:was|=|:|≈|~)\s*([\d.]+)\s*(mM|μM|uM|M)', re.I),
+        re.compile(r'\bKm\s*(?:for|of)\s+(?:the\s+)?(peroxidase|oxidase|catalase|SOD|GPx|GOx|laccase|phosphatase|esterase|haloperoxidase|NTR|hydrolase|nuclease|tyrosinase|catalytic)\s*[-\s]?\s*like\s+activity\s*(?:was|=|:|≈|~)\s*([\d.]+)\s*(mM|μM|uM|M)', re.I),
+    ]
+
+    _ENZYME_TYPE_VMAX_PATTERNS = [
+        re.compile(r'\bVmax\s*[\(（]\s*(peroxidase|oxidase|catalase|SOD|GPx|GOx|laccase|phosphatase|esterase|haloperoxidase|NTR|hydrolase|nuclease|tyrosinase|catalytic)\s*[-\s]?\s*like\s*[\)）]\s*(?:was|=|:|≈|~)\s*([\d.]+)\s*([^\s,;)]+)', re.I),
+        re.compile(r'\bVmax\s*(?:for|of)\s+(?:the\s+)?(peroxidase|oxidase|catalase|SOD|GPx|GOx|laccase|phosphatase|esterase|haloperoxidase|NTR|hydrolase|nuclease|tyrosinase|catalytic)\s*[-\s]?\s*like\s+activity\s*(?:was|=|:|≈|~)\s*([\d.]+)\s*([^\s,;)]+)', re.I),
+    ]
+
     def _fill_kinetics_list(self, record, kinetics_texts):
         kin = record["main_activity"]["kinetics"]
         existing_list = record["main_activity"].get("kinetics_list", [])
@@ -167,34 +208,184 @@ class KineticsAgent:
                 entry["substrate"] = substrate
             entries.append(entry)
 
-        _MULTI_KM_RE = re.compile(
-            r'\bKm\s*[\(（]\s*(\w[\w\d\-]*)\s*[\)）]\s*(?:was|=|:|≈|~)\s*([\d.]+)\s*(mM|μM|uM|M)',
-            re.I,
-        )
-        _MULTI_VMAX_RE = re.compile(
-            r'\bVmax\s*[\(（]\s*(\w[\w\d\-]*)\s*[\)）]\s*(?:was|=|:|≈|~)\s*([\d.]+)\s*([^\s,;]+)',
-            re.I,
-        )
-
         substrate_km = {}
         for text in kinetics_texts:
             norm_text = _normalize_ocr_scientific(text)
-            for m in _MULTI_KM_RE.finditer(norm_text):
+            for m in self._MULTI_KM_PATTERNS[0].finditer(norm_text):
                 sub_name = m.group(1)
                 km_val = m.group(2)
                 km_unit = m.group(3)
-                substrate_km[sub_name] = {"Km": km_val, "Km_unit": km_unit, "substrate": sub_name}
+                substrate_km.setdefault(sub_name, {"substrate": sub_name})
+                substrate_km[sub_name]["Km"] = km_val
+                substrate_km[sub_name]["Km_unit"] = km_unit
+            for m in self._MULTI_KM_PATTERNS[1].finditer(norm_text):
+                sub_name = m.group(1)
+                km_val = m.group(2)
+                km_unit = m.group(3)
+                substrate_km.setdefault(sub_name, {"substrate": sub_name})
+                substrate_km[sub_name]["Km"] = km_val
+                substrate_km[sub_name]["Km_unit"] = km_unit
+            for m in self._MULTI_KM_PATTERNS[2].finditer(norm_text):
+                sub_name = m.group(1)
+                km_val = m.group(2)
+                km_unit = m.group(3)
+                if sub_name not in substrate_km:
+                    substrate_km[sub_name] = {"substrate": sub_name, "Km": km_val, "Km_unit": km_unit}
+            for m in self._MULTI_KM_PATTERNS[3].finditer(norm_text):
+                sub_name = m.group(1)
+                km_val = m.group(2)
+                km_unit = m.group(3)
+                substrate_km.setdefault(sub_name, {"substrate": sub_name})
+                substrate_km[sub_name]["Km"] = km_val
+                substrate_km[sub_name]["Km_unit"] = km_unit
+            for m in self._MULTI_KM_PATTERNS[4].finditer(norm_text):
+                sub_name = m.group(1)
+                km_val = m.group(2)
+                km_unit = m.group(3)
+                substrate_km.setdefault(sub_name, {"substrate": sub_name})
+                substrate_km[sub_name]["Km"] = km_val
+                substrate_km[sub_name]["Km_unit"] = km_unit
 
-            for m in _MULTI_VMAX_RE.finditer(norm_text):
+            for m in self._MULTI_VMAX_PATTERNS[0].finditer(norm_text):
                 sub_name = m.group(1)
                 vmax_val = m.group(2)
                 vmax_unit = m.group(3)
-                if sub_name in substrate_km:
-                    substrate_km[sub_name]["Vmax"] = vmax_val
-                    substrate_km[sub_name]["Vmax_unit"] = vmax_unit
+                substrate_km.setdefault(sub_name, {"substrate": sub_name})
+                substrate_km[sub_name]["Vmax"] = vmax_val
+                substrate_km[sub_name]["Vmax_unit"] = vmax_unit
+            for m in self._MULTI_VMAX_PATTERNS[1].finditer(norm_text):
+                sub_name = m.group(1)
+                vmax_val = m.group(2)
+                vmax_unit = m.group(3)
+                substrate_km.setdefault(sub_name, {"substrate": sub_name})
+                substrate_km[sub_name]["Vmax"] = vmax_val
+                substrate_km[sub_name]["Vmax_unit"] = vmax_unit
+            for m in self._MULTI_VMAX_PATTERNS[2].finditer(norm_text):
+                sub_name = m.group(1)
+                vmax_val = m.group(2)
+                vmax_unit = m.group(3)
+                substrate_km.setdefault(sub_name, {"substrate": sub_name})
+                substrate_km[sub_name].setdefault("Vmax", vmax_val)
+                substrate_km[sub_name].setdefault("Vmax_unit", vmax_unit)
+            for m in self._MULTI_VMAX_PATTERNS[3].finditer(norm_text):
+                sub_name = m.group(1)
+                vmax_val = m.group(2)
+                vmax_unit = m.group(3)
+                substrate_km.setdefault(sub_name, {"substrate": sub_name})
+                substrate_km[sub_name]["Vmax"] = vmax_val
+                substrate_km[sub_name]["Vmax_unit"] = vmax_unit
+
+            for m in self._MULTI_KCAT_PATTERNS[0].finditer(norm_text):
+                sub_name = m.group(1)
+                kcat_val = m.group(2)
+                kcat_unit = m.group(3)
+                substrate_km.setdefault(sub_name, {"substrate": sub_name})
+                substrate_km[sub_name]["kcat"] = kcat_val
+                substrate_km[sub_name]["kcat_unit"] = kcat_unit
+            for m in self._MULTI_KCAT_PATTERNS[1].finditer(norm_text):
+                sub_name = m.group(1)
+                kcat_val = m.group(2)
+                kcat_unit = m.group(3)
+                substrate_km.setdefault(sub_name, {"substrate": sub_name})
+                substrate_km[sub_name]["kcat"] = kcat_val
+                substrate_km[sub_name]["kcat_unit"] = kcat_unit
+            for m in self._MULTI_KCAT_PATTERNS[2].finditer(norm_text):
+                sub_name = m.group(1)
+                kcat_val = m.group(2)
+                kcat_unit = m.group(3)
+                substrate_km.setdefault(sub_name, {"substrate": sub_name})
+                substrate_km[sub_name].setdefault("kcat", kcat_val)
+                substrate_km[sub_name].setdefault("kcat_unit", kcat_unit)
+
+            for m in self._MULTI_KCAT_KM_PATTERNS[0].finditer(norm_text):
+                sub_name = m.group(1)
+                kcat_km_val = m.group(2)
+                kcat_km_unit = m.group(3)
+                substrate_km.setdefault(sub_name, {"substrate": sub_name})
+                substrate_km[sub_name]["kcat_Km"] = kcat_km_val
+                substrate_km[sub_name]["kcat_Km_unit"] = kcat_km_unit
+            for m in self._MULTI_KCAT_KM_PATTERNS[1].finditer(norm_text):
+                sub_name = m.group(1)
+                kcat_km_val = m.group(2)
+                kcat_km_unit = m.group(3)
+                substrate_km.setdefault(sub_name, {"substrate": sub_name})
+                substrate_km[sub_name].setdefault("kcat_Km", kcat_km_val)
+                substrate_km[sub_name].setdefault("kcat_Km_unit", kcat_km_unit)
+
+            for m in self._JOINT_KM_VMAX_PATTERNS[0].finditer(norm_text):
+                sub1 = m.group(1)
+                km_val = m.group(2)
+                km_unit = m.group(3)
+                sub2 = m.group(4)
+                vmax_val = m.group(5)
+                vmax_unit = m.group(6)
+                substrate_km.setdefault(sub1, {"substrate": sub1})
+                substrate_km[sub1]["Km"] = km_val
+                substrate_km[sub1]["Km_unit"] = km_unit
+                if sub2 == sub1 or not sub2:
+                    substrate_km[sub1]["Vmax"] = vmax_val
+                    substrate_km[sub1]["Vmax_unit"] = vmax_unit
+                else:
+                    substrate_km.setdefault(sub2, {"substrate": sub2})
+                    substrate_km[sub2]["Vmax"] = vmax_val
+                    substrate_km[sub2]["Vmax_unit"] = vmax_unit
+            for m in self._JOINT_KM_VMAX_PATTERNS[1].finditer(norm_text):
+                sub1 = m.group(1)
+                km_val = m.group(2)
+                km_unit = m.group(3)
+                sub2 = m.group(4)
+                vmax_val = m.group(5)
+                vmax_unit = m.group(6)
+                substrate_km.setdefault(sub1, {"substrate": sub1})
+                substrate_km[sub1]["Km"] = km_val
+                substrate_km[sub1]["Km_unit"] = km_unit
+                if sub2 == sub1 or not sub2:
+                    substrate_km[sub1]["Vmax"] = vmax_val
+                    substrate_km[sub1]["Vmax_unit"] = vmax_unit
+                else:
+                    substrate_km.setdefault(sub2, {"substrate": sub2})
+                    substrate_km[sub2]["Vmax"] = vmax_val
+                    substrate_km[sub2]["Vmax_unit"] = vmax_unit
+
+        enzyme_type_kinetics = {}
+        for text in kinetics_texts:
+            norm_text = _normalize_ocr_scientific(text)
+            for m in self._ENZYME_TYPE_KM_PATTERNS[0].finditer(norm_text):
+                etype = m.group(1).lower() + "-like"
+                km_val = m.group(2)
+                km_unit = m.group(3)
+                enzyme_type_kinetics.setdefault(etype, {"enzyme_type": etype})
+                enzyme_type_kinetics[etype]["Km"] = km_val
+                enzyme_type_kinetics[etype]["Km_unit"] = km_unit
+            for m in self._ENZYME_TYPE_KM_PATTERNS[1].finditer(norm_text):
+                etype = m.group(1).lower() + "-like"
+                km_val = m.group(2)
+                km_unit = m.group(3)
+                enzyme_type_kinetics.setdefault(etype, {"enzyme_type": etype})
+                enzyme_type_kinetics[etype]["Km"] = km_val
+                enzyme_type_kinetics[etype]["Km_unit"] = km_unit
+            for m in self._ENZYME_TYPE_VMAX_PATTERNS[0].finditer(norm_text):
+                etype = m.group(1).lower() + "-like"
+                vmax_val = m.group(2)
+                vmax_unit = m.group(3)
+                enzyme_type_kinetics.setdefault(etype, {"enzyme_type": etype})
+                enzyme_type_kinetics[etype]["Vmax"] = vmax_val
+                enzyme_type_kinetics[etype]["Vmax_unit"] = vmax_unit
+            for m in self._ENZYME_TYPE_VMAX_PATTERNS[1].finditer(norm_text):
+                etype = m.group(1).lower() + "-like"
+                vmax_val = m.group(2)
+                vmax_unit = m.group(3)
+                enzyme_type_kinetics.setdefault(etype, {"enzyme_type": etype})
+                enzyme_type_kinetics[etype]["Vmax"] = vmax_val
+                enzyme_type_kinetics[etype]["Vmax_unit"] = vmax_unit
 
         for sub_name, data in substrate_km.items():
             already = any(e.get("substrate") == sub_name for e in entries)
+            if not already:
+                entries.append(data)
+
+        for etype, data in enzyme_type_kinetics.items():
+            already = any(e.get("enzyme_type") == etype for e in entries)
             if not already:
                 entries.append(data)
 
@@ -1655,23 +1846,16 @@ class RuleExtractorAdapter:
         ph_prof = act.get("pH_profile", {})
         temp_prof = act.get("temperature_profile", {})
 
-        if ph_prof.get("optimal_pH") is None:
-            for orig, norm in search_pairs:
-                for pat in _PH_PATTERNS["optimal_pH"]:
-                    m = pat.search(orig)
-                    if not m:
-                        m = pat.search(norm)
-                    if m:
-                        try:
-                            val = float(m.group(1))
-                            if 0 <= val <= 14:
-                                ph_prof["optimal_pH"] = val
-                                logger.info(f"[SMN] Fulltext fallback: optimal_pH={val}")
-                                break
-                        except (ValueError, IndexError):
-                            pass
-                if ph_prof.get("optimal_pH") is not None:
-                    break
+        selected_variants = self._build_selected_variants(selected_name)
+
+        ph_prof = self._context_aware_fallback(
+            ph_prof, "optimal_pH", _PH_PATTERNS["optimal_pH"],
+            all_text, norm_text, selected_variants, float_converter=lambda v: float(v) if 0 <= float(v) <= 14 else None,
+            field_name="optimal_pH"
+        )
+
+        if ph_prof.get("optimal_pH") is not None and not act.get("conditions", {}).get("pH"):
+            act.setdefault("conditions", {})["pH"] = str(ph_prof["optimal_pH"])
 
         if temp_prof.get("optimal_temperature") is None:
             for orig, norm in search_pairs:
@@ -1813,34 +1997,64 @@ class RuleExtractorAdapter:
 
         if kin.get("Km") is None:
             for pat in _KM_PATTERNS:
-                m = pat.search(all_text)
-                if not m:
-                    m = pat.search(norm_text)
-                if m:
+                found = False
+                sentences = all_text.split(".")
+                norm_sentences = norm_text.split(".")
+                for sent, norm_sent in zip(sentences, norm_sentences):
+                    m = pat.search(sent)
+                    if not m:
+                        m = pat.search(norm_sent)
+                    if not m:
+                        continue
+                    context = sent[max(0, m.start()-100):m.end()+100].lower()
+                    has_selected = any(v in context for v in selected_variants if len(v) >= 2)
+                    has_this_work = bool(self._THIS_WORK_CONTEXT.search(context))
+                    has_contrast = any(kw in context for kw in self._CONTRAST_KEYWORDS)
+                    has_negation = bool(self._NEGATION_PHRASES.search(context))
+                    if has_negation or (not (has_selected or has_this_work)) or has_contrast:
+                        continue
                     val = m.group(1)
                     unit = m.group(2) if m.lastindex and m.lastindex >= 2 else ""
                     parsed = _parse_scientific_notation(val.strip())
                     if isinstance(parsed, (int, float)):
                         kin["Km"] = parsed
                         kin["Km_unit"] = _norm_unit(unit) if unit else unit
-                        kin["source"] = "fulltext_fallback"
-                        logger.info(f"[SMN] Fulltext fallback: Km={parsed} {unit}")
+                        kin["source"] = "fulltext_fallback_context"
+                        logger.info(f"[SMN] Context-aware fallback: Km={parsed} {unit}")
+                        found = True
+                        break
+                if found:
                     break
 
         if kin.get("Vmax") is None:
             for pat in _VMAX_PATTERNS:
-                m = pat.search(all_text)
-                if not m:
-                    m = pat.search(norm_text)
-                if m:
+                found = False
+                sentences = all_text.split(".")
+                norm_sentences = norm_text.split(".")
+                for sent, norm_sent in zip(sentences, norm_sentences):
+                    m = pat.search(sent)
+                    if not m:
+                        m = pat.search(norm_sent)
+                    if not m:
+                        continue
+                    context = sent[max(0, m.start()-100):m.end()+100].lower()
+                    has_selected = any(v in context for v in selected_variants if len(v) >= 2)
+                    has_this_work = bool(self._THIS_WORK_CONTEXT.search(context))
+                    has_contrast = any(kw in context for kw in self._CONTRAST_KEYWORDS)
+                    has_negation = bool(self._NEGATION_PHRASES.search(context))
+                    if has_negation or (not (has_selected or has_this_work)) or has_contrast:
+                        continue
                     val = m.group(1)
                     unit = m.group(2) if m.lastindex and m.lastindex >= 2 else ""
                     parsed = _parse_scientific_notation(val.strip())
                     if isinstance(parsed, (int, float)):
                         kin["Vmax"] = parsed
                         kin["Vmax_unit"] = _norm_unit(unit) if unit else unit
-                        kin["source"] = "fulltext_fallback"
-                        logger.info(f"[SMN] Fulltext fallback: Vmax={parsed} {unit}")
+                        kin["source"] = "fulltext_fallback_context"
+                        logger.info(f"[SMN] Context-aware fallback: Vmax={parsed} {unit}")
+                        found = True
+                        break
+                if found:
                     break
 
         if act.get("mechanism") is None:
@@ -1908,3 +2122,103 @@ class RuleExtractorAdapter:
                         warns = []
                     warns.append("kinetics_in_SI_table_unreachable: Km/Vmax values likely in Supporting Information table")
                     diag["warnings"] = warns
+
+    def _build_selected_variants(self, selected_name: str) -> list:
+        if not selected_name:
+            return []
+        variants = [selected_name.lower().strip()]
+        if "@" in variants[0]:
+            variants.extend(p.strip() for p in variants[0].split("@") if p.strip())
+        if "/" in variants[0]:
+            variants.extend(p.strip() for p in variants[0].split("/") if p.strip())
+        for suffix in (" nanoparticles", " nanosheets", " nanorods",
+                       " nanotubes", " nanospheres", " nanozyme",
+                       " nanozymes", " catalyst", " nps"):
+            if variants[0].endswith(suffix):
+                variants.append(variants[0][:-len(suffix)])
+        return [v for v in variants if len(v) >= 2]
+
+    _THIS_WORK_CONTEXT = re.compile(
+        r'\b(?:this\s+work|this\s+study|current\s+work|current\s+study|present\s+work|present\s+study|'
+        r'our\s+(?:nanozyme|catalyst|material|system|sample|result|finding|approach|method|design)|'
+        r'the\s+(?:as[-\s]?prepared|as[-\s]?synthesized|above-mentioned|present|proposed|newly\s+developed)\s+'
+        r'(?:nanozyme|catalyst|material|system|sample|sensor|platform)|'
+        r'herein|as-prepared|as-synthesized|'
+        r'proposed\s+(?:nanozyme|catalyst|material|sensor|system|platform)|'
+        r'newly\s+(?:synthesized|prepared|developed|designed|fabricated))\b',
+        re.I,
+    )
+
+    _CONTRAST_KEYWORDS = (
+        "in contrast", "compared with", "compared to", "whereas",
+        "on the other hand", "higher than", "lower than",
+        "previous", "reported", "literature",
+        "earlier", "prior", "known", "conventional",
+        "commercial", "natural enzyme", "native enzyme",
+        "other reported", "previously reported", "recently reported",
+        "in previous studies", "in earlier work",
+    )
+
+    _NEGATION_PHRASES = re.compile(
+        r'\b(?:did\s+not|does\s+not|was\s+not|were\s+not|is\s+not|are\s+not|'
+        r'no\s+(?:significant|obvious|remarkable|detectable|measurable|apparent)\s+'
+        r'(?:change|difference|effect|increase|decrease|improvement|activity)|'
+        r'cannot|could\s+not|failed\s+to|unable\s+to|'
+        r'lack\s+of|absence\s+of|without\s+(?:any|significant|obvious))\b',
+        re.I,
+    )
+
+    def _context_aware_fallback(self, target_dict, field_name, patterns,
+                                 all_text, norm_text, selected_variants,
+                                 float_converter=None, value_extractor=None):
+        if target_dict.get(field_name) is not None:
+            return target_dict
+
+        sentences = all_text.split(".")
+        norm_sentences = norm_text.split(".")
+
+        for pat in patterns:
+            for sent, norm_sent in zip(sentences, norm_sentences):
+                m = pat.search(sent)
+                if not m:
+                    m = pat.search(norm_sent)
+                if not m:
+                    continue
+
+                context = sent[max(0, m.start()-100):m.end()+100].lower()
+                has_selected = any(v in context for v in selected_variants if len(v) >= 2)
+                has_this_work = bool(self._THIS_WORK_CONTEXT.search(context))
+                has_contrast = any(kw in context for kw in self._CONTRAST_KEYWORDS)
+                has_negation = bool(self._NEGATION_PHRASES.search(context))
+
+                if has_negation:
+                    continue
+                elif has_selected and not has_contrast:
+                    pass
+                elif has_this_work and not has_contrast:
+                    pass
+                elif has_contrast:
+                    continue
+                else:
+                    continue
+
+                if float_converter:
+                    try:
+                        val = float_converter(m.group(1))
+                        if val is not None:
+                            target_dict[field_name] = val
+                            logger.info(f"[SMN] Context-aware fallback: {field_name}={val}")
+                            return target_dict
+                    except (ValueError, IndexError):
+                        pass
+                elif value_extractor:
+                    result = value_extractor(m)
+                    if result is not None:
+                        target_dict[field_name] = result
+                        logger.info(f"[SMN] Context-aware fallback: {field_name}={result}")
+                        return target_dict
+                break
+            if target_dict.get(field_name) is not None:
+                break
+
+        return target_dict
