@@ -547,7 +547,7 @@ _RE_LEADING_DIGITS = re.compile(r'^\d+\s+')
 _RE_RATIO_FORMAT = re.compile(r'^[A-Z]{2,4}/\d+$', re.I)
 _RE_RATIO_FORMAT2 = re.compile(r'^[A-Z]{2,4}\d+/\d+$', re.I)
 _RE_ION_FORMAT = re.compile(r'^[A-Z][a-z]?\d*[+-]$')
-_RE_ELEMENT_FORMAT = re.compile(r'^[A-Z][a-z]?\d+$')
+_RE_ELEMENT_FORMAT = re.compile(r'^([A-Z][a-z]?)\d+$')
 
 def _normalize_ocr_scientific(text: str) -> str:
     if not text:

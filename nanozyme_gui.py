@@ -668,13 +668,6 @@ class NanozymeGUI:
         if not input_path:
             messagebox.showerror("错误", "请选择 PDF 文件或文件夹")
             return
-        if not self.server_process or self.server_process.poll() is not None:
-            if messagebox.askyesno("提示", "AI 后端未启动，是否自动启动？"):
-                self._ensure_server(mode="standard")
-                self.root.after(3000, self._do_conversion)
-                return
-            else:
-                return
         self._do_conversion()
 
     def _do_conversion(self):
