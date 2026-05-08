@@ -80,31 +80,30 @@ class FileProcessReport:
 
 
 class PDFBasicGUI:
-    # ── 固定默认 Profile（数字版英文纳米酶论文最优配置）──────────────────────
     DEFAULT_PROFILE = {
         "format": "json",
         "use_struct_tree": True,
         "reading_order": "xycut",
         "image_output": "external",
         "image_format": "png",
+        "table_method": "default",
+        "threads": "2",
+    }
+
+    HYBRID_PROFILE = {
+        "format": "json",
+        "use_struct_tree": True,
+        "reading_order": "xycut",
+        "image_output": "external",
+        "image_format": "png",
         "hybrid": "docling-fast",
-        "hybrid_mode": "auto",          # 不默认开启 full/enrich_picture
+        "hybrid_mode": "auto",
         "hybrid_url": "http://localhost:5002",
         "hybrid_timeout": "120000",
         "hybrid_fallback": True,
         "table_method": "default",
+        "threads": "2",
     }
-    # ── 服务器启动命令（固定，不再依赖用户勾选）──────────────────────────────
-    SERVER_CMD_DEFAULT = ["opendataloader-pdf-hybrid", "--port=5002",
-                          "--device", "cuda",
-                          "--enrich-formula"]
-    SERVER_CMD_OCR = ["opendataloader-pdf-hybrid", "--port=5002",
-                      "--device", "cuda",
-                      "--force-ocr", "--ocr-lang", "en",
-                      "--enrich-formula"]
-    # enrich-picture 专用命令留作备用，不放 GUI
-    # SERVER_CMD_ENRICH = ["opendataloader-pdf-hybrid", "--port=5002",
-    #                      "--enrich-picture-description"]
 
     def __init__(self, root):
         self.root = root
@@ -112,13 +111,8 @@ class PDFBasicGUI:
         self.root.geometry("860x680")
         self.root.resizable(True, True)
 
-        # 服务器进程
-        self.server_process = None
-        self.server_port = 5002
         self.server_ready = False
-        self.server_mode = None  # "standard" | "ocr" | None
 
-        # 变量（只保留必要的）
         self.input_path = tk.StringVar()
         self.output_dir = tk.StringVar()
         self.recursive = tk.BooleanVar(value=False)
@@ -545,99 +539,20 @@ class PDFBasicGUI:
             self.log(f"[配置] 提取结果输出目录: {folder}")
 
     def start_server(self):
-        if self.server_process and self.server_process.poll() is None:
-            messagebox.showinfo("提示", "服务器已在运行中")
-            return
         if self.server_ready:
-            self.log("[服务器] 服务器已就绪，无需重启")
+            self.log("[服务器] 已就绪，无需重启")
             return
-        self.log("[服务器] 启动中...")
-        self.server_status.config(text="● 启动中", foreground="orange")
-        self.set_phase_status("server", "running")
-        threading.Thread(target=self._server_worker, daemon=True).start()
+        self._ensure_server(mode="standard")
 
-    def _server_worker(self):
-        cmd = self.SERVER_CMD_DEFAULT
-        try:
-            env = os.environ.copy()
-            env["PYTHONIOENCODING"] = "gbk"
-            env["JAVA_TOOL_OPTIONS"] = "-Dfile.encoding=UTF-8"
-            env["HF_HUB_OFFLINE"] = "1"
-            env["PYTHONWARNINGS"] = "ignore:.*pin_memory.*:UserWarning"
-            env["CUDA_VISIBLE_DEVICES"] = "0"
-            self.server_process = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                encoding='gbk',
-                errors='replace',
-                env=env,
-            )
-            self.log(f"[服务器] 进程已启动 PID={self.server_process.pid}")
-
-            def read_output():
-                for line in self.server_process.stdout:
-                    self.log(f"[服务器] {line.strip()}")
-
-            threading.Thread(target=read_output, daemon=True).start()
-
-            import urllib.request
-            for attempt in range(60):
-                if self.server_process.poll() is not None:
-                    self.log(f"[服务器] 进程意外退出，返回码={self.server_process.returncode}")
-                    self.root.after(0, lambda: self._on_server_stopped())
-                    return
-                try:
-                    r = urllib.request.urlopen("http://localhost:5002/health", timeout=2)
-                    if r.status == 200:
-                        self.server_ready = True
-                        self.root.after(0, lambda: self._on_server_ready())
-                        return
-                except Exception:
-                    pass
-                time.sleep(1)
-
-            self.log("[服务器] 等待超时(60s)，服务器可能未正常启动")
-            self.root.after(0, lambda: self._on_server_timeout())
-
-        except Exception as e:
-            self.log(f"[服务器] 启动失败: {e}")
-            self.server_process = None
-            self.root.after(0, lambda: self._on_server_error(str(e)))
-
-    def _on_server_ready(self):
-        self.server_status.config(text="● 运行中", foreground="green")
-        self.set_phase_status("server", "ok")
-        self.log("[服务器] ✓ 服务器已就绪 (http://localhost:5002/health)")
-
-    def _on_server_stopped(self):
-        self.server_ready = False
-        self.server_process = None
-        self.server_status.config(text="● 已停止", foreground="red")
-        self.set_phase_status("server", "error")
-        self.log("[服务器] ✗ 服务器进程已退出")
-
-    def _on_server_timeout(self):
-        self.server_status.config(text="● 启动超时", foreground="orange")
-        self.set_phase_status("server", "error")
-        self.log("[服务器] ⚠ 启动超时，请检查日志")
-
-    def _on_server_error(self, msg):
-        self.server_ready = False
-        self.server_process = None
-        self.server_status.config(text="● 启动失败", foreground="red")
-        self.set_phase_status("server", "error")
-        self.log(f"[服务器] ✗ 启动失败: {msg}")
+    def _ensure_server(self, mode: str = "standard"):
+        if not self.server_ready:
+            self.server_ready = True
+            self.server_status.config(text="● 就绪", foreground="green")
+            self.set_phase_status("server", "ok")
+            self.log("[提示] 已就绪，使用 Python API 处理 PDF")
 
     def stop_server(self):
-        if self.server_process and self.server_process.poll() is None:
-            self.server_process.terminate()
-            self.log("已发送终止信号")
-            self.server_status.config(text="● 停止中", foreground="orange")
-            self.server_mode = None
-        else:
-            self.log("服务器未运行")
+        self.log("[提示] 使用 Python API 模式，无需停止服务器")
 
     def _needs_ocr_fallback(self, json_path: str) -> Tuple[bool, str]:
         """自动判定解析后的 JSON 是否需要 OCR fallback。
@@ -721,82 +636,11 @@ class PDFBasicGUI:
             return True, ";".join(reasons)
         return False, ""
 
-    def _ensure_server(self, mode: str = "standard"):
-        if self.server_ready:
-            return
-        if self.server_process and self.server_process.poll() is None:
-            import urllib.request
-            try:
-                r = urllib.request.urlopen("http://localhost:5002/health", timeout=3)
-                if r.status == 200:
-                    self.server_ready = True
-                    self.server_status.config(text="● 运行中", foreground="green")
-                    self.set_phase_status("server", "ok")
-                    self.log("[服务器] 已有服务器在运行")
-                    return
-            except Exception:
-                pass
-        self.log("[服务器] 服务器未就绪，正在启动...")
-        self.server_status.config(text="● 启动中", foreground="orange")
-        self.set_phase_status("server", "running")
-        import urllib.request
-        cmd = self.SERVER_CMD_DEFAULT
-        try:
-            env = os.environ.copy()
-            env["PYTHONIOENCODING"] = "gbk"
-            env["JAVA_TOOL_OPTIONS"] = "-Dfile.encoding=UTF-8"
-            env["HF_HUB_OFFLINE"] = "1"
-            env["PYTHONWARNINGS"] = "ignore:.*pin_memory.*:UserWarning"
-            env["CUDA_VISIBLE_DEVICES"] = "0"
-            self.server_process = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                encoding='gbk',
-                errors='replace',
-                env=env,
-            )
-            self.log(f"[服务器] 进程已启动 PID={self.server_process.pid}")
-
-            def read_output():
-                for line in self.server_process.stdout:
-                    self.log(f"[服务器] {line.strip()}")
-
-            threading.Thread(target=read_output, daemon=True).start()
-
-            for attempt in range(60):
-                if self.server_process.poll() is not None:
-                    raise RuntimeError(f"服务器进程意外退出，返回码={self.server_process.returncode}")
-                try:
-                    r = urllib.request.urlopen("http://localhost:5002/health", timeout=2)
-                    if r.status == 200:
-                        self.server_ready = True
-                        self.root.after(0, lambda: self._on_server_ready())
-                        self.log("[服务器] ✓ 服务器已就绪")
-                        return
-                except Exception:
-                    pass
-                time.sleep(1)
-            self.log("[服务器] ⚠ 启动超时")
-        except Exception as e:
-            self.log(f"[服务器] 启动失败: {e}")
-            self.server_process = None
-            self.root.after(0, lambda: self._on_server_error(str(e)))
-            raise
-
     def start_conversion(self):
         input_path = self.input_path.get().strip()
         if not input_path:
             messagebox.showerror("错误", "请选择 PDF 文件或文件夹")
             return
-        if not self.server_process or self.server_process.poll() is not None:
-            if messagebox.askyesno("提示", "AI 后端未启动，是否自动启动？"):
-                self._ensure_server(mode="standard")
-                self.root.after(3000, self._do_conversion)
-                return
-            else:
-                return
         self._do_conversion()
 
     def _do_conversion(self):
@@ -861,10 +705,8 @@ class PDFBasicGUI:
                     kwargs["input_path"] = all_pdf_paths
                     if output_dir:
                         kwargs["output_dir"] = output_dir
-                    self.log(f"[解析] [Python API] convert kwargs: {kwargs}")
-                    self.log("[解析] [Python API] 开始调用 opendataloader_pdf.convert ...")
+                    self.log(f"[解析] [Python API] 本地模式 convert (threads={kwargs.get('threads', '1')})")
                     import opendataloader_pdf
-                    os.environ["PYTHONIOENCODING"] = "utf-8"
                     opendataloader_pdf.convert(**kwargs)
                     self.log(f"[解析] [Python API] ✓ 批量解析完成 ({len(all_pdf_paths)} 个 PDF)")
                     for pdf_path in all_pdf_paths:
@@ -898,13 +740,14 @@ class PDFBasicGUI:
                             stem = Path(mpath).stem
                             base = Path(output_dir) if output_dir else Path(mpath).parent
                             out_json = base / (stem + ".json")
-                            cmd = ["opendataloader-pdf", str(mpath), "--format=json", f"--output-dir={str(base)}"]
+                            cmd = ["opendataloader-pdf", str(mpath), "--format=json",
+                                   "--use-struct-tree", "--reading-order=xycut",
+                                   "--image-output=external", "--image-format=png",
+                                   f"--output-dir={str(base)}"]
                             self.log(f"[解析] [CLI Fallback] 补跑: {stem}")
                             try:
-                                fe = os.environ.copy()
-                                fe["PYTHONIOENCODING"] = "gbk"
                                 result = subprocess.run(cmd, capture_output=True, text=True,
-                                                        encoding='gbk', errors='replace', env=fe, timeout=600)
+                                                        encoding='utf-8', errors='replace', timeout=600)
                                 if out_json.exists():
                                     r.artifact_written_ok = True
                                     r.parse_status = "SUCCESS_WITH_PROTOCOL_ERROR"
@@ -926,7 +769,6 @@ class PDFBasicGUI:
 
             for line in capture_buf.getvalue().strip().splitlines():
                 self.log(f"[转换] {line}")
-            os.environ.pop("PYTHONIOENCODING", None)
 
             if self.stop_event.is_set():
                 self.log("用户请求停止，跳过剩余文件...")
@@ -965,6 +807,28 @@ class PDFBasicGUI:
             if needs_ocr_list and not self.stop_event.is_set():
                 self._ensure_server(mode="ocr")
 
+                hybrid_available = False
+                try:
+                    import subprocess
+                    result = subprocess.run(
+                        ["opendataloader-pdf-hybrid", "--version"],
+                        capture_output=True, text=True, timeout=5,
+                    )
+                    hybrid_available = True
+                except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+                    pass
+
+                if hybrid_available:
+                    self.log("[OCR Fallback] 检测到 hybrid 后端，使用 docling-fast 模式重跑")
+                    ocr_profile = self.HYBRID_PROFILE
+                else:
+                    self.log("[OCR Fallback] hybrid 后端不可用，使用本地模式重跑（含 hybrid_fallback）")
+                    ocr_profile = dict(self.DEFAULT_PROFILE)
+                    ocr_profile["hybrid"] = "docling-fast"
+                    ocr_profile["hybrid_mode"] = "auto"
+                    ocr_profile["hybrid_timeout"] = "120000"
+                    ocr_profile["hybrid_fallback"] = True
+
                 def _ocr_one(item):
                     pdf_path, _reason = item
                     r = reports[pdf_path]
@@ -974,19 +838,15 @@ class PDFBasicGUI:
                     ocr_buf = io.StringIO()
                     with contextlib.redirect_stdout(ocr_buf):
                         try:
-                            os.environ["PYTHONIOENCODING"] = "utf-8"
-                            ocr_kwargs = dict(self.DEFAULT_PROFILE)
+                            ocr_kwargs = dict(ocr_profile)
                             ocr_kwargs["input_path"] = [str(pdf_path)]
                             ocr_kwargs["output_dir"] = str(base)
-                            ocr_kwargs["hybrid_timeout"] = "120000"
                             import opendataloader_pdf
                             opendataloader_pdf.convert(**ocr_kwargs)
                         except UnicodeDecodeError:
                             pass
                         except Exception as e:
-                            pass
-                        finally:
-                            os.environ.pop("PYTHONIOENCODING", None)
+                            self.log(f"[OCR Fallback] {stem} 重跑异常: {e}")
                     for line in ocr_buf.getvalue().strip().splitlines():
                         self.log(f"[OCR] {line}")
                     if out_json.exists():

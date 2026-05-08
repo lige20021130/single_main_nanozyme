@@ -99,17 +99,24 @@ class NanozymeGUI:
         "reading_order": "xycut",
         "image_output": "external",
         "image_format": "png",
+        "table_method": "default",
+        "threads": "2",
+    }
+
+    HYBRID_PROFILE = {
+        "format": "json",
+        "use_struct_tree": True,
+        "reading_order": "xycut",
+        "image_output": "external",
+        "image_format": "png",
         "hybrid": "docling-fast",
         "hybrid_mode": "auto",
         "hybrid_url": "http://localhost:5002",
         "hybrid_timeout": "120000",
         "hybrid_fallback": True,
         "table_method": "default",
+        "threads": "2",
     }
-
-    SERVER_CMD_DEFAULT = ["opendataloader-pdf-hybrid", "--port=5002",
-                          "--device", "cuda",
-                          "--enrich-formula"]
 
     def __init__(self, root):
         self.root = root
@@ -117,10 +124,7 @@ class NanozymeGUI:
         self.root.geometry("900x750")
         self.root.resizable(True, True)
 
-        self.server_process = None
-        self.server_port = 5002
         self.server_ready = False
-        self.server_mode = None
 
         self.input_path = tk.StringVar()
         self.output_dir = tk.StringVar()
@@ -730,10 +734,8 @@ class NanozymeGUI:
                     kwargs["input_path"] = all_pdf_paths
                     if output_dir:
                         kwargs["output_dir"] = output_dir
-                    self.log(f"[解析] [Python API] convert kwargs: {kwargs}")
-                    self.log("[解析] [Python API] 开始调用 opendataloader_pdf.convert ...")
+                    self.log(f"[解析] [Python API] 本地模式 convert (threads={kwargs.get('threads', '1')})")
                     import opendataloader_pdf
-                    os.environ["PYTHONIOENCODING"] = "utf-8"
                     opendataloader_pdf.convert(**kwargs)
                     self.log(f"[解析] [Python API] ✓ 批量解析完成 ({len(all_pdf_paths)} 个 PDF)")
                     for pdf_path in all_pdf_paths:
@@ -767,13 +769,14 @@ class NanozymeGUI:
                             stem = Path(mpath).stem
                             base = Path(output_dir) if output_dir else Path(mpath).parent
                             out_json = base / (stem + ".json")
-                            cmd = ["opendataloader-pdf", str(mpath), "--format=json", f"--output-dir={str(base)}"]
+                            cmd = ["opendataloader-pdf", str(mpath), "--format=json",
+                                   "--use-struct-tree", "--reading-order=xycut",
+                                   "--image-output=external", "--image-format=png",
+                                   f"--output-dir={str(base)}"]
                             self.log(f"[解析] [CLI Fallback] 补跑: {stem}")
                             try:
-                                fe = os.environ.copy()
-                                fe["PYTHONIOENCODING"] = "gbk"
                                 result = subprocess.run(cmd, capture_output=True, text=True,
-                                                        encoding='gbk', errors='replace', env=fe, timeout=600)
+                                                        encoding='utf-8', errors='replace', timeout=600)
                                 if out_json.exists():
                                     r.artifact_written_ok = True
                                     r.parse_status = "SUCCESS_WITH_PROTOCOL_ERROR"
@@ -795,7 +798,6 @@ class NanozymeGUI:
 
             for line in capture_buf.getvalue().strip().splitlines():
                 self.log(f"[转换] {line}")
-            os.environ.pop("PYTHONIOENCODING", None)
 
             if self.stop_event.is_set():
                 self.log("用户请求停止，跳过剩余文件...")
@@ -828,6 +830,28 @@ class NanozymeGUI:
             if needs_ocr_list and not self.stop_event.is_set():
                 self._ensure_server(mode="ocr")
 
+                hybrid_available = False
+                try:
+                    import subprocess
+                    result = subprocess.run(
+                        ["opendataloader-pdf-hybrid", "--version"],
+                        capture_output=True, text=True, timeout=5,
+                    )
+                    hybrid_available = True
+                except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+                    pass
+
+                if hybrid_available:
+                    self.log("[OCR Fallback] 检测到 hybrid 后端，使用 docling-fast 模式重跑")
+                    ocr_profile = self.HYBRID_PROFILE
+                else:
+                    self.log("[OCR Fallback] hybrid 后端不可用，使用本地模式重跑（含 hybrid_fallback）")
+                    ocr_profile = dict(self.DEFAULT_PROFILE)
+                    ocr_profile["hybrid"] = "docling-fast"
+                    ocr_profile["hybrid_mode"] = "auto"
+                    ocr_profile["hybrid_timeout"] = "120000"
+                    ocr_profile["hybrid_fallback"] = True
+
                 def _ocr_one(item):
                     pdf_path, _reason = item
                     r = reports[pdf_path]
@@ -837,19 +861,15 @@ class NanozymeGUI:
                     ocr_buf = io.StringIO()
                     with contextlib.redirect_stdout(ocr_buf):
                         try:
-                            os.environ["PYTHONIOENCODING"] = "utf-8"
-                            ocr_kwargs = dict(self.DEFAULT_PROFILE)
+                            ocr_kwargs = dict(ocr_profile)
                             ocr_kwargs["input_path"] = [str(pdf_path)]
                             ocr_kwargs["output_dir"] = str(base)
-                            ocr_kwargs["hybrid_timeout"] = "120000"
                             import opendataloader_pdf
                             opendataloader_pdf.convert(**ocr_kwargs)
                         except UnicodeDecodeError:
                             pass
                         except Exception as e:
-                            pass
-                        finally:
-                            os.environ.pop("PYTHONIOENCODING", None)
+                            self.log(f"[OCR Fallback] {stem} 重跑异常: {e}")
                     for line in ocr_buf.getvalue().strip().splitlines():
                         self.log(f"[OCR] {line}")
                     if out_json.exists():

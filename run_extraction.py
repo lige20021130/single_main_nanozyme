@@ -38,18 +38,23 @@ def preprocess_pdf(pdf_path: Path, output_dir: Path, extraction_mode: str) -> Op
         if is_available("opendataloader_pdf"):
             from opendataloader_pdf import convert
             try:
-                result = convert(str(pdf_path), output_dir=str(output_dir))
-                if isinstance(result, dict) and result.get("json_path"):
-                    json_path = Path(result["json_path"])
-                elif isinstance(result, str) and Path(result).exists():
-                    json_path = Path(result)
+                convert(
+                    input_path=str(pdf_path),
+                    output_dir=str(output_dir),
+                    format="json",
+                    use_struct_tree=True,
+                    reading_order="xycut",
+                    image_output="external",
+                    image_format="png",
+                    table_method="default",
+                    threads="2",
+                )
+                candidate = output_dir / f"{pdf_path.stem}.json"
+                if candidate.exists():
+                    json_path = candidate
                 else:
-                    candidate = output_dir / f"{pdf_path.stem}.json"
-                    if candidate.exists():
-                        json_path = candidate
-                    else:
-                        logger.error(f"PDF 解析未生成 JSON: {pdf_path.name}")
-                        return None
+                    logger.error(f"PDF 解析未生成 JSON: {pdf_path.name}")
+                    return None
                 logger.info(f"PDF 解析完成: {json_path.name}")
             except Exception as e:
                 logger.error(f"PDF 解析异常: {e}")

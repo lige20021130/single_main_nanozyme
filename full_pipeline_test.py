@@ -40,6 +40,8 @@ def step1_parse_pdf(pdf_path: Path) -> Path:
             reading_order="xycut",
             image_output="external",
             image_format="png",
+            table_method="default",
+            threads="2",
             output_dir=str(pdf_output),
         )
     except UnicodeDecodeError:
