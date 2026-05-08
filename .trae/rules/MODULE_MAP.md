@@ -24,6 +24,9 @@ PDF输入 → 预处理 → 规则/LLM/VLM多源提取 → 交叉验证 → 一�
 |----------|-----------|------|---------|
 | `extraction_agents.py` | `KineticsAgent`, `MorphologyAgent`, `SynthesisAgent`, `ApplicationAgent`, `RuleExtractorAdapter` | 4个专业提取Agent + 适配器，替代原始RuleExtractor | single_main_nanozyme_extractor(正则模式), numeric_validator |
 | `llm_extractor.py` | `LLMExtractor`, `TableExtractor`, `JSONFixer` | LLM文本提取（全文+表格），JSON修复 | api_client |
+| `llm_structured_extractor.py` | `LLMStructuredExtractor` | LLM结构化提取核心模块（LLM-First模式），分任务提取（动力学/形态/应用/酶类型），self-augmentation两步提取，Vmax自动单位转换，Km量级校验 | extraction_prompts, schema_constraints, api_client |
+| `extraction_prompts.py` | `build_kinetics_prompt()`, `build_morphology_prompt()`, `build_application_prompt()`, `build_enzyme_type_prompt()`, `build_self_augmentation_prompt()` | LLM提取prompt模板库，包含few-shot examples和纳米酶领域知识 | schema_constraints |
+| `schema_constraints.py` | `validate_against_schema()`, `auto_fix_schema_errors()`, `get_schema_for_openai()`, `NANOZYME_EXTRACTION_SCHEMA` | JSON schema约束定义，用于constrained decoding和输出验证 | 无外部依赖 |
 | `vlm_extractor.py` | `VLMExtractor` | 视觉语言模型图像提取（动力学图表/形态图） | api_client |
 | `activity_selector.py` | `ActivitySelector` | 催化活性类型选择与匹配 | 无外部依赖 |
 | `application_extractor.py` | `ApplicationExtractor`, `extract_method()`, `extract_sample_type()` | 应用信息提取（类型/方法/样品） | 无外部依赖 |
@@ -39,7 +42,7 @@ PDF输入 → 预处理 → 规则/LLM/VLM多源提取 → 交叉验证 → 一�
 | `consistency_guard.py` | `ConsistencyGuard` | 对比表/他人物质检测，防止提取非目标纳米酶数据 | 无外部依赖 |
 | `consistency_guard_agentic.py` | `AgenticConsistencyGuard`, `IssueSeverity`, `GuardIssue`, `GuardCheckResult` | 智能一致性守卫，LLM辅助裁决冲突 | nanozyme_models, api_client |
 | `extraction_verifier.py` | `ExtractionVerifier` | 提取结果验证，字段与原文证据交叉核对 | 无外部依赖 |
-| `numeric_validator.py` | `NumericValidator`, `normalize_unit()`, `is_concentration_unit()`, `is_rate_unit()`, `calibrate_magnitude_ranges()` | 数值范围校验、单位归一化、量级标定 | 无外部依赖 |
+| `numeric_validator.py` | `NumericValidator`, `normalize_unit()`, `is_concentration_unit()`, `is_rate_unit()`, `calibrate_magnitude_ranges()`, `validate_nanozyme_kinetics()` | 数值范围校验、单位归一化、量级标定、纳米酶领域知识验证（酶类型-量级范围-分析物兼容性） | 无外部依赖 |
 
 ## 数据模型层
 
@@ -95,7 +98,7 @@ PDF输入 → 预处理 → 规则/LLM/VLM多源提取 → 交叉验证 → 一�
 
 ## 关键数据流路径
 
-1. **动力学提取**: `RuleExtractor` → `KineticsAgent` → `_extract_kinetics_from_text/table/flattened_table` → `_backfill_kinetics_units` → `NumericValidator`
+1. **动力学提取**: `LLMStructuredExtractor.extract_kinetics`(LLM-First) → `RuleExtractor` → `KineticsAgent` → `_extract_kinetics_from_text/table/flattened_table` → `_backfill_kinetics_units` → `NumericValidator`
 2. **LLM精炼**: `SingleMainNanozymePipeline._call_llm_with_refinement` → `llm_refinement.AgenticLLMExtractor` → `LLMSchemaValidator` → 回填
 3. **VLM提取**: `SingleMainNanozymePipeline._call_vlm` → `VLMExtractor` → 结果合并到important_values → 回填kinetics
 4. **交叉验证**: Rule结果 + LLM结果 + VLM结果 → `CrossValidationAgent.merge_results` → 冲突检测 → 合并 → `check_multi_figure_kinetics_consistency` 多图一致性

@@ -4945,6 +4945,11 @@ class SingleMainNanozymePipeline:
             logger.info("[SMN] Using RuleExtractorAdapter (4 specialized agents)")
         else:
             logger.warning("[SMN] extraction_agents not available, using original RuleExtractor")
+        self.llm_structured = None
+        if client and self.config.enable_llm and is_available("llm_structured_extractor"):
+            from llm_structured_extractor import LLMStructuredExtractor
+            self.llm_structured = LLMStructuredExtractor(client, self.config)
+            logger.info("[SMN] LLMStructuredExtractor loaded (LLM-First mode)")
         self.num_val = NumericValidator()
         if is_available("diagnostics_builder"):
             from diagnostics_builder import DiagnosticsBuilder as FullDiagnosticsBuilder
@@ -5358,6 +5363,8 @@ class SingleMainNanozymePipeline:
                         rule_km = record["main_activity"]["kinetics"].get("Km")
                         raw_km_unit = km_item.get("unit", "")
                         vlm_val, raw_km_unit = _parse_unit_scientific_prefix(vlm_val, raw_km_unit)
+                        iv["value"] = str(vlm_val)
+                        iv["unit"] = raw_km_unit
                         km_unit_ok = _is_concentration_unit_fn(raw_km_unit) if raw_km_unit and _is_concentration_unit_fn else False
                         if rule_km is None:
                             record["main_activity"]["kinetics"]["Km"] = vlm_val
@@ -5402,6 +5409,8 @@ class SingleMainNanozymePipeline:
                             continue
                         raw_vmax_unit = vmax_item.get("unit", "")
                         vlm_val, raw_vmax_unit = _parse_unit_scientific_prefix(vlm_val, raw_vmax_unit)
+                        iv["value"] = str(vlm_val)
+                        iv["unit"] = raw_vmax_unit
                         rule_vmax = record["main_activity"]["kinetics"].get("Vmax")
                         vmax_unit_ok = _is_rate_unit_fn(raw_vmax_unit) if raw_vmax_unit and _is_rate_unit_fn else False
                         if rule_vmax is None:
@@ -5873,6 +5882,28 @@ class SingleMainNanozymePipeline:
                      f"kinetics={figure_summ['kinetics_figures']}, "
                      f"morphology={figure_summ['morphology_figures']}")
 
+        if self.llm_structured:
+            try:
+                _table_raw_texts = []
+                for t in tables:
+                    if isinstance(t, dict):
+                        _table_raw_texts.append(t.get("raw_text", "") or t.get("text", ""))
+                    elif isinstance(t, str):
+                        _table_raw_texts.append(t)
+                llm_structured_result = await self.llm_structured.extract_all(
+                    selected_name, buckets,
+                    table_texts=_table_raw_texts[:5] if _table_raw_texts else None,
+                )
+                if llm_structured_result:
+                    self._apply_llm_structured_result(record, llm_structured_result)
+                    logger.info(f"[SMN] LLM-structured: enzyme_type={llm_structured_result.get('enzyme_like_type')}, "
+                                 f"Km={llm_structured_result.get('kinetics', {}).get('Km')}, "
+                                 f"kinetics_list={len(llm_structured_result.get('kinetics_list', []))}, "
+                                 f"morphology={llm_structured_result.get('morphology')}, "
+                                 f"apps={len(llm_structured_result.get('applications', []))}")
+            except Exception as e:
+                logger.warning(f"[SMN] LLM-structured extraction failed, falling back to rules: {e}")
+
         self.rule_ext.extract_from_evidence(record, buckets, table_kinetics_values, selected_name, doc=doc)
         logger.info(f"[SMN] Rule extraction: enzyme_type={record['main_activity']['enzyme_like_type']}, "
                      f"Km={record['main_activity']['kinetics'].get('Km')}, "
@@ -6052,6 +6083,13 @@ class SingleMainNanozymePipeline:
         warnings.extend(val_warnings)
 
         self._backfill_kinetics_from_important_values(record)
+
+        self._final_kinetics_validation(record)
+
+        nanozyme_kin_warnings = self.num_val.validate_nanozyme_kinetics(record)
+        if nanozyme_kin_warnings:
+            warnings.extend(nanozyme_kin_warnings)
+            logger.info(f"[SMN] Nanozyme kinetics domain warnings: {nanozyme_kin_warnings[:3]}")
 
         self._infer_profiles(record, buckets)
 
@@ -6596,6 +6634,52 @@ class SingleMainNanozymePipeline:
         if backfilled:
             logger.info(f"[SMN] Backfilled kinetics from important_values: {', '.join(backfilled)}")
 
+    def _final_kinetics_validation(self, record: Dict[str, Any]) -> None:
+        kin = record.get("main_activity", {}).get("kinetics", {})
+        if not isinstance(kin, dict):
+            return
+
+        km_val = kin.get("Km")
+        km_u = kin.get("Km_unit", "")
+        if isinstance(km_val, (int, float)) and km_u in ("M",):
+            if km_val > 1.0:
+                logger.warning(f"[SMN] Final validation: Km={km_val} M is unrealistically large, clearing.")
+                kin["Km"] = None
+                kin["Km_unit"] = None
+                kin["needs_review"] = True
+        elif isinstance(km_val, (int, float)) and km_u in ("mM",) and km_val > 1000:
+            logger.warning(f"[SMN] Final validation: Km={km_val} mM is unrealistically large, clearing.")
+            kin["Km"] = None
+            kin["Km_unit"] = None
+            kin["needs_review"] = True
+
+        vmax_val = kin.get("Vmax")
+        vmax_u = kin.get("Vmax_unit", "")
+        if isinstance(vmax_val, (int, float)) and vmax_u in ("M/s", "M s^-1", "M s-1") and abs(vmax_val) < 1.0:
+            new_val = vmax_val * 1e6
+            kin["Vmax"] = new_val
+            kin["Vmax_unit"] = "μM/s"
+            logger.info(f"[SMN] Final validation: Vmax auto-converted {vmax_val} M/s -> {new_val} μM/s")
+        elif isinstance(vmax_val, (int, float)) and vmax_u in ("mM/s", "mM s^-1", "mM s-1") and abs(vmax_val) < 1.0:
+            new_val = vmax_val * 1e3
+            kin["Vmax"] = new_val
+            kin["Vmax_unit"] = "μM/s"
+            logger.info(f"[SMN] Final validation: Vmax auto-converted {vmax_val} mM/s -> {new_val} μM/s")
+
+        for kl in record.get("main_activity", {}).get("kinetics_list", []):
+            if not isinstance(kl, dict):
+                continue
+            kl_km = kl.get("Km")
+            kl_kmu = kl.get("Km_unit", "")
+            if isinstance(kl_km, (int, float)) and kl_kmu in ("M",) and kl_km > 1.0:
+                kl["Km"] = None
+                kl["Km_unit"] = None
+            kl_vmax = kl.get("Vmax")
+            kl_vmaxu = kl.get("Vmax_unit", "")
+            if isinstance(kl_vmax, (int, float)) and kl_vmaxu in ("M/s", "M s^-1", "M s-1") and abs(kl_vmax) < 1.0:
+                kl["Vmax"] = kl_vmax * 1e6
+                kl["Vmax_unit"] = "μM/s"
+
     def _infer_profiles(self, record: Dict[str, Any], buckets: Dict[str, List[str]]) -> None:
         act = record.get("main_activity", {})
         if not act:
@@ -6651,6 +6735,73 @@ class SingleMainNanozymePipeline:
 
         act["pH_profile"] = pH_prof
         act["temperature_profile"] = temp_prof
+
+    def _apply_llm_structured_result(self, record: Dict[str, Any], llm_result: Dict[str, Any]) -> None:
+        ma = record.get("main_activity", {})
+        if not isinstance(ma, dict):
+            return
+
+        if llm_result.get("enzyme_like_type") and not ma.get("enzyme_like_type"):
+            ma["enzyme_like_type"] = llm_result["enzyme_like_type"]
+
+        llm_kin = llm_result.get("kinetics", {})
+        if isinstance(llm_kin, dict):
+            kin = ma.get("kinetics", {})
+            if not isinstance(kin, dict):
+                kin = {}
+                ma["kinetics"] = kin
+            for key in ("Km", "Km_unit", "Vmax", "Vmax_unit", "kcat", "kcat_unit",
+                         "kcat_Km", "kcat_Km_unit", "substrate"):
+                if llm_kin.get(key) is not None and kin.get(key) is None:
+                    kin[key] = llm_kin[key]
+
+        llm_kin_list = llm_result.get("kinetics_list", [])
+        if llm_kin_list and not ma.get("kinetics_list"):
+            ma["kinetics_list"] = llm_kin_list
+
+        sel = record.get("selected_nanozyme", {})
+        if isinstance(sel, dict):
+            for key in ("morphology", "size", "size_unit", "crystal_structure",
+                         "surface_area", "synthesis_method"):
+                if llm_result.get(key) is not None and not sel.get(key):
+                    sel[key] = llm_result[key]
+            llm_synth_cond = llm_result.get("synthesis_conditions")
+            if isinstance(llm_synth_cond, dict):
+                sc = sel.get("synthesis_conditions", {})
+                if not isinstance(sc, dict):
+                    sc = {}
+                    sel["synthesis_conditions"] = sc
+                for sc_key in ("temperature", "time"):
+                    if llm_synth_cond.get(sc_key) is not None and not sc.get(sc_key):
+                        sc[sc_key] = llm_synth_cond[sc_key]
+                if llm_synth_cond.get("precursors") and not sc.get("precursors"):
+                    sc["precursors"] = llm_synth_cond["precursors"]
+            if llm_result.get("characterization") and not sel.get("characterization"):
+                sel["characterization"] = llm_result["characterization"]
+
+        llm_apps = llm_result.get("applications", [])
+        if llm_apps and not record.get("applications"):
+            record["applications"] = llm_apps
+
+        llm_ph = llm_result.get("pH_profile", {})
+        if isinstance(llm_ph, dict):
+            ph = ma.get("pH_profile", {})
+            if not isinstance(ph, dict):
+                ph = {}
+                ma["pH_profile"] = ph
+            for ph_key in ("optimal_pH", "pH_range"):
+                if llm_ph.get(ph_key) is not None and not ph.get(ph_key):
+                    ph[ph_key] = llm_ph[ph_key]
+
+        llm_tp = llm_result.get("temperature_profile", {})
+        if isinstance(llm_tp, dict):
+            tp = ma.get("temperature_profile", {})
+            if not isinstance(tp, dict):
+                tp = {}
+                ma["temperature_profile"] = tp
+            for tp_key in ("optimal_temperature", "temperature_range"):
+                if llm_tp.get(tp_key) is not None and not tp.get(tp_key):
+                    tp[tp_key] = llm_tp[tp_key]
 
     def _merge_llm(self, record: Dict[str, Any], llm: Dict[str, Any]) -> Dict[str, Any]:
         if self._guard:

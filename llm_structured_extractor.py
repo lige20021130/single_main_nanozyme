@@ -1,0 +1,244 @@
+import json
+import logging
+import re
+from typing import Dict, List, Any, Optional
+
+from extraction_prompts import (
+    build_kinetics_prompt,
+    build_morphology_prompt,
+    build_application_prompt,
+    build_enzyme_type_prompt,
+    build_self_augmentation_prompt,
+)
+from schema_constraints import validate_against_schema, auto_fix_schema_errors
+
+logger = logging.getLogger(__name__)
+
+
+class LLMStructuredExtractor:
+    def __init__(self, client, config=None):
+        self.client = client
+        self.config = config
+        self.model = getattr(config, "llm_model", "gpt-4o") if config else "gpt-4o"
+        self.temperature = 0.0
+        self.max_tokens = 4096
+        self.enable_self_augmentation = getattr(config, "enable_self_augmentation", True) if config else True
+        self.enable_constrained_output = getattr(config, "enable_constrained_output", True) if config else True
+
+    async def extract_kinetics(
+        self,
+        nanozyme_name: str,
+        text_chunks: List[str],
+        table_texts: List[str] = None,
+    ) -> Dict[str, Any]:
+        combined_text = self._prepare_text(text_chunks, max_chars=6000)
+        if table_texts:
+            table_combined = "\n\n[Table data]:\n" + "\n".join(table_texts[:5])
+            combined_text += table_combined[:3000]
+
+        messages = build_kinetics_prompt(nanozyme_name, combined_text)
+        result = await self._call_llm_structured(messages, "kinetics")
+
+        if self.enable_self_augmentation and result:
+            augmented = await self._self_augment(result, combined_text, "kinetics")
+            if augmented:
+                result = augmented
+
+        if result:
+            result = self._post_process_kinetics(result)
+
+        return result if result else {}
+
+    async def extract_morphology(
+        self,
+        nanozyme_name: str,
+        text_chunks: List[str],
+    ) -> Dict[str, Any]:
+        combined_text = self._prepare_text(text_chunks, max_chars=4000)
+        messages = build_morphology_prompt(nanozyme_name, combined_text)
+        result = await self._call_llm_structured(messages, "morphology")
+        return result if result else {}
+
+    async def extract_applications(
+        self,
+        nanozyme_name: str,
+        text_chunks: List[str],
+    ) -> Dict[str, Any]:
+        combined_text = self._prepare_text(text_chunks, max_chars=4000)
+        messages = build_application_prompt(nanozyme_name, combined_text)
+        result = await self._call_llm_structured(messages, "applications")
+        return result if result else {}
+
+    async def extract_enzyme_type(
+        self,
+        nanozyme_name: str,
+        text_chunks: List[str],
+    ) -> Optional[str]:
+        combined_text = self._prepare_text(text_chunks, max_chars=3000)
+        messages = build_enzyme_type_prompt(nanozyme_name, combined_text)
+        result = await self._call_llm_structured(messages, "enzyme_type")
+        if result and isinstance(result, dict):
+            return result.get("enzyme_like_type")
+        return None
+
+    async def extract_all(
+        self,
+        nanozyme_name: str,
+        buckets: Dict[str, List[str]],
+        table_texts: List[str] = None,
+    ) -> Dict[str, Any]:
+        result = {}
+
+        etype = await self.extract_enzyme_type(
+            nanozyme_name,
+            buckets.get("activity", []) + buckets.get("mechanism", []) + buckets.get("abstract", [])
+        )
+        result["enzyme_like_type"] = etype
+
+        kinetics = await self.extract_kinetics(
+            nanozyme_name,
+            buckets.get("kinetics", []) + buckets.get("activity", []),
+            table_texts,
+        )
+        result.update(kinetics)
+
+        morphology = await self.extract_morphology(
+            nanozyme_name,
+            buckets.get("material", []) + buckets.get("characterization", [])
+        )
+        result.update(morphology)
+
+        applications = await self.extract_applications(
+            nanozyme_name,
+            buckets.get("application", []) + buckets.get("sensing", [])
+        )
+        result.update(applications)
+
+        errors = validate_against_schema(result)
+        if errors:
+            logger.warning(f"[LLM-Ext] Schema validation errors: {errors}")
+            result = auto_fix_schema_errors(result, errors)
+
+        return result
+
+    async def _call_llm_structured(
+        self,
+        messages: List[Dict[str, str]],
+        task_name: str,
+    ) -> Optional[Dict[str, Any]]:
+        if not self.client:
+            logger.warning(f"[LLM-Ext] No client available for {task_name}")
+            return None
+
+        try:
+            extra_params = {}
+            if self.enable_constrained_output:
+                extra_params["response_format"] = {"type": "json_object"}
+
+            content = await self.client.chat_completion_text(
+                messages=messages,
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+                extra_params=extra_params if extra_params else None,
+            )
+
+            if not content:
+                logger.warning(f"[LLM-Ext] Empty response for {task_name}")
+                return None
+
+            parsed = self._parse_json_response(content)
+            if parsed is None:
+                logger.warning(f"[LLM-Ext] Failed to parse JSON for {task_name}: {content[:200]}")
+                return None
+
+            logger.info(f"[LLM-Ext] {task_name} extraction succeeded")
+            return parsed
+
+        except Exception as e:
+            logger.error(f"[LLM-Ext] {task_name} extraction failed: {e}")
+            return None
+
+    async def _self_augment(
+        self,
+        previous_result: Dict[str, Any],
+        text: str,
+        task_name: str,
+    ) -> Optional[Dict[str, Any]]:
+        messages = build_self_augmentation_prompt(
+            json.dumps(previous_result, ensure_ascii=False, indent=2),
+            text,
+        )
+        augmented = await self._call_llm_structured(messages, f"{task_name}_augmented")
+        if augmented:
+            logger.info(f"[LLM-Ext] Self-augmentation improved {task_name}")
+        return augmented
+
+    def _post_process_kinetics(self, result: Dict[str, Any]) -> Dict[str, Any]:
+        kin = result.get("kinetics", {})
+        if isinstance(kin, dict):
+            self._fix_vmax_unit(kin)
+            self._fix_km_magnitude(kin)
+
+        for kl in result.get("kinetics_list", []):
+            if not isinstance(kl, dict):
+                continue
+            self._fix_vmax_unit(kl)
+            self._fix_km_magnitude(kl)
+
+        return result
+
+    def _fix_vmax_unit(self, kin_dict: Dict[str, Any]) -> None:
+        vmax_val = kin_dict.get("Vmax")
+        vmax_u = kin_dict.get("Vmax_unit", "")
+        if not isinstance(vmax_val, (int, float)):
+            return
+
+        if vmax_u in ("M/s", "M·s-1", "M s^-1") and abs(vmax_val) < 1.0:
+            kin_dict["Vmax"] = vmax_val * 1e6
+            kin_dict["Vmax_unit"] = "μM/s"
+            logger.info(f"[LLM-Ext] Auto-converted Vmax {vmax_val} M/s -> {vmax_val*1e6} μM/s")
+        elif vmax_u in ("mM/s", "mM·s-1") and abs(vmax_val) < 1.0:
+            kin_dict["Vmax"] = vmax_val * 1e3
+            kin_dict["Vmax_unit"] = "μM/s"
+            logger.info(f"[LLM-Ext] Auto-converted Vmax {vmax_val} mM/s -> {vmax_val*1e3} μM/s")
+
+    def _fix_km_magnitude(self, kin_dict: Dict[str, Any]) -> None:
+        km_val = kin_dict.get("Km")
+        km_u = kin_dict.get("Km_unit", "")
+        if isinstance(km_val, (int, float)) and km_u == "M" and km_val > 1.0:
+            kin_dict["Km"] = None
+            kin_dict["Km_unit"] = None
+            logger.warning(f"[LLM-Ext] Cleared unrealistic Km={km_val} M")
+        elif isinstance(km_val, (int, float)) and km_u == "mM" and km_val > 1000:
+            kin_dict["Km"] = None
+            kin_dict["Km_unit"] = None
+            logger.warning(f"[LLM-Ext] Cleared unrealistic Km={km_val} mM")
+
+    def _prepare_text(self, chunks: List[str], max_chars: int = 6000) -> str:
+        if not chunks:
+            return ""
+        combined = "\n".join(chunks)
+        if len(combined) > max_chars:
+            combined = combined[:max_chars]
+        return combined
+
+    def _parse_json_response(self, content: str) -> Optional[Dict[str, Any]]:
+        content = content.strip()
+        if content.startswith("```"):
+            content = re.sub(r'^```\w*\n?', '', content)
+            content = re.sub(r'\n?```$', '', content)
+            content = content.strip()
+
+        try:
+            return json.loads(content)
+        except json.JSONDecodeError:
+            pass
+
+        json_match = re.search(r'\{[\s\S]*\}', content)
+        if json_match:
+            try:
+                return json.loads(json_match.group())
+            except json.JSONDecodeError:
+                pass
+
+        return None
