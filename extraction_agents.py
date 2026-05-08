@@ -391,6 +391,20 @@ class KineticsAgent:
             kin["Vmax_unit"] = None
             kin["needs_review"] = True
 
+        km_val = kin.get("Km")
+        km_u = kin.get("Km_unit", "")
+        if isinstance(km_val, (int, float)) and km_u in ("M",):
+            if km_val > 1.0:
+                logger.warning(f"[KineticsAgent] Km={km_val} M is unrealistically large for nanozyme, clearing.")
+                kin["Km"] = None
+                kin["Km_unit"] = None
+                kin["needs_review"] = True
+        elif isinstance(km_val, (int, float)) and km_u in ("mM",) and km_val > 1000:
+            logger.warning(f"[KineticsAgent] Km={km_val} mM is unrealistically large, clearing.")
+            kin["Km"] = None
+            kin["Km_unit"] = None
+            kin["needs_review"] = True
+
     def _extract_kinetics_from_text(self, record, kinetics_texts):
         km_candidates = []
         vmax_candidates = []

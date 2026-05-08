@@ -700,13 +700,49 @@ def _validate_and_assign_kinetics_unit(record_kinetics: dict, param: str, raw_un
             record_kinetics["Km_unit"] = _norm_fn(raw_unit) if _norm_fn else raw_unit
     elif param == "Vmax":
         if _rate_fn and _rate_fn(raw_unit):
-            record_kinetics["Vmax_unit"] = _norm_fn(raw_unit) if _norm_fn else raw_unit
+            norm_unit = _norm_fn(raw_unit) if _norm_fn else raw_unit
+            vmax_val = record_kinetics.get("Vmax")
+            if norm_unit in ("M/s", "M s^-1", "M s-1") and isinstance(vmax_val, (int, float)) and abs(vmax_val) < 1.0:
+                new_val = vmax_val * 1e6
+                record_kinetics["Vmax"] = new_val
+                record_kinetics["Vmax_unit"] = "μM/s"
+                logger.info(f"[SMN] Vmax auto-converted: {vmax_val} M/s -> {new_val} μM/s")
+            elif norm_unit in ("mM/s", "mM s^-1", "mM s-1") and isinstance(vmax_val, (int, float)) and abs(vmax_val) < 1.0:
+                new_val = vmax_val * 1e3
+                record_kinetics["Vmax"] = new_val
+                record_kinetics["Vmax_unit"] = "μM/s"
+                logger.info(f"[SMN] Vmax auto-converted: {vmax_val} mM/s -> {new_val} μM/s")
+            else:
+                record_kinetics["Vmax_unit"] = norm_unit
         elif _conc_fn and _conc_fn(raw_unit):
             logger.warning(f"[SMN] Vmax_unit='{raw_unit}' is a concentration unit, not rate. Skipping.")
         else:
             record_kinetics["Vmax_unit"] = _norm_fn(raw_unit) if _norm_fn else raw_unit
     elif param in ("kcat", "kcat_Km"):
         record_kinetics[f"{param}_unit"] = _norm_fn(raw_unit) if _norm_fn else raw_unit
+
+
+def _parse_unit_scientific_prefix(value: float, raw_unit: str) -> Tuple[float, str]:
+    if not raw_unit or not isinstance(raw_unit, str):
+        return value, raw_unit or ""
+    _SUPERSCRIPT_MAP = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹⁻", "0123456789-")
+    normalized_unit = raw_unit.translate(_SUPERSCRIPT_MAP)
+    prefix_m = re.match(r'^[\s]*[×x\u00d7]\s*10[\^]?[\-]?\s*(\d+)\s+', normalized_unit.strip())
+    if not prefix_m:
+        return value, raw_unit
+    exp_str = prefix_m.group(1)
+    remaining_unit = normalized_unit[prefix_m.end():].strip()
+    has_minus = bool(re.search(r'10[\^]?[\-]', normalized_unit[:prefix_m.end()]))
+    try:
+        exp_int = int(exp_str)
+        if has_minus:
+            adjusted = value * (10 ** -exp_int)
+        else:
+            adjusted = value * (10 ** exp_int)
+        logger.info(f"[SMN] Parsed scientific prefix from unit: {value} * 10^{('-' if has_minus else '')}{exp_int} = {adjusted}, unit='{remaining_unit}'")
+        return adjusted, remaining_unit
+    except (ValueError, TypeError):
+        return value, raw_unit
 
 
 def _extract_vmax_fallback(text: str) -> Optional[Dict[str, Any]]:
@@ -2452,6 +2488,20 @@ class NanozymeScorer:
             cand["score"] = score
 
         scored = sorted(candidates, key=lambda x: x["score"], reverse=True)
+
+        if len(scored) >= 2:
+            top_name = scored[0]["name"]
+            for i in range(1, min(len(scored), 5)):
+                other_name = scored[i]["name"]
+                if (other_name in top_name and len(other_name) < len(top_name)
+                        and re.search(r'[@/]', top_name)):
+                    pass
+                elif (top_name in other_name and len(top_name) < len(other_name)
+                      and re.search(r'[@/]', other_name)
+                      and scored[i]["score"] >= scored[0]["score"] - 8):
+                    scored[0], scored[i] = scored[i], scored[0]
+                    logger.info(f"[SMN] Composite name preferred: '{other_name}' over '{top_name}'")
+                    break
 
         if len(scored) >= 2 and scored[0]["score"] - scored[1]["score"] <= 4:
             top_tas = bool(scored[0]["sources"] & {"title", "abstract", "synthesis"})
@@ -4393,6 +4443,12 @@ class RuleExtractor:
         "MOF-derived", "prussian blue analogue",
     ]
 
+    _MORPHOLOGY_PHRASE_PATTERNS = [
+        re.compile(r'(?:uniform|regular|monodisperse|well-defined|well-defined)\s+((?:hollow|solid|mesoporous|porous|core-shell|yolk-shell)\s+)?((?:polyhedral|spherical|cubical|rod-like|sheet-like|flower-like|dendritic|branched|needle-like|spindle|ellipsoidal|prismatic|hexagonal|tetragonal)\s+)?(?:morphology|shape|structure|nanostructure)', re.I),
+        re.compile(r'(?:exhibits?|shows?|displays?|possesses?|has|with)\s+(?:a\s+|an\s+)?((?:hollow|solid|mesoporous|porous|core-shell|yolk-shell|uniform|regular)\s+)?((?:polyhedral|spherical|cubical|rod-like|sheet-like|flower-like|dendritic|branched|needle-like|spindle|ellipsoidal|prismatic|hexagonal|tetragonal)\s+)?morphology', re.I),
+        re.compile(r'(?:morphology|shape|structure)\s+(?:of\s+(?:the\s+)?)?(?:\S+\s+){0,3}(?:is|was|are|were)\s+(?:found\s+to\s+be\s+)?(?:a\s+|an\s+)?((?:hollow|solid|mesoporous|porous|core-shell|yolk-shell|uniform|regular|well-defined)\s+)?((?:polyhedral|spherical|cubical|rod-like|sheet-like|flower-like|dendritic|branched|needle-like|spindle|ellipsoidal|prismatic|hexagonal|tetragonal)\s+)?', re.I),
+    ]
+
     def _extract_morphology_from_text(self, record, char_texts):
         sel = record.get("selected_nanozyme", {})
         if not isinstance(sel, dict):
@@ -4400,6 +4456,24 @@ class RuleExtractor:
         if sel.get("morphology"):
             return
         selected_name = (sel.get("name") or "").lower()
+
+        phrase_match = None
+        for text in char_texts:
+            tl = text.lower()
+            has_name = selected_name and selected_name in tl
+            is_caption = "figure" in tl or "fig." in tl or "tem " in tl or "sem " in tl or "hrtem" in tl or "afm" in tl
+            if not (has_name or is_caption):
+                continue
+            for pat in self._MORPHOLOGY_PHRASE_PATTERNS:
+                m = pat.search(text)
+                if m:
+                    parts = [g.strip() for g in m.groups() if g and g.strip()]
+                    if parts:
+                        phrase_match = " ".join(parts).rstrip()
+                        break
+            if phrase_match:
+                break
+
         term_scores = {}
         for text in char_texts:
             tl = text.lower()
@@ -4413,7 +4487,10 @@ class RuleExtractor:
             sorted_terms = sorted(term_scores.items(), key=lambda x: -x[1])
             top_score = sorted_terms[0][1]
             selected = [t for t, s in sorted_terms if s >= top_score * 0.5][:3]
-            sel["morphology"] = ", ".join(selected)
+            if phrase_match:
+                sel["morphology"] = phrase_match
+            else:
+                sel["morphology"] = ", ".join(selected)
 
     def _fulltext_fallback_extract(self, record, doc, selected_name):
         all_text = "\n".join(doc.chunks) if doc.chunks else ""
@@ -5280,6 +5357,7 @@ class SingleMainNanozymePipeline:
                             continue
                         rule_km = record["main_activity"]["kinetics"].get("Km")
                         raw_km_unit = km_item.get("unit", "")
+                        vlm_val, raw_km_unit = _parse_unit_scientific_prefix(vlm_val, raw_km_unit)
                         km_unit_ok = _is_concentration_unit_fn(raw_km_unit) if raw_km_unit and _is_concentration_unit_fn else False
                         if rule_km is None:
                             record["main_activity"]["kinetics"]["Km"] = vlm_val
@@ -5322,8 +5400,9 @@ class SingleMainNanozymePipeline:
                             vlm_val = float(vmax_item["value"])
                         except (ValueError, TypeError):
                             continue
-                        rule_vmax = record["main_activity"]["kinetics"].get("Vmax")
                         raw_vmax_unit = vmax_item.get("unit", "")
+                        vlm_val, raw_vmax_unit = _parse_unit_scientific_prefix(vlm_val, raw_vmax_unit)
+                        rule_vmax = record["main_activity"]["kinetics"].get("Vmax")
                         vmax_unit_ok = _is_rate_unit_fn(raw_vmax_unit) if raw_vmax_unit and _is_rate_unit_fn else False
                         if rule_vmax is None:
                             record["main_activity"]["kinetics"]["Vmax"] = vlm_val
@@ -5380,9 +5459,11 @@ class SingleMainNanozymePipeline:
                             vlm_val = float(kcat_item["value"])
                         except (ValueError, TypeError):
                             continue
+                        raw_kcat_unit = kcat_item.get("unit", "s⁻¹")
+                        vlm_val, raw_kcat_unit = _parse_unit_scientific_prefix(vlm_val, raw_kcat_unit)
                         if record["main_activity"]["kinetics"].get("kcat") is None:
                             record["main_activity"]["kinetics"]["kcat"] = vlm_val
-                            record["main_activity"]["kinetics"]["kcat_unit"] = kcat_item.get("unit", "s⁻¹")
+                            record["main_activity"]["kinetics"]["kcat_unit"] = raw_kcat_unit
                             record["main_activity"]["kinetics"]["source"] = "VLM"
                             if caption:
                                 record["main_activity"]["kinetics"]["_evidence_kcat"] = str(caption)[:300]
@@ -5402,9 +5483,11 @@ class SingleMainNanozymePipeline:
                             vlm_val = float(kcat_km_item["value"])
                         except (ValueError, TypeError):
                             continue
+                        raw_kcat_km_unit = kcat_km_item.get("unit", "M⁻¹s⁻¹")
+                        vlm_val, raw_kcat_km_unit = _parse_unit_scientific_prefix(vlm_val, raw_kcat_km_unit)
                         if record["main_activity"]["kinetics"].get("kcat_Km") is None:
                             record["main_activity"]["kinetics"]["kcat_Km"] = vlm_val
-                            record["main_activity"]["kinetics"]["kcat_Km_unit"] = kcat_km_item.get("unit", "M⁻¹s⁻¹")
+                            record["main_activity"]["kinetics"]["kcat_Km_unit"] = raw_kcat_km_unit
                             record["main_activity"]["kinetics"]["source"] = "VLM"
                             if caption:
                                 record["main_activity"]["kinetics"]["_evidence_kcat_Km"] = str(caption)[:300]
