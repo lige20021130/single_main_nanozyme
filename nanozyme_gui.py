@@ -1177,10 +1177,12 @@ class NanozymeGUI:
 
     def start_extraction(self):
         if not Path("config.yaml").exists():
-            messagebox.showwarning("配置缺失",
+            if not messagebox.askyesno("配置缺失",
                 "未找到 config.yaml 配置文件。\n"
-                "请先在程序目录创建该文件并填入 API 密钥后重试。")
-            return
+                "将以规则模式提取（不调用 LLM/VLM）。\n\n"
+                "如需 AI 增强提取，请创建 config.yaml 并填入 API 密钥。\n\n"
+                "是否继续规则模式提取？"):
+                return
 
         success_reports = [
             r for r in self.file_reports

@@ -1206,10 +1206,12 @@ class PDFBasicGUI:
         """启动大模型提取（支持单文件和批量模式）"""
         # 检查 config.yaml 是否存在
         if not Path("config.yaml").exists():
-            messagebox.showwarning("配置缺失",
+            if not messagebox.askyesno("配置缺失",
                 "未找到 config.yaml 配置文件。\n"
-                "请先在程序目录创建该文件并填入 API 密钥后重试。")
-            return
+                "将以规则模式提取（不调用 LLM/VLM）。\n\n"
+                "如需 AI 增强提取，请创建 config.yaml 并填入 API 密钥。\n\n"
+                "是否继续规则模式提取？"):
+                return
 
         # 收集所有预处理成功的 mid_task 文件
         success_reports = [

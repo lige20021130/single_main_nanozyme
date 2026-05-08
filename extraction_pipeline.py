@@ -90,11 +90,8 @@ class ExtractionPipeline:
         per_document_timeout: float = 600,
         pipeline_timeout: float = 3600,
     ):
-        self.per_document_timeout = per_document_timeout
-        self.pipeline_timeout = pipeline_timeout
-        """
-        初始化提取管道
-        
+        """初始化提取管道
+
         Args:
             config_path: 配置文件路径
             output_dir: 输出目录
@@ -102,6 +99,8 @@ class ExtractionPipeline:
             enable_queue: 是否启用任务队列
             use_new_modules: 是否使用新模块（配置管理、缓存等）
         """
+        self.per_document_timeout = per_document_timeout
+        self.pipeline_timeout = pipeline_timeout
         self._setup_logging()
         
         # 加载配置
@@ -400,9 +399,25 @@ class ExtractionPipeline:
         if not SMN_AVAILABLE:
             raise RuntimeError("single_main_nanozyme_extractor 模块不可用")
 
-        result = asyncio.run(self.process_mid_json_single_main_nanozyme(
-            mid_json_path, progress_callback, use_cache
-        ))
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        if loop and loop.is_running():
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                future = pool.submit(
+                    asyncio.run,
+                    self.process_mid_json_single_main_nanozyme(
+                        mid_json_path, progress_callback, use_cache
+                    )
+                )
+                result = future.result(timeout=self.per_document_timeout + 60)
+        else:
+            result = asyncio.run(self.process_mid_json_single_main_nanozyme(
+                mid_json_path, progress_callback, use_cache
+            ))
         return result.get('metadata', {}).get(
             'output_path',
             str(self.output_dir / f"{Path(mid_json_path).stem}_extracted.json")
