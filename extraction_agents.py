@@ -1943,7 +1943,7 @@ class RuleExtractorAdapter:
 
         if not sel.get("characterization") or len(sel.get("characterization", [])) == 0:
             found_techniques = set()
-            for tech_name, pattern in self._CHARACTERIZATION_TECHNIQUES.items():
+            for tech_name, pattern in self.morphology_agent._CHARACTERIZATION_TECHNIQUES.items():
                 if pattern.search(all_text):
                     found_techniques.add(tech_name)
             if found_techniques:
@@ -1954,7 +1954,7 @@ class RuleExtractorAdapter:
         if apps:
             for app in apps:
                 if app.get("target_analyte") is None and app.get("application_type") in ("sensing", "detection"):
-                    for pat in _ANALYTE_PATTERNS:
+                    for pat in self.application_agent._ANALYTE_PATTERNS:
                         m = pat.search(all_text)
                         if m:
                             candidate = m.group(1).strip() if m.lastindex else m.group(0).strip()
@@ -1967,7 +1967,7 @@ class RuleExtractorAdapter:
 
                 if app.get("sample_type") is None and app.get("application_type") in ("sensing", "detection"):
                     tl = all_text.lower()
-                    for sample_kw, sample_type in self._SAMPLE_TYPE_MAP.items():
+                    for sample_kw, sample_type in self.application_agent._SAMPLE_TYPE_MAP.items():
                         if sample_kw in tl:
                             app["sample_type"] = sample_type
                             logger.info(f"[SMN] Fulltext fallback: sample_type={sample_type}")
