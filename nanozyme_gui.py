@@ -1177,12 +1177,25 @@ class NanozymeGUI:
 
     def start_extraction(self):
         if not Path("config.yaml").exists():
-            if not messagebox.askyesno("配置缺失",
-                "未找到 config.yaml 配置文件。\n"
-                "将以规则模式提取（不调用 LLM/VLM）。\n\n"
-                "如需 AI 增强提取，请创建 config.yaml 并填入 API 密钥。\n\n"
-                "是否继续规则模式提取？"):
+            choice = messagebox.askyesnocancel(
+                "配置缺失",
+                "未找到 config.yaml 配置文件。\n\n"
+                "点击「是」：自动生成模板配置文件（需手动填入API密钥）\n"
+                "点击「否」：以规则模式提取（不调用 LLM/VLM）\n"
+                "点击「取消」：返回\n\n"
+                "提示：规则模式无需API密钥即可使用，但提取精度较低。\n"
+                "      AI模式需配置DeepSeek/OpenAI等API密钥。"
+            )
+            if choice is None:
                 return
+            elif choice is True:
+                self._generate_config_template()
+                messagebox.showinfo("配置已生成",
+                    "已生成 config.yaml 模板文件。\n\n"
+                    "请用文本编辑器打开，填入API密钥后重新启动系统。\n"
+                    "当前将以规则模式继续提取。")
+            else:
+                self.log("[提取] 规则模式提取（无 LLM/VLM）")
 
         success_reports = [
             r for r in self.file_reports
@@ -1212,6 +1225,38 @@ class NanozymeGUI:
             daemon=True
         )
         self.extract_thread.start()
+
+    def _generate_config_template(self):
+        template = """# Nanozyme Extraction System Configuration
+# Fill in your API keys below to enable AI-enhanced extraction
+
+providers:
+  llm:
+    model: deepseek-chat
+    base_url: https://api.deepseek.com/v1
+    api_key: YOUR_DEEPSEEK_API_KEY
+    max_tokens: 8192
+    temperature: 0.1
+
+  vlm:
+    model: Qwen/Qwen2-VL-7B-Instruct
+    base_url: https://api.siliconflow.cn/v1
+    api_key: YOUR_SILICONFLOW_API_KEY
+    max_tokens: 4096
+
+pipeline:
+  enable_llm: true
+  enable_vlm: true
+  enable_cache: true
+  per_document_timeout: 600
+  results_dir: extraction_results
+"""
+        try:
+            with open("config.yaml", "w", encoding="utf-8") as f:
+                f.write(template)
+            self.log("[配置] 已生成 config.yaml 模板文件")
+        except Exception as e:
+            self.log(f"[配置] 生成配置文件失败: {e}")
 
     def stop_extraction(self):
         if messagebox.askyesno("确认停止", "确定要停止当前提取任务吗?"):
