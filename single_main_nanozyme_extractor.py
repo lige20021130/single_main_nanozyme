@@ -4927,6 +4927,116 @@ class NumericValidator:
         record["diagnostics"]["warnings"].extend(warnings)
         return record, warnings
 
+    _NANOZYME_KM_RANGES = {
+        "peroxidase-like": (0.001, 500, "mM"),
+        "oxidase-like": (0.01, 200, "mM"),
+        "catalase-like": (0.1, 1000, "mM"),
+        "superoxide-dismutase-like": (0.01, 100, "mM"),
+        "glucose-oxidase-like": (0.1, 500, "mM"),
+        "haloperoxidase-like": (0.01, 100, "mM"),
+        "phosphatase-like": (0.001, 200, "mM"),
+        "laccase-like": (0.01, 50, "mM"),
+        "nitroreductase-like": (0.001, 100, "mM"),
+    }
+
+    _NANOZYME_VMAX_RANGES = {
+        "peroxidase-like": (1e-4, 1e6, "μM/s"),
+        "oxidase-like": (1e-3, 1e5, "μM/s"),
+        "catalase-like": (1e-2, 1e6, "μM/s"),
+        "glucose-oxidase-like": (1e-3, 1e5, "μM/s"),
+    }
+
+    _ANALYTE_ENZYME_COMPATIBILITY = {
+        "peroxidase-like": {"h2o2", "tmb", "abts", "opd", "dab", "glucose", "dopamine", "ascorbic acid"},
+        "oxidase-like": {"glucose", "ascorbic acid", "uric acid", "cholesterol", "dopamine"},
+        "catalase-like": {"h2o2"},
+        "glucose-oxidase-like": {"glucose", "o2"},
+        "superoxide-dismutase-like": {"superoxide", "o2-"},
+        "haloperoxidase-like": {"br-", "i-", "h2o2"},
+    }
+
+    def validate_nanozyme_kinetics(self, record: Dict[str, Any]) -> List[str]:
+        warnings = []
+        ma = record.get("main_activity", {})
+        etype = ma.get("enzyme_like_type", "")
+        kin = ma.get("kinetics", {})
+
+        if not isinstance(kin, dict) or not etype:
+            return warnings
+
+        km_range = self._NANOZYME_KM_RANGES.get(etype)
+        if km_range:
+            km_val = kin.get("Km")
+            km_u = kin.get("Km_unit", "")
+            if isinstance(km_val, (int, float)):
+                km_mM = self._to_mM(km_val, km_u)
+                if km_mM is not None:
+                    lo, hi, _ = km_range
+                    if km_mM < lo or km_mM > hi:
+                        warnings.append(
+                            f"Km={km_val} {km_u} ({km_mM:.4f} mM) outside typical range "
+                            f"for {etype} ({lo}-{hi} mM)"
+                        )
+
+        vmax_range = self._NANOZYME_VMAX_RANGES.get(etype)
+        if vmax_range:
+            vmax_val = kin.get("Vmax")
+            vmax_u = kin.get("Vmax_unit", "")
+            if isinstance(vmax_val, (int, float)):
+                vmax_uM = self._to_uM_per_s(vmax_val, vmax_u)
+                if vmax_uM is not None:
+                    lo, hi, _ = vmax_range
+                    if vmax_uM < lo or vmax_uM > hi:
+                        warnings.append(
+                            f"Vmax={vmax_val} {vmax_u} ({vmax_uM:.4f} μM/s) outside typical range "
+                            f"for {etype}"
+                        )
+
+        for i, kl in enumerate(ma.get("kinetics_list", [])):
+            if not isinstance(kl, dict):
+                continue
+            if km_range:
+                kl_km = kl.get("Km")
+                kl_kmu = kl.get("Km_unit", "")
+                if isinstance(kl_km, (int, float)):
+                    kl_km_mM = self._to_mM(kl_km, kl_kmu)
+                    if kl_km_mM is not None:
+                        lo, hi, _ = km_range
+                        if kl_km_mM < lo or kl_km_mM > hi:
+                            warnings.append(
+                                f"kinetics_list[{i}]: Km={kl_km} {kl_kmu} outside typical range for {etype}"
+                            )
+
+        for app in record.get("applications", []):
+            if not isinstance(app, dict):
+                continue
+            analyte = app.get("target_analyte", "")
+            if analyte and etype in self._ANALYTE_ENZYME_COMPATIBILITY:
+                compat = self._ANALYTE_ENZYME_COMPATIBILITY[etype]
+                if analyte.lower() not in {a.lower() for a in compat}:
+                    warnings.append(
+                        f"Analyte '{analyte}' may be incompatible with {etype} "
+                        f"(expected: {', '.join(sorted(compat))})"
+                    )
+
+        return warnings
+
+    def _to_mM(self, val: float, unit: str) -> Optional[float]:
+        conversions = {"M": 1e3, "mM": 1.0, "μM": 1e-3, "uM": 1e-3, "nM": 1e-6, "pM": 1e-9}
+        factor = conversions.get(unit)
+        return val * factor if factor else None
+
+    def _to_uM_per_s(self, val: float, unit: str) -> Optional[float]:
+        conversions = {
+            "M/s": 1e6, "M s^-1": 1e6, "M·s-1": 1e6,
+            "mM/s": 1e3, "mM s^-1": 1e3, "mM·s-1": 1e3,
+            "μM/s": 1.0, "uM/s": 1.0, "μM s^-1": 1.0,
+            "nM/s": 1e-3, "nM s^-1": 1e-3,
+            "μM/min": 1.0 / 60, "uM/min": 1.0 / 60,
+        }
+        factor = conversions.get(unit)
+        return val * factor if factor else None
+
 
 class SingleMainNanozymePipeline:
     def __init__(self, client=None, config: Optional[SMNConfig] = None):
