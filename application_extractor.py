@@ -139,6 +139,47 @@ _INVALID_ANALYTE_PHRASES = {
     "peroxidase activity",
 }
 
+def is_valid_analyte(analyte: str) -> bool:
+    if not analyte or not isinstance(analyte, str):
+        return False
+    t = analyte.lower().strip()
+    if not t or len(t) < 2:
+        return False
+    if any(p in t for p in _PROBE_MOLECULES if len(p) > 2):
+        return False
+    if t in _INVALID_ANALYTE_PHRASES:
+        return False
+    return True
+
+
+async def llm_validate_analyte(analyte: str, context: str, client) -> bool:
+    if not analyte or not context or not client:
+        return True
+    prompt = f"""In a nanozyme paper, the extraction system identified "{analyte}" as a target_analyte (the molecule being detected/quantified by the sensing platform).
+
+Context from the paper:
+{context[:1500]}
+
+Question: Is "{analyte}" truly a target_analyte (the detection target), or is it actually:
+- A substrate (consumed in the catalytic reaction, like TMB, H2O2, ABTS)?
+- A probe molecule (used as a signal indicator to verify activity/SERS sensitivity, like crystal violet, methylene blue, R6G)?
+- A vague/invalid description (like "catalytic reactions", "enzyme activity")?
+
+Answer with ONLY one word: "valid" if it is a genuine target analyte, or "invalid" if it is a substrate, probe, or vague description."""
+
+    try:
+        resp = await client.chat_completion_text(
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.0,
+            max_tokens=10,
+        )
+        if resp and isinstance(resp, str):
+            answer = resp.strip().lower()
+            return answer.startswith("valid")
+    except Exception as e:
+        logger.warning(f"LLM analyte validation failed: {e}")
+    return True
+
 
 def classify_application_type(desc: str, app_type_raw: str = "") -> str:
     combined = (desc + " " + app_type_raw).lower()

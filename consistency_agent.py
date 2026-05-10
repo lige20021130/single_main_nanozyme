@@ -58,6 +58,8 @@ class ConsistencyAgent:
         warnings.extend(w7)
         record, w8 = self.check_analyte_enzyme_consistency(record)
         warnings.extend(w8)
+        record, w9 = self.validate_analytes(record)
+        warnings.extend(w9)
         return record, warnings
 
     def normalize_application_types(self, record: Dict) -> Tuple[Dict, List[str]]:
@@ -324,4 +326,16 @@ class ConsistencyAgent:
                     )
                     app["needs_review"] = True
                     break
+        return record, warnings
+
+    def validate_analytes(self, record: Dict) -> Tuple[Dict, List[str]]:
+        warnings = []
+        from application_extractor import is_valid_analyte
+        for app in record.get("applications", []):
+            if not isinstance(app, dict):
+                continue
+            analyte = app.get("target_analyte")
+            if analyte and not is_valid_analyte(str(analyte)):
+                warnings.append(f"invalid_analyte_filtered: {analyte}")
+                app["target_analyte"] = None
         return record, warnings

@@ -209,14 +209,28 @@ Focus on:
 
 CRITICAL SEMANTIC DISTINCTIONS — you MUST understand these roles:
 1. **substrate** (in kinetics) = molecule consumed in the catalytic reaction (e.g., TMB, ABTS, OPD, H2O2, DCFH-DA)
-2. **probe molecule** = molecule used to visualize/verify the catalytic activity (e.g., crystal violet/CV for SERS, methylene blue, Rhodamine B). These are NOT target analytes!
+2. **probe molecule** = molecule used to visualize/verify the catalytic activity or SERS sensitivity (e.g., crystal violet/CV for SERS, methylene blue, Rhodamine B, R6G). These are NOT target analytes! They are signal indicators.
 3. **target_analyte** (in applications) = the molecule being detected/quantified through the nanozyme's catalytic reaction (e.g., glucose, dopamine, ascorbic acid, Hg2+, cancer cells)
 
+DECISION FRAMEWORK for target_analyte:
+Ask yourself: "Is this molecule the REASON for building the sensing platform, or is it just a TOOL used to demonstrate the platform works?"
+- If it's the REASON (what we want to detect/measure) → it IS the target_analyte
+- If it's a TOOL (used to generate signal, verify activity, or calibrate) → it is NOT the target_analyte
+
+Common patterns:
+- "detect ascorbic acid using oxidase-like reaction" → target_analyte = ascorbic acid (the detection target)
+- "crystal violet (CV+) used as SERS probe" → target_analyte = null (CV+ is just a probe)
+- "TMB oxidation monitored by UV-vis" → target_analyte = null (TMB is a substrate)
+- "sensing platform for glucose detection" → target_analyte = glucose
+- "inhibition-based detection of AA" → target_analyte = ascorbic acid (AA inhibits the reaction, enabling its detection)
+
 KEY RULES:
-- Do NOT confuse probe molecules with target analytes. Crystal violet is a SERS probe, NOT an analyte.
+- Do NOT confuse probe molecules with target analytes. Crystal violet, methylene blue, R6G are SERS probes, NOT analytes.
 - The target_analyte is what the sensing platform is designed to DETECT, not what it uses as a signal indicator.
 - If the paper says "detect X using Y reaction monitored by Z technique", then X is the target_analyte, Y is the substrate, Z is the detection method.
 - "catalytic reactions" is NOT a valid target_analyte — it must be a specific molecule or species.
+- If the paper only demonstrates catalytic activity without a specific sensing target, set target_analyte to null.
+- Inhibition-based sensing: if a molecule INHIBITS the catalytic reaction and this inhibition is used to detect that molecule, then that molecule IS the target_analyte (e.g., ascorbic acid inhibiting oxidase-like activity → AA is the analyte).
 
 Text:
 {text}
@@ -264,6 +278,42 @@ APPLICATION_FEW_SHOT_EXAMPLES = [
                     "sample_type": None
                 }
             ]
+        }
+    },
+    {
+        "input": "In this study, crystal violet cation (CV+) is used as a probe to evaluate the SERS sensitivity of the MnCo2O4 and R-MnCo2O4 nanotubes. Then 5 μL of R-MnCo2O4 nanotubes suspension was mixed with 45 μL of CV+ solution with different concentrations from 10 to 1000 μM for 2 h to study the detection sensitivity. We have developed a simple and highly efficient SERS sensing platform based on the oxidase-like reaction to detect ascorbic acid (AA).",
+        "output": {
+            "applications": [
+                {
+                    "application_type": "sensing",
+                    "target_analyte": "ascorbic acid (AA)",
+                    "detection_limit": None,
+                    "detection_limit_unit": None,
+                    "method": "SERS",
+                    "sample_type": None
+                }
+            ]
+        }
+    },
+    {
+        "input": "The CeO2 nanozyme exhibited excellent peroxidase-like activity toward TMB oxidation. The catalytic reaction was monitored by UV-vis spectroscopy. The nanozyme was further applied for the detection of H2O2 with a linear range of 0.5-50 μM and LOD of 0.12 μM.",
+        "output": {
+            "applications": [
+                {
+                    "application_type": "sensing",
+                    "target_analyte": "H2O2",
+                    "detection_limit": 0.12,
+                    "detection_limit_unit": "μM",
+                    "method": "colorimetric",
+                    "sample_type": None
+                }
+            ]
+        }
+    },
+    {
+        "input": "Methylene blue (MB) was used as a SERS probe molecule to verify the enhancement factor of the Au@Ag nanozyme substrate. The SERS substrate showed an enhancement factor of 1.5 × 10^5.",
+        "output": {
+            "applications": []
         }
     },
 ]

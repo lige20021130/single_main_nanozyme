@@ -1296,6 +1296,18 @@ HARD RULES:
 9. For kinetics, extract BOTH Km AND Vmax if both appear. Look carefully for Vmax — it often appears near Km. If multiple substrates have Km/Vmax pairs, list each in kinetics_list.
 10. size = numeric value only (e.g. 50), size_unit = unit only (e.g. "nm"). Do NOT combine them.
 
+APPLICATION EXTRACTION — SEMANTIC ROLE DISTINCTION:
+You MUST correctly distinguish three semantic roles in nanozyme sensing applications:
+- **substrate**: molecule consumed in the catalytic reaction (TMB, ABTS, OPD, H2O2, DCFH-DA)
+- **probe molecule**: molecule used as a signal indicator to verify activity or SERS sensitivity (crystal violet/CV, methylene blue/MB, Rhodamine B, R6G). These are NOT target analytes!
+- **target_analyte**: the molecule the sensing platform is designed to DETECT (glucose, dopamine, ascorbic acid, Hg2+, cancer cells)
+
+Decision rule: "Is this molecule the REASON for building the sensing platform, or just a TOOL?"
+- REASON → target_analyte
+- TOOL (signal indicator, probe, calibration agent) → NOT target_analyte
+
+Special case — inhibition-based sensing: if a molecule INHIBITS the catalytic reaction and this inhibition enables detection of that molecule, it IS the target_analyte (e.g., ascorbic acid inhibiting oxidase-like activity → AA is the analyte).
+
 OUTPUT STRUCTURE:
 {
   "selected_nanozyme": {
@@ -1333,7 +1345,7 @@ OUTPUT STRUCTURE:
 
 KEY EXTRACTION RULES:
 - Kinetics: Extract BOTH Km AND Vmax. source="text"|"table". Look for: "Km = X mM", "Km(TMB) = X", "Vmax = X M/s", "Vmax = X mM/s", "kcat = X s⁻¹", "kcat/Km = X M⁻¹s⁻¹". Vmax often appears as: "Vmax = 30×10⁻⁸ M·s⁻¹", "Vmax = 25.7 mM·s⁻¹", "maximum velocity", "Vmax(TMB)". If multiple substrates, pick primary (TMB/H2O2).
-- Synthesis: method name + conditions (temp/time/precursors). Common: hydrothermal, solvothermal, co-precipitation, sol-gel, calcination, pyrolysis, CVD, self-assembly, carbonization, stripping.
+- Synthesis: method name + conditions (temp/time/precursors). Common: hydrothermal, solvothermal, co-precipitation, sol-gel, calcination, pyrolysis, CVD, self-assembly, carbonization, stripping, electrospinning, NaBH4 reduction.
 - pH_profile: optimal_pH = pH at maximum activity. pH_range = active range (e.g. "3-7"). Look for "optimal pH", "pH optimum", "maximum activity at pH X", "pH-dependent activity".
 - Temperature_profile: optimal_temperature = temp at maximum activity. temperature_range = active range. Look for "optimal temperature", "maximum activity at X°C".
 - Size: size = number only, size_unit = unit. crystal_structure = phase (spinel/perovskite/amorphous/graphitic). surface_area = BET value.
@@ -4692,11 +4704,8 @@ class RuleExtractor:
                     if m:
                         try:
                             raw_analyte = m.group(1).strip()
-                            from application_extractor import _PROBE_MOLECULES as _APP_PROBES, _INVALID_ANALYTE_PHRASES as _APP_INVALID
-                            t_low = raw_analyte.lower()
-                            is_probe = any(p in t_low for p in _APP_PROBES if len(p) > 2)
-                            is_invalid = t_low in _APP_INVALID
-                            if not is_probe and not is_invalid:
+                            from application_extractor import is_valid_analyte
+                            if is_valid_analyte(raw_analyte):
                                 app["analyte"] = raw_analyte
                             break
                         except (IndexError, ValueError):
@@ -4828,11 +4837,8 @@ class RuleExtractor:
                     analyte = m.group(1).strip() if m.lastindex else m.group(0).strip()
                     analyte = re.sub(r'\s+', ' ', analyte).strip()
                     if len(analyte) > 2 and analyte.lower() not in ("the", "this", "that"):
-                        from application_extractor import _PROBE_MOLECULES as _AP, _INVALID_ANALYTE_PHRASES as _AIP
-                        t_low = analyte.lower()
-                        is_probe = any(p in t_low for p in _AP if len(p) > 2)
-                        is_invalid = t_low in _AIP
-                        if not is_probe and not is_invalid:
+                        from application_extractor import is_valid_analyte
+                        if is_valid_analyte(analyte):
                             app["target_analyte"] = analyte
                     break
             for sample_kw, sample_type in sorted(self._SAMPLE_TYPE_MAP.items(), key=lambda x: -len(x[0])):
@@ -5671,9 +5677,8 @@ class SingleMainNanozymePipeline:
                     vlm_lr = sp.get("linear_range")
                     vlm_analyte = sp.get("target_analyte")
                     if vlm_analyte:
-                        from application_extractor import _PROBE_MOLECULES as _AP5, _INVALID_ANALYTE_PHRASES as _AIP5
-                        t_low = str(vlm_analyte).lower()
-                        if any(p in t_low for p in _AP5 if len(p) > 2) or t_low in _AIP5:
+                        from application_extractor import is_valid_analyte
+                        if not is_valid_analyte(str(vlm_analyte)):
                             vlm_analyte = None
                     if vlm_lod or vlm_lr:
                         apps = record.get("applications", [])
@@ -6964,15 +6969,11 @@ class SingleMainNanozymePipeline:
 
         llm_apps = llm_result.get("applications", [])
         if llm_apps and not record.get("applications"):
-            from application_extractor import _PROBE_MOLECULES, _INVALID_ANALYTE_PHRASES
+            from application_extractor import is_valid_analyte
             for app in llm_apps:
                 analyte = app.get("target_analyte", "")
-                if analyte:
-                    t = analyte.lower().strip()
-                    is_probe = any(p in t for p in _PROBE_MOLECULES if len(p) > 2)
-                    is_invalid = t in _INVALID_ANALYTE_PHRASES
-                    if is_probe or is_invalid:
-                        app["target_analyte"] = None
+                if analyte and not is_valid_analyte(analyte):
+                    app["target_analyte"] = None
             record["applications"] = llm_apps
 
         llm_ph = llm_result.get("pH_profile", {})
@@ -7401,9 +7402,8 @@ class SingleMainNanozymePipeline:
                     a["application_type"] = self._normalize_app_type(a["application_type"])
                 if a.get("target_analyte"):
                     a["target_analyte"] = self._clean_analyte_name(a["target_analyte"])
-                    from application_extractor import _PROBE_MOLECULES as _AP2, _INVALID_ANALYTE_PHRASES as _AIP2
-                    t_low = (a["target_analyte"] or "").lower()
-                    if any(p in t_low for p in _AP2 if len(p) > 2) or t_low in _AIP2:
+                    from application_extractor import is_valid_analyte
+                    if not is_valid_analyte(a["target_analyte"] or ""):
                         a["target_analyte"] = None
                 valid.append(a)
             if valid:

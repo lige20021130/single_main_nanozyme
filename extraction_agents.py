@@ -1281,11 +1281,8 @@ class ApplicationAgent:
                     if len(analyte) > 2 and analyte.lower() not in ("the", "this", "that"):
                         if analyte.lower() == "h2o2" and self._is_kinetics_context(text):
                             continue
-                        from application_extractor import _PROBE_MOLECULES as _AP4, _INVALID_ANALYTE_PHRASES as _AIP4
-                        t_low = analyte.lower()
-                        is_probe = any(p in t_low for p in _AP4 if len(p) > 2)
-                        is_invalid = t_low in _AIP4
-                        if not is_probe and not is_invalid:
+                        from application_extractor import is_valid_analyte
+                        if is_valid_analyte(analyte):
                             app["target_analyte"] = analyte
                     break
             for sample_kw, sample_type in self._SAMPLE_TYPE_MAP.items():
@@ -1986,11 +1983,8 @@ class RuleExtractorAdapter:
                         if m:
                             candidate = m.group(1).strip() if m.lastindex else m.group(0).strip()
                             if len(candidate) > 2 and candidate.lower() not in ("the", "this", "that", "it", "our", "a", "an"):
-                                from application_extractor import _PROBE_MOLECULES as _AP3, _INVALID_ANALYTE_PHRASES as _AIP3
-                                t_low = candidate.lower()
-                                is_probe = any(p in t_low for p in _AP3 if len(p) > 2)
-                                is_invalid = t_low in _AIP3
-                                if not is_probe and not is_invalid:
+                                from application_extractor import is_valid_analyte
+                                if is_valid_analyte(candidate):
                                     app["target_analyte"] = candidate
                                     logger.info(f"[SMN] Fulltext fallback: target_analyte={candidate}")
                                 break

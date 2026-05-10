@@ -39,7 +39,7 @@ VISION_PROMPT = """请分析这张来自纳米酶论文的图像。
     "particle_size": {"value": null, "unit": "nm"},
     "peak_positions": [],
     "other_values": [],
-    "sensing_performance": {{"LOD": null, "linear_range": null, "sensitivity": null}},
+    "sensing_performance": {{"LOD": null, "linear_range": null, "sensitivity": null, "target_analyte": null}},
     "application_hints": []
   },
   "observations": [],
@@ -61,6 +61,8 @@ VISION_PROMPT = """请分析这张来自纳米酶论文的图像。
   null
 
 - application_hints: if the figure or caption suggests an application scenario (e.g., glucose sensing, tumor therapy, pollutant degradation), list the application type keywords. Allowed values: {application_type_enum}
+
+- sensing_performance.target_analyte: the molecule being DETECTED by the sensing platform (e.g., glucose, ascorbic acid, Hg2+). Do NOT put probe molecules (crystal violet, methylene blue, R6G) or substrates (TMB, ABTS) here. A probe molecule is a TOOL used to verify SERS sensitivity; a target_analyte is the REASON for building the sensing platform.
 
 - 只有当图中数值明确可读时，才填写 Km / Vmax / particle_size
 - 如果 caption 提供了高质量上下文，可以用于辅助理解图像类型
@@ -99,7 +101,7 @@ TABLE_VLM_PROMPT = """请分析这张来自纳米酶论文的表格截图。
     "particle_size": {"value": null, "unit": "nm"},
     "peak_positions": [],
     "other_values": [],
-    "sensing_performance": {"LOD": null, "linear_range": null, "sensitivity": null},
+    "sensing_performance": {"LOD": null, "linear_range": null, "sensitivity": null, "target_analyte": null},
     "application_hints": []
   },
   "observations": [],
