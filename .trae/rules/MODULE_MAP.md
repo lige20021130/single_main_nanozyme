@@ -23,6 +23,7 @@ PDF输入 → 预处理 → 规则/LLM/VLM多源提取 → 交叉验证 → 一�
 | 模块文件 | 核心类/函数 | 职责 | 关键依赖 |
 |----------|-----------|------|---------|
 | `extraction_agents.py` | `KineticsAgent`, `MorphologyAgent`, `SynthesisAgent`, `ApplicationAgent`, `RuleExtractorAdapter` | 4个专业提取Agent + 适配器，替代原始RuleExtractor | single_main_nanozyme_extractor(正则模式), numeric_validator |
+| `material_identifier.py` | `MaterialIdentifier`, `PROBE_MOLECULES` | LLM-First材料识别器，识别主纳米酶和关联体系，探针分子黑名单 | api_client |
 | `llm_extractor.py` | `LLMExtractor`, `TableExtractor`, `JSONFixer` | LLM文本提取（全文+表格），JSON修复 | api_client |
 | `llm_structured_extractor.py` | `LLMStructuredExtractor` | LLM结构化提取核心模块（LLM-First模式），分任务提取（动力学/形态/应用/酶类型），self-augmentation两步提取，Vmax自动单位转换，Km量级校验 | extraction_prompts, schema_constraints, api_client |
 | `extraction_prompts.py` | `build_kinetics_prompt()`, `build_morphology_prompt()`, `build_application_prompt()`, `build_enzyme_type_prompt()`, `build_self_augmentation_prompt()` | LLM提取prompt模板库，包含few-shot examples和纳米酶领域知识 | schema_constraints |

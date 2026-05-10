@@ -214,6 +214,9 @@ _NON_MATERIAL_PHRASES = frozenset({
     "bare", "pristine", "pure",
     "free enzyme", "natural enzyme", "native enzyme",
     "commercial enzyme", "free HRP",
+    "abstract", "introduction", "results", "discussion",
+    "conclusion", "methods", "experimental", "supplementary",
+    "supporting information", "references", "acknowledgments",
 })
 
 _RATIO_PATTERN = re.compile(r'^[A-Za-z]/[A-Za-z]', re.I)
@@ -2485,6 +2488,12 @@ class NanozymeScorer:
             score += self._score_data_richness(cand, doc)
             score += self._score_narrative_importance(cand, title, abstract_text)
 
+            if cand.get("llm_identified"):
+                score += 25
+                logger.debug(f"[SMN] LLM-identified bonus +25 for '{cand['name']}'")
+            if cand.get("llm_related"):
+                score += 5
+
             cand["score"] = score
 
         scored = sorted(candidates, key=lambda x: x["score"], reverse=True)
@@ -2999,32 +3008,49 @@ class TableProcessor:
             )
             if not is_target:
                 continue
+            material_variant = None
+            if "material" in col_map and col_map["material"] < len(row):
+                mat_cell = str(row[col_map["material"]]).strip()
+                if mat_cell and mat_cell.lower() != "material":
+                    material_variant = mat_cell
             if "Km" in col_map and col_map["Km"] < len(row):
                 km_val = row[col_map["Km"]]
                 km_unit = row[col_map["Km_unit"]] if "Km_unit" in col_map and col_map["Km_unit"] < len(row) else None
                 if km_val is not None and str(km_val).strip():
                     sub = row[col_map["substrate"]] if "substrate" in col_map and col_map["substrate"] < len(row) else None
-                    values.append({"parameter": "Km", "value": str(km_val).strip(),
+                    entry = {"parameter": "Km", "value": str(km_val).strip(),
                                    "unit": str(km_unit).strip() if km_unit else None,
                                    "substrate": str(sub).strip() if sub else None,
-                                   "source": "table_structured"})
+                                   "source": "table_structured"}
+                    if material_variant:
+                        entry["material_variant"] = material_variant
+                    values.append(entry)
             if "Vmax" in col_map and col_map["Vmax"] < len(row):
                 vmax_val = row[col_map["Vmax"]]
                 vmax_unit = row[col_map["Vmax_unit"]] if "Vmax_unit" in col_map and col_map["Vmax_unit"] < len(row) else None
                 if vmax_val is not None and str(vmax_val).strip():
-                    values.append({"parameter": "Vmax", "value": str(vmax_val).strip(),
+                    entry = {"parameter": "Vmax", "value": str(vmax_val).strip(),
                                    "unit": str(vmax_unit).strip() if vmax_unit else None,
-                                   "substrate": None, "source": "table_structured"})
+                                   "substrate": None, "source": "table_structured"}
+                    if material_variant:
+                        entry["material_variant"] = material_variant
+                    values.append(entry)
             if "kcat" in col_map and col_map["kcat"] < len(row):
                 kcat_val = row[col_map["kcat"]]
                 if kcat_val is not None and str(kcat_val).strip():
-                    values.append({"parameter": "kcat", "value": str(kcat_val).strip(),
-                                   "unit": "s⁻¹", "substrate": None, "source": "table_structured"})
+                    entry = {"parameter": "kcat", "value": str(kcat_val).strip(),
+                                   "unit": "s⁻¹", "substrate": None, "source": "table_structured"}
+                    if material_variant:
+                        entry["material_variant"] = material_variant
+                    values.append(entry)
             if "kcat_Km" in col_map and col_map["kcat_Km"] < len(row):
                 kcat_km_val = row[col_map["kcat_Km"]]
                 if kcat_km_val is not None and str(kcat_km_val).strip():
-                    values.append({"parameter": "kcat_Km", "value": str(kcat_km_val).strip(),
-                                   "unit": "M⁻¹s⁻¹", "substrate": None, "source": "table_structured"})
+                    entry = {"parameter": "kcat_Km", "value": str(kcat_km_val).strip(),
+                                   "unit": "M⁻¹s⁻¹", "substrate": None, "source": "table_structured"}
+                    if material_variant:
+                        entry["material_variant"] = material_variant
+                    values.append(entry)
         return values
 
     def get_kinetics_values(self, classified: Dict[str, Any], selected_name: str) -> List[Dict]:
@@ -5060,6 +5086,11 @@ class SingleMainNanozymePipeline:
             from llm_structured_extractor import LLMStructuredExtractor
             self.llm_structured = LLMStructuredExtractor(client, self.config)
             logger.info("[SMN] LLMStructuredExtractor loaded (LLM-First mode)")
+        self.material_identifier = None
+        if client and self.config.enable_llm and is_available("material_identifier"):
+            from material_identifier import MaterialIdentifier
+            self.material_identifier = MaterialIdentifier(client, self.config)
+            logger.info("[SMN] MaterialIdentifier loaded (LLM-First material identification)")
         self.num_val = NumericValidator()
         if is_available("diagnostics_builder"):
             from diagnostics_builder import DiagnosticsBuilder as FullDiagnosticsBuilder
@@ -5871,9 +5902,29 @@ class SingleMainNanozymePipeline:
                      f"year={record['paper'].get('year')}, doi={record['paper'].get('doi')}")
 
         candidates = self.recaller.recall(doc)
-        logger.info(f"[SMN] Candidates: {len(candidates)}")
+        logger.info(f"[SMN] Candidates (rule-based): {len(candidates)}")
         for c in candidates[:3]:
             logger.info(f"[SMN]   {c['name']} (sources={c.get('sources',set())})")
+
+        llm_material_result = {}
+        if self.material_identifier:
+            try:
+                title = doc.metadata.get("title", "")
+                abstract_chunks = [c for c in doc.chunks[:5] if "abstract" in c.lower()[:200]]
+                first_chunks = doc.chunks[:5]
+                llm_material_result = await self.material_identifier.identify(
+                    title=title,
+                    abstract_chunks=abstract_chunks,
+                    first_chunks=first_chunks,
+                )
+                if llm_material_result:
+                    candidates = self.material_identifier.enhance_candidates(
+                        candidates, llm_material_result, doc
+                    )
+                    logger.info(f"[SMN] LLM material identification: primary={llm_material_result.get('primary_nanozyme')}, "
+                                f"related={[r['name'] for r in llm_material_result.get('related_systems', [])]}")
+            except Exception as e:
+                logger.warning(f"[SMN] MaterialIdentifier failed, using rule-based candidates only: {e}")
 
         if not candidates:
             warnings.append("no_candidates_found")
@@ -5911,6 +5962,12 @@ class SingleMainNanozymePipeline:
                 self._agentic_guard = None
 
         record["selected_nanozyme"]["name"] = selected_name
+        if llm_material_result:
+            record["selected_nanozyme"]["llm_identified"] = True
+            record["selected_nanozyme"]["llm_confidence"] = llm_material_result.get("confidence", 0.0)
+            related = llm_material_result.get("related_systems", [])
+            if related:
+                record["selected_nanozyme"]["related_systems"] = related
 
         buckets = self.bucket_builder.build(doc, selected_name, all_candidate_names)
         logger.info(f"[SMN] Buckets: " + ", ".join(f"{k}={len(v)}" for k, v in buckets.items()))

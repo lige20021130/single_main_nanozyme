@@ -110,6 +110,35 @@ _KNOWN_ANALYTES = {
     "cr(vi)", "cr6+", "mn2+", "zn2+", "ag+", "al3+",
 }
 
+_PROBE_MOLECULES = {
+    "crystal violet", "cv+", "cv",
+    "methylene blue", "mb",
+    "rhodamine b", "rhb",
+    "rhodamine 6g", "r6g",
+    "4-nitrophenol", "4-np",
+    "congo red",
+    "methyl orange",
+    "methyl red",
+    "eosin y",
+    "fluorescein",
+    "janus green b",
+    "nile blue",
+    "nile red",
+    "acridine orange",
+    "proflavine",
+    "safranin",
+    "neutral red",
+}
+
+_INVALID_ANALYTE_PHRASES = {
+    "catalytic reactions",
+    "catalytic reaction",
+    "enzyme activity",
+    "nanozyme activity",
+    "oxidase activity",
+    "peroxidase activity",
+}
+
 
 def classify_application_type(desc: str, app_type_raw: str = "") -> str:
     combined = (desc + " " + app_type_raw).lower()
@@ -210,6 +239,9 @@ class ApplicationExtractor:
         if not target_analyte:
             target_analyte = self._infer_analyte_from_desc(desc)
 
+        if target_analyte:
+            target_analyte = self._filter_analyte(target_analyte)
+
         substrates = raw.get("substrates", [])
         if isinstance(substrates, str):
             substrates = [s.strip() for s in substrates.split(",") if s.strip()]
@@ -266,6 +298,18 @@ class ApplicationExtractor:
         if detect_match:
             return detect_match.group(1).strip()
         return ""
+
+    def _filter_analyte(self, analyte: str) -> str:
+        if not analyte:
+            return ""
+        t = analyte.lower().strip()
+        if t in _PROBE_MOLECULES:
+            logger.info(f"[AppExtractor] Filtered out probe molecule as analyte: {analyte}")
+            return ""
+        if t in _INVALID_ANALYTE_PHRASES:
+            logger.info(f"[AppExtractor] Filtered out invalid analyte phrase: {analyte}")
+            return ""
+        return analyte
 
     def _extract_from_tables(
         self,

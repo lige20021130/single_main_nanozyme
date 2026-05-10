@@ -40,8 +40,13 @@ Focus on:
 - kcat (turnover number) with unit — if reported
 - kcat/Km (catalytic efficiency) with unit — if reported
 - Substrate name for each kinetic parameter
+- Material variant name — if the paper compares multiple related materials (e.g., R-MnCo2O4 vs MnCo2O4), specify which material each kinetics entry belongs to
 
-IMPORTANT: If the paper tests multiple substrates (e.g., TMB AND H2O2), you MUST extract kinetics for EACH substrate into kinetics_list.
+IMPORTANT RULES:
+1. If the paper tests multiple substrates (e.g., TMB AND H2O2), you MUST extract kinetics for EACH substrate into kinetics_list
+2. If the paper compares multiple related material variants (e.g., pristine vs reduced, doped vs undoped), you MUST include "material_variant" for EACH kinetics entry to indicate which material it belongs to
+3. If the paper uses different detection methods for the same material (e.g., SERS vs UV-vis), include "detection_method" for each entry
+4. Do NOT merge kinetics data from different materials — each material variant gets its own entry in kinetics_list
 
 Text:
 {text}
@@ -69,7 +74,9 @@ Respond in JSON format:
       "kcat_unit": "<unit or null>",
       "kcat_Km": <number or null>,
       "kcat_Km_unit": "<unit or null>",
-      "substrate": "<substrate name>"
+      "substrate": "<substrate name>",
+      "material_variant": "<material name if multiple variants exist, otherwise null>",
+      "detection_method": "<method name if multiple methods exist, otherwise null>"
     }}
   ]
 }}"""
@@ -86,8 +93,8 @@ KINETICS_FEW_SHOT_EXAMPLES = [
                 "substrate": "TMB"
             },
             "kinetics_list": [
-                {"Km": 0.35, "Km_unit": "mM", "Vmax": 44.1, "Vmax_unit": "μM/s", "kcat": None, "kcat_unit": None, "kcat_Km": None, "kcat_Km_unit": None, "substrate": "TMB"},
-                {"Km": 0.89, "Km_unit": "mM", "Vmax": 0.079, "Vmax_unit": "μM/s", "kcat": None, "kcat_unit": None, "kcat_Km": None, "kcat_Km_unit": None, "substrate": "H2O2"}
+                {"Km": 0.35, "Km_unit": "mM", "Vmax": 44.1, "Vmax_unit": "μM/s", "kcat": None, "kcat_unit": None, "kcat_Km": None, "kcat_Km_unit": None, "substrate": "TMB", "material_variant": None, "detection_method": None},
+                {"Km": 0.89, "Km_unit": "mM", "Vmax": 0.079, "Vmax_unit": "μM/s", "kcat": None, "kcat_unit": None, "kcat_Km": None, "kcat_Km_unit": None, "substrate": "H2O2", "material_variant": None, "detection_method": None}
             ]
         }
     },
@@ -102,7 +109,7 @@ KINETICS_FEW_SHOT_EXAMPLES = [
                 "substrate": "TMB"
             },
             "kinetics_list": [
-                {"Km": 18.1, "Km_unit": "mM", "Vmax": 0.0832, "Vmax_unit": "μM/s", "kcat": None, "kcat_unit": None, "kcat_Km": None, "kcat_Km_unit": None, "substrate": "TMB"}
+                {"Km": 18.1, "Km_unit": "mM", "Vmax": 0.0832, "Vmax_unit": "μM/s", "kcat": None, "kcat_unit": None, "kcat_Km": None, "kcat_Km_unit": None, "substrate": "TMB", "material_variant": None, "detection_method": None}
             ]
         }
     },
@@ -117,7 +124,25 @@ KINETICS_FEW_SHOT_EXAMPLES = [
                 "substrate": "TMB"
             },
             "kinetics_list": [
-                {"Km": 0.3496, "Km_unit": "mM", "Vmax": None, "Vmax_unit": None, "kcat": 85200.0, "kcat_unit": "s⁻¹", "kcat_Km": 250000.0, "kcat_Km_unit": "M⁻¹s⁻¹", "substrate": "TMB"}
+                {"Km": 0.3496, "Km_unit": "mM", "Vmax": None, "Vmax_unit": None, "kcat": 85200.0, "kcat_unit": "s⁻¹", "kcat_Km": 250000.0, "kcat_Km_unit": "M⁻¹s⁻¹", "substrate": "TMB", "material_variant": None, "detection_method": None}
+            ]
+        }
+    },
+    {
+        "input": "The kinetic parameters of R-MnCo2O4 and MnCo2O4 nanotubes were determined. For R-MnCo2O4, the Km was 0.018 mM and Vmax was 1.2 × 10⁻⁷ M/s by SERS method, while by UV-vis method the Km was 0.14 mM and Vmax was 1.4 × 10⁻⁷ M/s. For MnCo2O4, the Km was 0.05 mM and Vmax was 1.7 × 10⁻⁷ M/s by SERS method, and by UV-vis method the Km was 0.33 mM and Vmax was 3.3 × 10⁻⁷ M/s.",
+        "output": {
+            "kinetics": {
+                "Km": 0.018, "Km_unit": "mM",
+                "Vmax": 0.12, "Vmax_unit": "μM/s",
+                "kcat": None, "kcat_unit": None,
+                "kcat_Km": None, "kcat_Km_unit": None,
+                "substrate": "TMB"
+            },
+            "kinetics_list": [
+                {"Km": 0.018, "Km_unit": "mM", "Vmax": 0.12, "Vmax_unit": "μM/s", "kcat": None, "kcat_unit": None, "kcat_Km": None, "kcat_Km_unit": None, "substrate": "TMB", "material_variant": "R-MnCo2O4", "detection_method": "SERS"},
+                {"Km": 0.14, "Km_unit": "mM", "Vmax": 0.14, "Vmax_unit": "μM/s", "kcat": None, "kcat_unit": None, "kcat_Km": None, "kcat_Km_unit": None, "substrate": "TMB", "material_variant": "R-MnCo2O4", "detection_method": "UV-vis"},
+                {"Km": 0.05, "Km_unit": "mM", "Vmax": 0.17, "Vmax_unit": "μM/s", "kcat": None, "kcat_unit": None, "kcat_Km": None, "kcat_Km_unit": None, "substrate": "TMB", "material_variant": "MnCo2O4", "detection_method": "SERS"},
+                {"Km": 0.33, "Km_unit": "mM", "Vmax": 0.33, "Vmax_unit": "μM/s", "kcat": None, "kcat_unit": None, "kcat_Km": None, "kcat_Km_unit": None, "substrate": "TMB", "material_variant": "MnCo2O4", "detection_method": "UV-vis"}
             ]
         }
     },
@@ -177,15 +202,21 @@ APPLICATION_EXTRACTION_PROMPT = """Extract application information of the nanozy
 
 Focus on:
 - Application type: {app_types}
-- Target analyte: what is being detected/quantified (e.g., glucose, Hg2+, dopamine)
+- Target analyte: what is being detected/quantified (e.g., glucose, Hg2+, dopamine, ascorbic acid)
 - Detection limit (LOD) with unit (e.g., 0.15 μM)
-- Detection method (e.g., colorimetric, fluorescent, electrochemical)
+- Detection method (e.g., colorimetric, fluorescent, electrochemical, SERS)
 - Sample type (e.g., serum, water, cell, tissue)
 
-IMPORTANT DISTINCTIONS:
-- substrate (in kinetics) = molecule consumed in catalytic reaction (TMB, H2O2, ABTS)
-- target_analyte (in applications) = molecule being detected/quantified (glucose, dopamine, Hg2+)
-- These are DIFFERENT — do NOT put target_analyte into substrates
+CRITICAL SEMANTIC DISTINCTIONS — you MUST understand these roles:
+1. **substrate** (in kinetics) = molecule consumed in the catalytic reaction (e.g., TMB, ABTS, OPD, H2O2, DCFH-DA)
+2. **probe molecule** = molecule used to visualize/verify the catalytic activity (e.g., crystal violet/CV for SERS, methylene blue, Rhodamine B). These are NOT target analytes!
+3. **target_analyte** (in applications) = the molecule being detected/quantified through the nanozyme's catalytic reaction (e.g., glucose, dopamine, ascorbic acid, Hg2+, cancer cells)
+
+KEY RULES:
+- Do NOT confuse probe molecules with target analytes. Crystal violet is a SERS probe, NOT an analyte.
+- The target_analyte is what the sensing platform is designed to DETECT, not what it uses as a signal indicator.
+- If the paper says "detect X using Y reaction monitored by Z technique", then X is the target_analyte, Y is the substrate, Z is the detection method.
+- "catalytic reactions" is NOT a valid target_analyte — it must be a specific molecule or species.
 
 Text:
 {text}

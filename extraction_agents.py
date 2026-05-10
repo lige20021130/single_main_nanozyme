@@ -1051,10 +1051,18 @@ class MorphologyAgent:
             if elem.lower() in name_lower:
                 found_elements.add(elem)
 
-        combined = " ".join(texts[:20])
-        for elem in self._METAL_ELEMENTS:
-            if re.search(r'\b' + re.escape(elem) + r'\b', combined):
-                found_elements.add(elem)
+        if not found_elements:
+            material_texts = []
+            for t in texts[:10]:
+                t_lower = t.lower()
+                if name_lower and name_lower in t_lower:
+                    material_texts.append(t)
+            if not material_texts:
+                material_texts = texts[:5]
+            combined = " ".join(material_texts)
+            for elem in self._METAL_ELEMENTS:
+                if re.search(r'\b' + re.escape(elem) + r'\b', combined):
+                    found_elements.add(elem)
 
         if found_elements:
             sel["metal_elements"] = sorted(list(found_elements))
