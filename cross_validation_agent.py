@@ -296,9 +296,14 @@ class CrossValidationAgent:
 
             llm_apps = llm_result.get("applications", [])
             if isinstance(llm_apps, list):
+                from application_extractor import _PROBE_MOLECULES as _CVA_PROBES, _INVALID_ANALYTE_PHRASES as _CVA_INVALID
                 for llm_app in llm_apps:
                     if not isinstance(llm_app, dict):
                         continue
+                    if llm_app.get("target_analyte"):
+                        t_low = (llm_app["target_analyte"] or "").lower()
+                        if any(p in t_low for p in _CVA_PROBES if len(p) > 2) or t_low in _CVA_INVALID:
+                            llm_app["target_analyte"] = None
                     existing = record.get("applications", [])
                     is_dup = False
                     for ex in existing:
@@ -387,6 +392,11 @@ class CrossValidationAgent:
         lr = sensing.get("linear_range")
         analyte = sensing.get("target_analyte")
         method = sensing.get("method")
+        if analyte:
+            from application_extractor import _PROBE_MOLECULES as _CVA2_PROBES, _INVALID_ANALYTE_PHRASES as _CVA2_INVALID
+            t_low = str(analyte).lower()
+            if any(p in t_low for p in _CVA2_PROBES if len(p) > 2) or t_low in _CVA2_INVALID:
+                analyte = None
         if not lod and not lr and not analyte:
             return
         matched = False

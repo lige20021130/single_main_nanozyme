@@ -4691,7 +4691,13 @@ class RuleExtractor:
                     m = pat.search(all_text)
                     if m:
                         try:
-                            app["analyte"] = m.group(1).strip()
+                            raw_analyte = m.group(1).strip()
+                            from application_extractor import _PROBE_MOLECULES as _APP_PROBES, _INVALID_ANALYTE_PHRASES as _APP_INVALID
+                            t_low = raw_analyte.lower()
+                            is_probe = any(p in t_low for p in _APP_PROBES if len(p) > 2)
+                            is_invalid = t_low in _APP_INVALID
+                            if not is_probe and not is_invalid:
+                                app["analyte"] = raw_analyte
                             break
                         except (IndexError, ValueError):
                             pass
@@ -4822,7 +4828,12 @@ class RuleExtractor:
                     analyte = m.group(1).strip() if m.lastindex else m.group(0).strip()
                     analyte = re.sub(r'\s+', ' ', analyte).strip()
                     if len(analyte) > 2 and analyte.lower() not in ("the", "this", "that"):
-                        app["target_analyte"] = analyte
+                        from application_extractor import _PROBE_MOLECULES as _AP, _INVALID_ANALYTE_PHRASES as _AIP
+                        t_low = analyte.lower()
+                        is_probe = any(p in t_low for p in _AP if len(p) > 2)
+                        is_invalid = t_low in _AIP
+                        if not is_probe and not is_invalid:
+                            app["target_analyte"] = analyte
                     break
             for sample_kw, sample_type in sorted(self._SAMPLE_TYPE_MAP.items(), key=lambda x: -len(x[0])):
                 if sample_kw in text_lower:
@@ -5659,6 +5670,11 @@ class SingleMainNanozymePipeline:
                     vlm_lod = sp.get("LOD")
                     vlm_lr = sp.get("linear_range")
                     vlm_analyte = sp.get("target_analyte")
+                    if vlm_analyte:
+                        from application_extractor import _PROBE_MOLECULES as _AP5, _INVALID_ANALYTE_PHRASES as _AIP5
+                        t_low = str(vlm_analyte).lower()
+                        if any(p in t_low for p in _AP5 if len(p) > 2) or t_low in _AIP5:
+                            vlm_analyte = None
                     if vlm_lod or vlm_lr:
                         apps = record.get("applications", [])
                         matched_app = None
@@ -6948,6 +6964,15 @@ class SingleMainNanozymePipeline:
 
         llm_apps = llm_result.get("applications", [])
         if llm_apps and not record.get("applications"):
+            from application_extractor import _PROBE_MOLECULES, _INVALID_ANALYTE_PHRASES
+            for app in llm_apps:
+                analyte = app.get("target_analyte", "")
+                if analyte:
+                    t = analyte.lower().strip()
+                    is_probe = any(p in t for p in _PROBE_MOLECULES if len(p) > 2)
+                    is_invalid = t in _INVALID_ANALYTE_PHRASES
+                    if is_probe or is_invalid:
+                        app["target_analyte"] = None
             record["applications"] = llm_apps
 
         llm_ph = llm_result.get("pH_profile", {})
@@ -7376,6 +7401,10 @@ class SingleMainNanozymePipeline:
                     a["application_type"] = self._normalize_app_type(a["application_type"])
                 if a.get("target_analyte"):
                     a["target_analyte"] = self._clean_analyte_name(a["target_analyte"])
+                    from application_extractor import _PROBE_MOLECULES as _AP2, _INVALID_ANALYTE_PHRASES as _AIP2
+                    t_low = (a["target_analyte"] or "").lower()
+                    if any(p in t_low for p in _AP2 if len(p) > 2) or t_low in _AIP2:
+                        a["target_analyte"] = None
                 valid.append(a)
             if valid:
                 existing_apps = record.get("applications", [])

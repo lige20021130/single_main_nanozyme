@@ -134,16 +134,13 @@ class MaterialIdentifier:
 
     async def _call_llm(self, messages: List[Dict[str, str]]) -> Optional[str]:
         try:
-            response = await self.client.chat(
+            result = await self.client.chat_completion_text(
                 messages=messages,
-                model=self.model,
                 temperature=self.temperature,
                 max_tokens=self.max_tokens,
             )
-            if response and isinstance(response, dict):
-                choices = response.get("choices", [])
-                if choices:
-                    return choices[0].get("message", {}).get("content", "")
+            if result and isinstance(result, str):
+                return result.strip()
             return None
         except Exception as e:
             logger.warning(f"[MaterialIdentifier] LLM call failed: {e}")

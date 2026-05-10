@@ -303,7 +303,7 @@ class ApplicationExtractor:
         if not analyte:
             return ""
         t = analyte.lower().strip()
-        if t in _PROBE_MOLECULES:
+        if any(p in t for p in _PROBE_MOLECULES if len(p) > 2):
             logger.info(f"[AppExtractor] Filtered out probe molecule as analyte: {analyte}")
             return ""
         if t in _INVALID_ANALYTE_PHRASES:
