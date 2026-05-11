@@ -1076,7 +1076,7 @@ _SYNTHESIS_METHODS = {
     "immobilization": re.compile(r'\bimmobiliz', re.I),
     "encapsulation": re.compile(r'\bencapsulat', re.I),
     "deposition": re.compile(r'\bdeposit', re.I),
-    "reduction": re.compile(r'\breduc(?:ed|tion)\s+(?:by|with|using|via|through)\b', re.I),
+    "reduction": re.compile(r'\breduc(?:ed|tion)\s+(?:by|with|using|via|through)\b|\bNaBH4\s+reduc|\bchemical\s+reduc|\bsurface\s+reduc', re.I),
     "freeze_drying": re.compile(r'\bfreeze[-\s]?dry', re.I),
     "ball_milling": re.compile(r'\bball[-\s]?mill', re.I),
     "3d_printing": re.compile(r'\b3D\s+print', re.I),

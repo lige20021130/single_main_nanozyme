@@ -934,6 +934,10 @@ class NanozymePreprocessor:
         (r'[×x*]\s*10[_\s^-]*\d+|\b\d+e[+-]?\d+\b', 'scientific_notation'),
         (r'(?i)\bdetect\s+\w+', 'target_analyte_detection'),
         (r'(?i)\b(?:LOD|detection\s+limit|limit\s+of\s+detection)\b.{0,30}\b(?:μM|nM|pM|mM|ng/mL|μg/mL|pg/mL|ppb|ppm)\b', 'LOD_with_unit'),
+        (r'(?i)\b(?:synthesized|prepared|fabricated)\s+(?:using|by|via|through|with)\b', 'synthesis_method'),
+        (r'(?i)\b(?:electrospinning|calcination|calcined|hydrothermal|solvothermal|co-precipitation|sol-gel|annealing)\b', 'synthesis_technique'),
+        (r'(?i)\bNaBH4\b|\bsodium\s+borohydride\b', 'reducing_agent'),
+        (r'(?i)\b(?:XRD|XPS|EDX|EDS|TEM|HRTEM|SEM|FTIR|BET|Raman|SAED|HAADF|XAFS|EPR|AFM|ICP|TGA|UV-vis|PL|DLS)\b', 'characterization_technique'),
     ]
 
     _HARD_RECALL_TABLE_FIGURE_PATTERN = (

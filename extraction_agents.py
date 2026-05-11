@@ -1074,17 +1074,17 @@ class MorphologyAgent:
         sel = record.get("selected_nanozyme", {})
         if not isinstance(sel, dict):
             return
-        if sel.get("characterization") and len(sel["characterization"]) > 0:
-            return
 
+        existing = set(sel.get("characterization") or [])
         found_techniques = set()
         combined = " ".join(texts[:20])
         for tech_name, pattern in self._CHARACTERIZATION_TECHNIQUES.items():
             if pattern.search(combined):
                 found_techniques.add(tech_name)
 
-        if found_techniques:
-            sel["characterization"] = sorted(list(found_techniques))
+        merged = existing | found_techniques
+        if merged:
+            sel["characterization"] = sorted(list(merged))
 
 
 class SynthesisAgent:
@@ -1097,7 +1097,8 @@ class SynthesisAgent:
         sel = record.get("selected_nanozyme", {})
         if not isinstance(sel, dict):
             return
-        if sel.get("synthesis_method") is None:
+        current_method = sel.get("synthesis_method")
+        if current_method is None or current_method in ("general synthesis", "general_synthesis"):
             method_scores = {}
             for text in synthesis_texts:
                 for method_name, pattern in _SYNTHESIS_METHODS.items():
@@ -1108,10 +1109,14 @@ class SynthesisAgent:
             if method_scores:
                 non_generic = {k: v for k, v in method_scores.items() if k != "general_synthesis"}
                 if non_generic:
-                    best_method = max(non_generic, key=non_generic.get)
+                    sorted_methods = sorted(non_generic.keys(), key=lambda k: non_generic[k], reverse=True)
+                    if len(sorted_methods) > 1:
+                        sel["synthesis_method"] = " + ".join(m.replace("_", " ") for m in sorted_methods[:3])
+                    else:
+                        sel["synthesis_method"] = sorted_methods[0].replace("_", " ")
                 else:
                     best_method = max(method_scores, key=method_scores.get)
-                sel["synthesis_method"] = best_method.replace("_", " ")
+                    sel["synthesis_method"] = best_method.replace("_", " ")
 
         synth_cond = sel.get("synthesis_conditions", {})
         if not isinstance(synth_cond, dict):
@@ -1769,16 +1774,25 @@ class RuleExtractorAdapter:
 
 
 
-        if sel.get("synthesis_method") is None:
+        current_method = sel.get("synthesis_method")
+        if current_method is None or current_method in ("general synthesis", "general_synthesis"):
             method_scores = {}
             for method_name, pattern in _SYNTHESIS_METHODS.items():
                 if pattern.search(all_text):
                     method_scores[method_name] = method_scores.get(method_name, 0) + 1
             if method_scores:
-                best = max(method_scores, key=method_scores.get)
-                if best != "general_synthesis" or len(method_scores) == 1:
-                    sel["synthesis_method"] = best.replace("_", " ")
-                    logger.info(f"[SMN] Fulltext fallback: synthesis_method={best}")
+                non_generic = {k: v for k, v in method_scores.items() if k != "general_synthesis"}
+                if non_generic:
+                    sorted_methods = sorted(non_generic.keys(), key=lambda k: non_generic[k], reverse=True)
+                    if len(sorted_methods) > 1:
+                        sel["synthesis_method"] = " + ".join(m.replace("_", " ") for m in sorted_methods[:3])
+                    else:
+                        sel["synthesis_method"] = sorted_methods[0].replace("_", " ")
+                    logger.info(f"[SMN] Fulltext fallback: synthesis_method={sel['synthesis_method']}")
+                elif current_method is None:
+                    sel["synthesis_method"] = "general synthesis"
+                    logger.info("[SMN] Fulltext fallback: synthesis_method=general_synthesis (only match)")
+
 
         if sel.get("size") is None:
             for pat in _SIZE_PATTERNS:
@@ -1809,14 +1823,30 @@ class RuleExtractorAdapter:
                 sel["morphology"] = ", ".join(found_terms[:3])
                 logger.info(f"[SMN] Fulltext fallback: morphology={sel['morphology']}")
 
-        if sel.get("crystal_structure") is None:
+        existing_char = set(sel.get("characterization") or [])
+        if True:
+            found_techniques = set()
+            for tech_name, pattern in self.morphology_agent._CHARACTERIZATION_TECHNIQUES.items():
+                if pattern.search(all_text):
+                    found_techniques.add(tech_name)
+            merged = existing_char | found_techniques
+            if merged and len(merged) > len(existing_char):
+                sel["characterization"] = sorted(list(merged))
+                new_ones = found_techniques - existing_char
+                if new_ones:
+                    logger.info(f"[SMN] Fulltext fallback: characterization added {sorted(new_ones)}")
+
+        existing_crystal = sel.get("crystal_structure")
+        if existing_crystal is None or existing_crystal in ("crystalline", "amorphous"):
+            best_crystal = None
             for pat in _CRYSTAL_STRUCTURE_PATTERNS:
                 m = pat.search(all_text)
                 if m:
                     groups = m.groups()
                     all_digits = [g for g in groups if g and re.match(r'^\d{3}$', g)]
                     if all_digits:
-                        sel["crystal_structure"] = ", ".join(f"({p})" for p in all_digits)
+                        best_crystal = ", ".join(f"({p})" for p in all_digits)
+                        break
                     elif m.lastindex and m.group(1):
                         raw = m.group(1).strip()
                         if re.match(r'^[\d\s,.\u00c5]+$', raw):
@@ -1824,9 +1854,11 @@ class RuleExtractorAdapter:
                         elif re.match(r'^[\d\s,]+$', raw):
                             planes = re.findall(r'\d{3}', raw)
                             if planes:
-                                sel["crystal_structure"] = ", ".join(f"({p})" for p in planes)
+                                best_crystal = ", ".join(f"({p})" for p in planes)
+                                break
                         else:
-                            sel["crystal_structure"] = raw.lower()
+                            if best_crystal is None:
+                                best_crystal = raw.lower()
                     else:
                         match_text = m.group(0).lower()
                         for struct_name in ("spinel", "perovskite", "fluorite", "cubic",
@@ -1837,14 +1869,17 @@ class RuleExtractorAdapter:
                                            "graphitic", "face-centered cubic",
                                            "body-centered cubic"):
                             if struct_name in match_text:
-                                sel["crystal_structure"] = struct_name
+                                if best_crystal is None or struct_name not in ("crystalline", "amorphous"):
+                                    best_crystal = struct_name
                                 break
-                        if sel.get("crystal_structure") is None:
+                        if best_crystal is None:
                             planes = re.findall(r'\((\d{3})\)', m.group(0))
                             if planes:
-                                sel["crystal_structure"] = ", ".join(f"({p})" for p in planes)
-                    logger.info(f"[SMN] Fulltext fallback: crystal_structure={sel.get('crystal_structure')}")
-                    break
+                                best_crystal = ", ".join(f"({p})" for p in planes)
+                                break
+            if best_crystal:
+                sel["crystal_structure"] = best_crystal
+                logger.info(f"[SMN] Fulltext fallback: crystal_structure={best_crystal}")
 
         act["pH_profile"] = ph_prof
         act["temperature_profile"] = temp_prof
