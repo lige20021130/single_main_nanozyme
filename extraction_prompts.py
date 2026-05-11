@@ -19,6 +19,8 @@ CRITICAL DOMAIN KNOWLEDGE:
 8. When multiple substrates are tested, extract kinetics for EACH substrate separately into kinetics_list
 9. Material names with @ or / (e.g., Fe3O4@C, Co-N-C) are composite/doped materials — these are MORE specific than simple oxide names
 10. Morphology should be specific (e.g., "uniform hollow polyhedral", "core-shell spherical"), NOT generic (e.g., "nanoparticle")
+11. When a paper compares multiple related materials (e.g., R-MnCo2O4 vs MnCo2O4), each material's kinetics MUST be in a separate kinetics_list entry with material_variant field
+12. SERS (Surface-Enhanced Raman Scattering) is a detection method, not an enzyme type. Papers using SERS to monitor nanozyme reactions still have oxidase-like/peroxidase-like etc. as the enzyme type.
 
 HARD RULES:
 1. Extract ONLY information explicitly stated in the text — do NOT guess or fabricate
@@ -27,6 +29,8 @@ HARD RULES:
 4. For multi-substrate kinetics, put the PRIMARY substrate in kinetics and ALL substrates in kinetics_list
 5. Output valid JSON only — no Markdown fences, no comments, no explanations
 6. If a value uses scientific notation (e.g., 4.41 × 10⁻⁵), convert to decimal (e.g., 4.41e-5)
+7. target_analyte in applications = the molecule being DETECTED, NOT the substrate consumed or the probe used for signal
+8. Probe molecules (crystal violet, methylene blue, R6G for SERS) are signal indicators, NOT target analytes
 """.format(
     enzyme_types=get_enzyme_type_enum_string(),
     app_types=get_application_type_enum_string(),
@@ -47,6 +51,17 @@ IMPORTANT RULES:
 2. If the paper compares multiple related material variants (e.g., pristine vs reduced, doped vs undoped), you MUST include "material_variant" for EACH kinetics entry to indicate which material it belongs to
 3. If the paper uses different detection methods for the same material (e.g., SERS vs UV-vis), include "detection_method" for each entry
 4. Do NOT merge kinetics data from different materials — each material variant gets its own entry in kinetics_list
+
+HOW TO IDENTIFY MATERIAL VARIANTS:
+- Look for prefixes like "R-" (reduced), "O-" (oxidized), "N-" (nitrogen-doped)
+- Look for suffixes like "-400" (calcination temperature), "-Air" (annealing atmosphere)
+- Look for explicit comparisons: "pristine X vs modified X", "X before/after treatment"
+- Look for figure legends or table headers that distinguish materials (e.g., "Fig.3a: R-MnCo2O4", "Fig.3b: MnCo2O4")
+- If a kinetic value is associated with a specific material name in the text, that name goes in material_variant
+
+HOW TO IDENTIFY DETECTION METHODS:
+- Look for phrases like "by SERS method", "by UV-vis spectroscopy", "determined by colorimetric assay"
+- If the same material has different Km/Vmax values obtained by different methods, create SEPARATE entries with different detection_method values
 
 Text:
 {text}
@@ -347,6 +362,9 @@ Now review your extraction against the original text and check for:
 4. Missing multi-substrate kinetics data (if the paper tests TMB AND H2O2, both should be in kinetics_list)
 5. Overly generic morphology (should be specific, e.g., "hollow polyhedral" not "nanoparticle")
 6. Substrate vs target_analyte confusion (substrates are consumed in the reaction; analytes are detected)
+7. **Application semantic role validation**: For each target_analyte in applications, ask: "Is this molecule the REASON for building the sensing platform, or just a TOOL?" Probe molecules (crystal violet, methylene blue, R6G used for SERS) and substrates (TMB, ABTS used as chromogenic agents) are NOT target analytes. The target_analyte must be what the platform DETECTS.
+8. **Inhibition-based sensing**: If a molecule inhibits the catalytic reaction and this inhibition is used to detect that molecule, it IS the target_analyte (e.g., ascorbic acid inhibiting oxidase-like activity → AA is the analyte).
+9. **Material variant attribution**: If kinetics_list contains data for multiple related materials (e.g., R-MnCo2O4 vs MnCo2O4), ensure each entry has the correct material_variant field.
 
 Original text:
 {text}

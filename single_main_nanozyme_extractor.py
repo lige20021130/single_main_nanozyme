@@ -1409,6 +1409,7 @@ class SMNConfig:
         self.llm_refinement_max_iterations = kwargs.get("llm_refinement_max_iterations", 3)
         self.enable_agentic_guard = kwargs.get("enable_agentic_guard", True)
         self.enable_llm_conflict_resolution = kwargs.get("enable_llm_conflict_resolution", True)
+        self.enable_llm_analyte_validation = kwargs.get("enable_llm_analyte_validation", True)
 
     @classmethod
     def from_dict(cls, d: Optional[Dict[str, Any]]) -> "SMNConfig":
@@ -5056,7 +5057,14 @@ class NumericValidator:
             analyte = app.get("target_analyte", "")
             if analyte and etype in self._ANALYTE_ENZYME_COMPATIBILITY:
                 compat = self._ANALYTE_ENZYME_COMPATIBILITY[etype]
-                if analyte.lower() not in {a.lower() for a in compat}:
+                compat_lower = {a.lower() for a in compat}
+                analyte_clean = re.sub(r'\s*\(.*?\)\s*', '', analyte).strip().lower()
+                analyte_matched = (
+                    analyte.lower() in compat_lower
+                    or analyte_clean in compat_lower
+                    or any(c in analyte.lower() for c in compat_lower)
+                )
+                if not analyte_matched:
                     warnings.append(
                         f"Analyte '{analyte}' may be incompatible with {etype} "
                         f"(expected: {', '.join(sorted(compat))})"
@@ -5085,6 +5093,7 @@ class SingleMainNanozymePipeline:
     def __init__(self, client=None, config: Optional[SMNConfig] = None):
         self.client = client
         self.config = config or SMNConfig()
+        self.enable_llm_analyte_validation = self.config.enable_llm_analyte_validation
         self.meta_ext = PaperMetadataExtractor()
         self.recaller = CandidateRecaller(top_k=self.config.material_candidate_top_k)
         self.scorer = NanozymeScorer()
@@ -6397,6 +6406,25 @@ class SingleMainNanozymePipeline:
                 record["diagnostics"]["warnings"] = warnings
                 logger.info(f"[SMN] ConsistencyAgent warnings: {consistency_warnings}")
 
+            if self.client and self.enable_llm_analyte_validation:
+                try:
+                    ctx_parts = []
+                    app_sentences = record.get("raw_supporting_text", {}).get("application", [])
+                    for s in app_sentences[:10]:
+                        if isinstance(s, str):
+                            ctx_parts.append(s)
+                    app_ctx = " ".join(ctx_parts)[:2000]
+                    if app_ctx:
+                        record, llm_analyte_warnings = await self.consistency_agent.validate_analytes_with_llm(
+                            record, client=self.client, context=app_ctx
+                        )
+                        if llm_analyte_warnings:
+                            warnings.extend(llm_analyte_warnings)
+                            record["diagnostics"]["warnings"] = warnings
+                            logger.info(f"[SMN] LLM analyte validation warnings: {llm_analyte_warnings}")
+                except Exception as e:
+                    logger.warning(f"[SMN] LLM analyte validation failed: {e}")
+
         record = validate_schema(record)
 
         sel_name = record.get("selected_nanozyme", {}).get("name")
@@ -6848,6 +6876,11 @@ class SingleMainNanozymePipeline:
             kin["Vmax"] = new_val
             kin["Vmax_unit"] = "μM/s"
             logger.info(f"[SMN] Final validation: Vmax auto-converted {vmax_val} M/s -> {new_val} μM/s")
+        elif isinstance(vmax_val, (int, float)) and vmax_u in ("M/s", "M s^-1", "M s-1") and abs(vmax_val) > 1e-3:
+            logger.warning(f"[SMN] Final validation: Vmax={vmax_val} M/s is unrealistically large for nanozyme, clearing.")
+            kin["Vmax"] = None
+            kin["Vmax_unit"] = None
+            kin["needs_review"] = True
         elif isinstance(vmax_val, (int, float)) and vmax_u in ("mM/s", "mM s^-1", "mM s-1") and abs(vmax_val) < 1.0:
             new_val = vmax_val * 1e3
             kin["Vmax"] = new_val

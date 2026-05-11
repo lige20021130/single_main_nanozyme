@@ -1045,17 +1045,20 @@ class MorphologyAgent:
         if sel.get("metal_elements") and len(sel["metal_elements"]) > 0:
             return
 
-        name_lower = (selected_name or "").lower()
         found_elements = set()
-        for elem in self._METAL_ELEMENTS:
-            if elem.lower() in name_lower:
-                found_elements.add(elem)
+        formula_match = re.search(r'([A-Z][a-z]?\d*(?:[A-Z][a-z]?\d*)+)', selected_name or "")
+        if formula_match:
+            formula = formula_match.group(1)
+            tokens = re.findall(r'[A-Z][a-z]?', formula)
+            for token in tokens:
+                if token in self._METAL_ELEMENTS:
+                    found_elements.add(token)
 
         if not found_elements:
             material_texts = []
             for t in texts[:10]:
                 t_lower = t.lower()
-                if name_lower and name_lower in t_lower:
+                if selected_name and selected_name.lower() in t_lower:
                     material_texts.append(t)
             if not material_texts:
                 material_texts = texts[:5]

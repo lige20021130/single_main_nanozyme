@@ -339,3 +339,20 @@ class ConsistencyAgent:
                 warnings.append(f"invalid_analyte_filtered: {analyte}")
                 app["target_analyte"] = None
         return record, warnings
+
+    async def validate_analytes_with_llm(self, record: Dict, client=None, context: str = "") -> Tuple[Dict, List[str]]:
+        record, warnings = self.validate_analytes(record)
+        if not client or not context:
+            return record, warnings
+        from application_extractor import llm_validate_analyte
+        for app in record.get("applications", []):
+            if not isinstance(app, dict):
+                continue
+            analyte = app.get("target_analyte")
+            if not analyte:
+                continue
+            is_valid = await llm_validate_analyte(str(analyte), context, client)
+            if not is_valid:
+                warnings.append(f"llm_invalid_analyte_filtered: {analyte}")
+                app["target_analyte"] = None
+        return record, warnings

@@ -634,7 +634,14 @@ class NumericValidator:
             analyte = app.get("target_analyte", "")
             if analyte and etype in self._ANALYTE_ENZYME_COMPATIBILITY:
                 compat = self._ANALYTE_ENZYME_COMPATIBILITY[etype]
-                if analyte.lower() not in {a.lower() for a in compat}:
+                compat_lower = {a.lower() for a in compat}
+                analyte_clean = re.sub(r'\s*\(.*?\)\s*', '', analyte).strip().lower()
+                analyte_matched = (
+                    analyte.lower() in compat_lower
+                    or analyte_clean in compat_lower
+                    or any(c in analyte.lower() for c in compat_lower)
+                )
+                if not analyte_matched:
                     warnings.append(
                         f"Analyte '{analyte}' may be incompatible with {etype} "
                         f"(expected: {', '.join(sorted(compat))})"

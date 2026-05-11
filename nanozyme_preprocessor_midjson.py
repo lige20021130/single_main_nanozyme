@@ -932,6 +932,8 @@ class NanozymePreprocessor:
         (r'(?i)\b(?:mM|μM|uM|nM|pM)\b', 'concentration_unit'),
         (r'(?i)\bM\s*s[_\s^-]*1\b|M\s*/\s*s\b|μM\s*min[_\s^-]*1\b', 'rate_unit'),
         (r'[×x*]\s*10[_\s^-]*\d+|\b\d+e[+-]?\d+\b', 'scientific_notation'),
+        (r'(?i)\bdetect\s+\w+', 'target_analyte_detection'),
+        (r'(?i)\b(?:LOD|detection\s+limit|limit\s+of\s+detection)\b.{0,30}\b(?:μM|nM|pM|mM|ng/mL|μg/mL|pg/mL|ppb|ppm)\b', 'LOD_with_unit'),
     ]
 
     _HARD_RECALL_TABLE_FIGURE_PATTERN = (
