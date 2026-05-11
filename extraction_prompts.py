@@ -77,7 +77,9 @@ Respond in JSON format:
     "kcat_unit": "<unit or null>",
     "kcat_Km": <number or null>,
     "kcat_Km_unit": "<unit or null>",
-    "substrate": "<primary substrate name or null>"
+    "substrate": "<primary substrate name or null>",
+    "detection_method": "<primary detection method or null>",
+    "material_variant": "<primary material variant or null>"
   }},
   "kinetics_list": [
     {{

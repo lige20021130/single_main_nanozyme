@@ -52,6 +52,8 @@ NANOZYME_KINETICS_SCHEMA = {
         "kcat_Km": {"type": ["number", "null"]},
         "kcat_Km_unit": {"type": ["string", "null"]},
         "substrate": {"type": ["string", "null"]},
+        "detection_method": {"type": ["string", "null"]},
+        "material_variant": {"type": ["string", "null"]},
     },
     "required": [],
 }
