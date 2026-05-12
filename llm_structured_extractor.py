@@ -10,6 +10,7 @@ from extraction_prompts import (
     build_enzyme_type_prompt,
     build_self_augmentation_prompt,
     build_table_kinetics_prompt,
+    build_verification_prompt,
 )
 from schema_constraints import validate_against_schema, auto_fix_schema_errors
 from dependencies import is_available as _dep_available
@@ -26,6 +27,8 @@ class LLMStructuredExtractor:
         self.max_tokens = 4096
         self.enable_self_augmentation = getattr(config, "enable_self_augmentation", True) if config else True
         self.enable_constrained_output = getattr(config, "enable_constrained_output", True) if config else True
+        self.enable_verification = getattr(config, "enable_verification", True) if config else True
+        self.max_verification_rounds = getattr(config, "max_verification_rounds", 1) if config else 1
 
     async def extract_kinetics(
         self,
@@ -48,6 +51,9 @@ class LLMStructuredExtractor:
 
         if result:
             result = self._post_process_kinetics(result)
+
+        if result and self.enable_verification:
+            result = await self._verify_and_correct(nanozyme_name, combined_text, result, "kinetics")
 
         if table_texts:
             table_result = await self.extract_from_table(nanozyme_name, table_texts)
@@ -289,6 +295,42 @@ class LLMStructuredExtractor:
         if PYDANTIC_AVAILABLE:
             return NanozymeExtractionModel
         return None
+
+    async def _verify_and_correct(
+        self,
+        nanozyme_name: str,
+        text: str,
+        result: Dict[str, Any],
+        task_name: str,
+    ) -> Dict[str, Any]:
+        if not self.enable_verification or not self.client:
+            return result
+
+        for round_num in range(self.max_verification_rounds):
+            result_str = json.dumps(result, ensure_ascii=False, indent=2)
+            messages = build_verification_prompt(nanozyme_name, text, result_str)
+            verification = await self._call_llm_structured(messages, f"{task_name}_verify_r{round_num+1}")
+
+            if not verification:
+                logger.info(f"[LLM-Ext] Verification round {round_num+1} returned no result, keeping original")
+                break
+
+            if not verification.get("has_errors", False):
+                logger.info(f"[LLM-Ext] Verification round {round_num+1}: no errors found")
+                break
+
+            errors = verification.get("errors_found", [])
+            logger.info(f"[LLM-Ext] Verification round {round_num+1}: found {len(errors)} errors: {errors}")
+
+            corrected = verification.get("corrected_result")
+            if corrected and isinstance(corrected, dict):
+                result = corrected
+                logger.info(f"[LLM-Ext] Applied corrections from verification round {round_num+1}")
+            else:
+                logger.warning(f"[LLM-Ext] Verification found errors but no corrected_result provided")
+                break
+
+        return result
 
     async def _self_augment(
         self,

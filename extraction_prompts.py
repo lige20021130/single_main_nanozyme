@@ -949,3 +949,41 @@ def build_table_kinetics_prompt(nanozyme_name: str, text: str, include_examples:
         nanozyme_name=nanozyme_name, text=text
     )})
     return messages
+
+
+VERIFICATION_PROMPT = """You are a nanozyme data verification expert. Review the following extraction result against the original text and identify any errors.
+
+Nanozyme name: "{nanozyme_name}"
+
+Original text:
+{text}
+
+Extraction result:
+{extraction_result}
+
+Check for these common errors:
+1. WRONG VALUES: Km, Vmax, kcat values that don't match the text
+2. WRONG UNITS: Unit mismatch (e.g., text says mM but extraction says μM)
+3. MISSING DATA: Values present in text but missing from extraction
+4. FABRICATED DATA: Values in extraction not found in text
+5. WRONG SUBSTRATE: Substrate name doesn't match text
+6. UNIT CONVERSION ERRORS: Incorrect conversion (e.g., M/s to μM/s should multiply by 1e6)
+
+If you find errors, provide the CORRECTED extraction result. If no errors, return the original result unchanged.
+
+Respond in JSON format:
+{{
+  "has_errors": <true or false>,
+  "errors_found": ["<description of error 1>", "<description of error 2>"],
+  "corrected_result": <the corrected extraction result, same structure as input>
+}}"""
+
+
+def build_verification_prompt(nanozyme_name: str, text: str, extraction_result: str) -> List[Dict[str, str]]:
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    messages.append({"role": "user", "content": VERIFICATION_PROMPT.format(
+        nanozyme_name=nanozyme_name,
+        text=text,
+        extraction_result=extraction_result,
+    )})
+    return messages

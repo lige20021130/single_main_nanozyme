@@ -261,3 +261,57 @@ def test_merge_kinetics_results():
     assert merged["kinetics"]["Km"] == 0.35
     assert merged["kinetics"]["Vmax"] == 44.1
     assert len(merged["kinetics_list"]) == 2
+
+
+@pytest.mark.asyncio
+async def test_verify_and_correct_no_errors(mock_client):
+    ext = LLMStructuredExtractor(mock_client)
+    ext.enable_verification = True
+    ext.max_verification_rounds = 1
+
+    call_count = 0
+    original_call = mock_client.chat_completion_text
+
+    async def side_effect(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            return json.dumps({"has_errors": False, "errors_found": [], "corrected_result": None})
+        return json.dumps({})
+
+    mock_client.chat_completion_text.side_effect = side_effect
+
+    result = await ext._verify_and_correct(
+        "Fe3O4", "Km was 0.35 mM",
+        {"kinetics": {"Km": 0.35, "Km_unit": "mM"}},
+        "kinetics"
+    )
+    assert result["kinetics"]["Km"] == 0.35
+
+
+@pytest.mark.asyncio
+async def test_verify_and_correct_with_errors(mock_client):
+    ext = LLMStructuredExtractor(mock_client)
+    ext.enable_verification = True
+    ext.max_verification_rounds = 1
+
+    call_count = 0
+    async def side_effect(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            return json.dumps({
+                "has_errors": True,
+                "errors_found": ["Km value wrong: should be 0.89 not 0.35"],
+                "corrected_result": {"kinetics": {"Km": 0.89, "Km_unit": "mM"}}
+            })
+        return json.dumps({})
+
+    mock_client.chat_completion_text.side_effect = side_effect
+
+    result = await ext._verify_and_correct(
+        "Fe3O4", "Km was 0.89 mM",
+        {"kinetics": {"Km": 0.35, "Km_unit": "mM"}},
+        "kinetics"
+    )
+    assert result["kinetics"]["Km"] == 0.89
