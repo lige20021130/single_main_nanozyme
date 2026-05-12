@@ -11,6 +11,8 @@ from extraction_prompts import (
     build_self_augmentation_prompt,
     build_table_kinetics_prompt,
     build_verification_prompt,
+    build_synthesis_prompt,
+    build_ph_temp_prompt,
 )
 from schema_constraints import validate_against_schema, auto_fix_schema_errors
 from dependencies import is_available as _dep_available
@@ -176,6 +178,26 @@ class LLMStructuredExtractor:
             return result.get("enzyme_like_type")
         return None
 
+    async def extract_synthesis(
+        self,
+        nanozyme_name: str,
+        text_chunks: List[str],
+    ) -> Dict[str, Any]:
+        combined_text = self._prepare_text(text_chunks, max_chars=4000)
+        messages = build_synthesis_prompt(nanozyme_name, combined_text)
+        result = await self._call_llm_structured(messages, "synthesis")
+        return result if result else {}
+
+    async def extract_ph_temp(
+        self,
+        nanozyme_name: str,
+        text_chunks: List[str],
+    ) -> Dict[str, Any]:
+        combined_text = self._prepare_text(text_chunks, max_chars=3000)
+        messages = build_ph_temp_prompt(nanozyme_name, combined_text)
+        result = await self._call_llm_structured(messages, "ph_temp")
+        return result if result else {}
+
     async def extract_all(
         self,
         nanozyme_name: str,
@@ -208,6 +230,28 @@ class LLMStructuredExtractor:
             buckets.get("application", []) + buckets.get("sensing", [])
         )
         result.update(applications)
+
+        synthesis = await self.extract_synthesis(
+            nanozyme_name,
+            buckets.get("material", []) + buckets.get("synthesis", [])
+        )
+        if synthesis:
+            if "synthesis_method" in synthesis and not result.get("synthesis_method"):
+                result["synthesis_method"] = synthesis["synthesis_method"]
+            if "synthesis_conditions" in synthesis and not result.get("synthesis_conditions"):
+                result["synthesis_conditions"] = synthesis["synthesis_conditions"]
+            if "characterization" in synthesis and not result.get("characterization"):
+                result["characterization"] = synthesis["characterization"]
+
+        ph_temp = await self.extract_ph_temp(
+            nanozyme_name,
+            buckets.get("activity", []) + buckets.get("kinetics", [])
+        )
+        if ph_temp:
+            if "pH_profile" in ph_temp and not result.get("pH_profile"):
+                result["pH_profile"] = ph_temp["pH_profile"]
+            if "temperature_profile" in ph_temp and not result.get("temperature_profile"):
+                result["temperature_profile"] = ph_temp["temperature_profile"]
 
         errors = validate_against_schema(result)
         if errors:

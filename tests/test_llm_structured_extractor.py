@@ -315,3 +315,44 @@ async def test_verify_and_correct_with_errors(mock_client):
         "kinetics"
     )
     assert result["kinetics"]["Km"] == 0.89
+
+
+@pytest.mark.asyncio
+async def test_extract_synthesis(mock_client):
+    mock_client.chat_completion_text.return_value = json.dumps({
+        "synthesis_method": "hydrothermal",
+        "synthesis_conditions": {
+            "temperature": 180,
+            "time": "12 h",
+            "precursors": ["FeCl3", "NaOH"],
+            "solvent": "water",
+            "atmosphere": None,
+            "post_treatment": None
+        },
+        "characterization": ["XRD", "TEM", "XPS"]
+    })
+    ext = LLMStructuredExtractor(mock_client)
+    result = await ext.extract_synthesis("Fe3O4", ["Fe3O4 was prepared by hydrothermal method at 180°C for 12 h"])
+    assert result["synthesis_method"] == "hydrothermal"
+    assert result["synthesis_conditions"]["temperature"] == 180
+
+
+@pytest.mark.asyncio
+async def test_extract_ph_temp(mock_client):
+    mock_client.chat_completion_text.return_value = json.dumps({
+        "pH_profile": {
+            "optimal_pH": 4.0,
+            "pH_range": "3.0-5.0",
+            "pH_stability": "3.0-6.0"
+        },
+        "temperature_profile": {
+            "optimal_temperature": 40,
+            "temperature_range": "25-55",
+            "temperature_unit": "°C",
+            "thermal_stability": "up to 60°C"
+        }
+    })
+    ext = LLMStructuredExtractor(mock_client)
+    result = await ext.extract_ph_temp("Fe3O4", ["optimal pH was 4.0, optimal temperature was 40°C"])
+    assert result["pH_profile"]["optimal_pH"] == 4.0
+    assert result["temperature_profile"]["optimal_temperature"] == 40
