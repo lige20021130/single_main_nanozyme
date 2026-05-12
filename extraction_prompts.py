@@ -22,6 +22,20 @@ CRITICAL DOMAIN KNOWLEDGE:
 11. When a paper compares multiple related materials (e.g., R-MnCo2O4 vs MnCo2O4), each material's kinetics MUST be in a separate kinetics_list entry with material_variant field
 12. SERS (Surface-Enhanced Raman Scattering) is a detection method, not an enzyme type. Papers using SERS to monitor nanozyme reactions still have oxidase-like/peroxidase-like etc. as the enzyme type.
 
+TABLE INTERPRETATION KNOWLEDGE:
+1. When reading tables, the row labeled "this work", "our catalyst", "present work" contains data for the TARGET nanozyme
+2. Rows labeled with other material names (e.g., "HRP", "natural enzyme", "Fe3O4 NPs") are REFERENCE data, not the target
+3. Table headers like "Km (mM)" indicate the unit for that column — do NOT add the unit again
+4. Scientific notation in tables: "4.41 × 10⁻⁵" or "4.41e-5" should be converted to decimal form (4.41e-5)
+
+UNIT CONVERSION TABLE:
+- M/s → μM/s: multiply by 1e6 (e.g., 4.41e-5 M/s = 44.1 μM/s)
+- M/s → mM/s: multiply by 1e3
+- mM/s → μM/s: multiply by 1e3
+- M → mM: multiply by 1e3
+- M → μM: multiply by 1e6
+- min⁻¹ → s⁻¹: divide by 60
+
 HARD RULES:
 1. Extract ONLY information explicitly stated in the text — do NOT guess or fabricate
 2. Use null for missing values (not 0, not empty string)
@@ -305,6 +319,74 @@ MORPHOLOGY_FEW_SHOT_EXAMPLES = [
             "characterization": ["XRD", "TEM", "XPS", "FTIR"]
         }
     },
+    {
+        "input": "The Mo-SAN (single-atom nanozyme) with isolated Mo-N4 sites was synthesized by pyrolysis of Mo-PhIM at 900°C for 2 h under Ar atmosphere. TEM and HAADF-STEM confirmed the atomic dispersion of Mo. XPS and XAFS were used to analyze the electronic structure.",
+        "output": {
+            "morphology": "single-atom dispersed",
+            "size": None,
+            "size_unit": None,
+            "crystal_structure": None,
+            "surface_area": None,
+            "synthesis_method": "pyrolysis",
+            "synthesis_conditions": {
+                "temperature": 900,
+                "time": "2 h",
+                "precursors": ["Mo-PhIM"]
+            },
+            "characterization": ["TEM", "HAADF-STEM", "XPS", "XAFS"]
+        }
+    },
+    {
+        "input": "ZIF-8 nanocrystals with rhombic dodecahedral morphology were prepared by mixing Zn(NO3)2 and 2-methylimidazole at room temperature for 24 h. The average particle size was 150 nm. BET surface area was 1250 m²/g. XRD confirmed the sodalite structure.",
+        "output": {
+            "morphology": "rhombic dodecahedral",
+            "size": 150.0,
+            "size_unit": "nm",
+            "crystal_structure": "sodalite",
+            "surface_area": "1250 m²/g",
+            "synthesis_method": "room-temperature coprecipitation",
+            "synthesis_conditions": {
+                "temperature": 25,
+                "time": "24 h",
+                "precursors": ["Zn(NO3)2", "2-methylimidazole"]
+            },
+            "characterization": ["XRD", "BET"]
+        }
+    },
+    {
+        "input": "Fe3O4@C core-shell nanoparticles were synthesized via a solvothermal method using FeCl3·6H2O and sodium citrate at 200°C for 10 h. The particles showed uniform spherical morphology with a core diameter of 150 nm and a shell thickness of 25 nm. XRD patterns indicated an inverse spinel structure.",
+        "output": {
+            "morphology": "core-shell spherical",
+            "size": 200.0,
+            "size_unit": "nm",
+            "crystal_structure": "inverse spinel",
+            "surface_area": None,
+            "synthesis_method": "solvothermal",
+            "synthesis_conditions": {
+                "temperature": 200,
+                "time": "10 h",
+                "precursors": ["FeCl3·6H2O", "sodium citrate"]
+            },
+            "characterization": ["XRD"]
+        }
+    },
+    {
+        "input": "Co-Fe LDH nanosheets were prepared by co-precipitation of Co(NO3)2 and Fe(NO3)3 with NaOH at 60°C for 30 min followed by hydrothermal aging at 120°C for 6 h. The nanosheets had a lateral size of 200-500 nm and thickness of 10-20 nm. XRD showed a layered double hydroxide structure with (003) and (006) reflections.",
+        "output": {
+            "morphology": "nanosheet",
+            "size": 350.0,
+            "size_unit": "nm",
+            "crystal_structure": "layered double hydroxide",
+            "surface_area": None,
+            "synthesis_method": "co-precipitation with hydrothermal aging",
+            "synthesis_conditions": {
+                "temperature": 120,
+                "time": "6 h",
+                "precursors": ["Co(NO3)2", "Fe(NO3)3", "NaOH"]
+            },
+            "characterization": ["XRD"]
+        }
+    },
 ]
 
 APPLICATION_EXTRACTION_PROMPT = """Extract application information of the nanozyme "{nanozyme_name}" from the following text.
@@ -423,6 +505,59 @@ APPLICATION_FEW_SHOT_EXAMPLES = [
         "input": "Methylene blue (MB) was used as a SERS probe molecule to verify the enhancement factor of the Au@Ag nanozyme substrate. The SERS substrate showed an enhancement factor of 1.5 × 10^5.",
         "output": {
             "applications": []
+        }
+    },
+    {
+        "input": "The Co3O4 nanozyme was applied for the detection of Hg2+ ions in lake water and tap water samples. The detection limit was 0.05 nM with a linear range of 0.1-100 nM. The method was based on the inhibition of peroxidase-like activity by Hg2+.",
+        "output": {
+            "applications": [
+                {
+                    "application_type": "sensing",
+                    "target_analyte": "Hg2+",
+                    "detection_limit": 0.05,
+                    "detection_limit_unit": "nM",
+                    "method": "colorimetric",
+                    "sample_type": "water"
+                }
+            ]
+        }
+    },
+    {
+        "input": "The CeO2 nanozyme exhibited excellent ROS scavenging ability and was applied for anti-inflammatory therapy in a mouse model of arthritis. The treatment significantly reduced inflammatory cytokines TNF-α and IL-6.",
+        "output": {
+            "applications": [
+                {
+                    "application_type": "antioxidant",
+                    "target_analyte": "ROS",
+                    "detection_limit": None,
+                    "detection_limit_unit": None,
+                    "method": None,
+                    "sample_type": "mouse arthritis model"
+                }
+            ]
+        }
+    },
+    {
+        "input": "The Au@Pd nanozyme was used as a dual-functional platform: (1) colorimetric detection of glucose in human serum with LOD of 0.08 μM, and (2) antibacterial therapy against E. coli with 99.5% killing efficiency at 200 μg/mL under NIR irradiation.",
+        "output": {
+            "applications": [
+                {
+                    "application_type": "sensing",
+                    "target_analyte": "glucose",
+                    "detection_limit": 0.08,
+                    "detection_limit_unit": "μM",
+                    "method": "colorimetric",
+                    "sample_type": "serum"
+                },
+                {
+                    "application_type": "antibacterial",
+                    "target_analyte": "E. coli",
+                    "detection_limit": None,
+                    "detection_limit_unit": None,
+                    "method": "photothermal",
+                    "sample_type": None
+                }
+            ]
         }
     },
 ]
