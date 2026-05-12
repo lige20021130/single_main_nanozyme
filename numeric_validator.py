@@ -569,12 +569,17 @@ class NumericValidator:
 
     _ANALYTE_ENZYME_COMPATIBILITY = {
         "peroxidase-like": {"h2o2", "tmb", "abts", "opd", "dab", "glucose", "dopamine", "ascorbic acid"},
-        "oxidase-like": {"glucose", "ascorbic acid", "uric acid", "cholesterol", "dopamine"},
+        "oxidase-like": {"glucose", "ascorbic acid", "uric acid", "cholesterol", "dopamine", "xanthine", "epinephrine", "cysteine", "phenol", "pollutants", "pesticides"},
         "catalase-like": {"h2o2"},
         "glucose-oxidase-like": {"glucose", "o2"},
         "superoxide-dismutase-like": {"superoxide", "o2-"},
         "haloperoxidase-like": {"br-", "i-", "h2o2"},
     }
+
+    _BROAD_ANALYTE_PATTERNS = re.compile(
+        r'(?:pollut|pestic|heavy\s+metal|organic|carcinog|bacteri|virus|cancer|tumor|drug|toxin|contaminant|pathogen|biofilm|inflammation|cell)',
+        re.I,
+    )
 
     def validate_nanozyme_kinetics(self, record: Dict[str, Any]) -> List[str]:
         warnings = []
@@ -640,8 +645,9 @@ class NumericValidator:
                     analyte.lower() in compat_lower
                     or analyte_clean in compat_lower
                     or any(c in analyte.lower() for c in compat_lower)
+                    or any(analyte.lower() in c for c in compat_lower)
                 )
-                if not analyte_matched:
+                if not analyte_matched and not self._BROAD_ANALYTE_PATTERNS.search(analyte):
                     warnings.append(
                         f"Analyte '{analyte}' may be incompatible with {etype} "
                         f"(expected: {', '.join(sorted(compat))})"

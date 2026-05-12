@@ -155,17 +155,22 @@ def is_valid_analyte(analyte: str) -> bool:
 async def llm_validate_analyte(analyte: str, context: str, client) -> bool:
     if not analyte or not context or not client:
         return True
-    prompt = f"""In a nanozyme paper, the extraction system identified "{analyte}" as a target_analyte (the molecule being detected/quantified by the sensing platform).
+    prompt = f"""In a nanozyme paper, the extraction system identified "{analyte}" as a target_analyte (the molecule/cell/tissue being detected/quantified/degraded/killed by the nanozyme platform).
 
 Context from the paper:
 {context[:1500]}
 
-Question: Is "{analyte}" truly a target_analyte (the detection target), or is it actually:
-- A substrate (consumed in the catalytic reaction, like TMB, H2O2, ABTS)?
-- A probe molecule (used as a signal indicator to verify activity/SERS sensitivity, like crystal violet, methylene blue, R6G)?
-- A vague/invalid description (like "catalytic reactions", "enzyme activity")?
+Question: Is "{analyte}" truly a target_analyte (the detection, degradation, or therapeutic target), or is it actually:
+- A substrate (consumed in the catalytic reaction, like TMB, H2O2, ABTS, OPD)?
+- A probe molecule (used as a signal indicator to verify activity, like crystal violet, methylene blue, R6G)?
+- A completely vague/invalid description (like "catalytic reactions", "enzyme activity", "various substrates")?
 
-Answer with ONLY one word: "valid" if it is a genuine target analyte, or "invalid" if it is a substrate, probe, or vague description."""
+IMPORTANT: The following are VALID target analytes:
+- Broad but meaningful categories: "organic pollutants", "carcinogenic organic pollutants", "pesticides", "heavy metals"
+- Biological targets in therapeutic applications: "cancer cells", "tumor cells", "bacteria", "biofilm", "inflammation"
+- Only reject if it is clearly a substrate, probe, or meaningless phrase.
+
+Answer with ONLY one word: "valid" if it is a genuine target analyte, or "invalid" if it is a substrate, probe, or meaningless phrase."""
 
     try:
         resp = await client.chat_completion_text(

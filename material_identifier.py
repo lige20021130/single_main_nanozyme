@@ -205,6 +205,29 @@ class MaterialIdentifier:
             "reasoning": result.get("reasoning", ""),
         }
 
+    @staticmethod
+    def _fuzzy_match_name(target: str, candidate_name: str) -> bool:
+        t = target.lower().strip()
+        c = candidate_name.lower().strip()
+        if t == c:
+            return True
+        if t in c or c in t:
+            return True
+        import re
+        t_tokens = set(re.findall(r'[a-z0-9]+', t))
+        c_tokens = set(re.findall(r'[a-z0-9]+', c))
+        if t_tokens and c_tokens and t_tokens <= c_tokens:
+            return True
+        if t_tokens and c_tokens and len(t_tokens & c_tokens) / max(len(t_tokens), len(c_tokens)) >= 0.7:
+            return True
+        return False
+
+    def _find_matching_candidate(self, target: str, candidates: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        for cand in candidates:
+            if self._fuzzy_match_name(target, cand.get("name", "")):
+                return cand
+        return None
+
     def enhance_candidates(
         self,
         rule_candidates: List[Dict[str, Any]],
@@ -219,7 +242,9 @@ class MaterialIdentifier:
 
         existing_names = {c["name"].lower().strip() for c in rule_candidates if c.get("name")}
 
-        if primary_lower not in existing_names:
+        matched_cand = self._find_matching_candidate(primary, rule_candidates)
+
+        if matched_cand is None:
             new_candidate = {
                 "name": primary,
                 "sources": {"llm_identification"},
@@ -231,20 +256,21 @@ class MaterialIdentifier:
             rule_candidates.insert(0, new_candidate)
             logger.info(f"[MaterialIdentifier] Injected LLM-identified primary: {primary}")
         else:
-            for cand in rule_candidates:
-                if cand["name"].lower().strip() == primary_lower:
-                    cand["sources"].add("llm_identification")
-                    cand["llm_identified"] = True
-                    cand["llm_confidence"] = llm_result.get("confidence", 0.5)
-                    cand["evidence"].append(f"[LLM] Primary nanozyme: {primary}")
-                    break
+            matched_cand["sources"].add("llm_identification")
+            matched_cand["llm_identified"] = True
+            matched_cand["llm_confidence"] = llm_result.get("confidence", 0.5)
+            matched_cand["evidence"].append(f"[LLM] Primary nanozyme: {primary}")
+            if matched_cand["name"].lower().strip() != primary_lower:
+                matched_cand["llm_canonical_name"] = primary
+            logger.info(f"[MaterialIdentifier] Enhanced existing candidate: {matched_cand['name']} with LLM identification")
 
         related_names = set()
         for sys_info in llm_result.get("related_systems", []):
             rname = sys_info.get("name", "").strip()
             if rname:
                 related_names.add(rname.lower())
-                if rname.lower() not in existing_names:
+                r_matched = self._find_matching_candidate(rname, rule_candidates)
+                if r_matched is None:
                     rule_candidates.append({
                         "name": rname,
                         "sources": {"llm_related"},
@@ -253,6 +279,9 @@ class MaterialIdentifier:
                         "llm_related": True,
                         "llm_relationship": sys_info.get("relationship", "unknown"),
                     })
+                else:
+                    r_matched.setdefault("llm_related", True)
+                    r_matched["llm_relationship"] = sys_info.get("relationship", "unknown")
 
         for cand in rule_candidates:
             cand_lower = cand["name"].lower().strip()

@@ -344,6 +344,7 @@ _SECTION_SCORE_MAP = {
     "activity": 8, "kinetics": 8, "application": 5, "conclusion": 4,
     "hints_system": 3, "hints_enzyme": 2, "unknown": 0,
     "introduction": -8, "comparison_table": -12, "references": -12,
+    "llm_identification": 20, "llm_related": -5,
 }
 _GENERIC_PENALTY = -20
 
@@ -1401,7 +1402,7 @@ class SMNConfig:
         self.enable_llm = kwargs.get("enable_llm", True)
         self.enable_vlm = kwargs.get("enable_vlm", True)
         self.max_evidence_sentences_per_bucket = kwargs.get("max_evidence_sentences_per_bucket", 20)
-        self.material_candidate_top_k = kwargs.get("material_candidate_top_k", 5)
+        self.material_candidate_top_k = kwargs.get("material_candidate_top_k", 10)
         self.allow_supplementary_full_record = kwargs.get("allow_supplementary_full_record", False)
         self.numeric_validation_strict = kwargs.get("numeric_validation_strict", True)
         self.figure_values_to_important_values = kwargs.get("figure_values_to_important_values", True)
@@ -2037,7 +2038,7 @@ class CandidateRecaller:
             if self._is_valid_candidate(name):
                 results.append(name)
         for m in re.finditer(
-            r'\b(?:Fe|Co|Ni|Mn|Cu|Zn|Ce|Au|Ag|Pt|Pd|Ti|V|Cr|Mo|W|Ru|Rh|Ir|La|Zr|Al|Sn|Bi|In|Ga|Ge|Sb|Te|Hf|Ta|Re|Os|Y|Sc|Cd|Hg|Tl|Pb|Nb)\d*[-/]?(?:SA|SAN|SAC|SAzyme|SAEs)\b',
+            r'\b(?:Fe|Co|Ni|Mn|Cu|Zn|Ce|Au|Ag|Pt|Pd|Ti|V|Cr|Mo|W|Ru|Rh|Ir|La|Zr|Al|Sn|Bi|In|Ga|Ge|Sb|Te|Hf|Ta|Re|Os|Y|Sc|Cd|Hg|Tl|Pb|Nb)\d*[-/\s]?(?:SA|SAN|SAC|SAzyme|SAEs)\b',
             title, re.I,
         ):
             name = m.group(0).strip()
@@ -2185,7 +2186,7 @@ class CandidateRecaller:
                 candidates[name]["evidence"].append(text[max(0, m.start()-40):m.end()+40])
 
         for m in re.finditer(
-            r'\b(?:Fe|Co|Ni|Mn|Cu|Zn|Ce|Au|Ag|Pt|Pd|Ti|V|Cr|Mo|W|Ru|Rh|Ir|La|Zr|Al|Sn|Bi|In)\d*[-/]?(?:SA|SAN|SAC|SAzyme|SAEs|SACs|SA-N|SAC-N)\b',
+            r'\b(?:Fe|Co|Ni|Mn|Cu|Zn|Ce|Au|Ag|Pt|Pd|Ti|V|Cr|Mo|W|Ru|Rh|Ir|La|Zr|Al|Sn|Bi|In)\d*[-/\s]?(?:SA|SAN|SAC|SAzyme|SAEs|SACs|SA-N|SAC-N)\b',
             text, re.I,
         ):
             name = m.group(0).strip()
@@ -2193,6 +2194,11 @@ class CandidateRecaller:
                 candidates.setdefault(name, {"name": name, "sources": set(), "evidence": []})
                 candidates[name]["sources"].add(section)
                 candidates[name]["evidence"].append(text[max(0, m.start()-40):m.end()+40])
+                bare_suffix = re.sub(r'^[A-Z][a-z]?\d*[-/\s]+', '', name)
+                if bare_suffix in candidates and bare_suffix != name:
+                    candidates[name]["sources"] |= candidates[bare_suffix]["sources"]
+                    candidates[name]["evidence"].extend(candidates[bare_suffix].get("evidence", []))
+                    del candidates[bare_suffix]
 
         for m in re.finditer(
             r'\b(?:Prussian\s+blue|PB|PBA|PBAs?|LDH|LDHs|MXene|g-C3N4|g-C\dN\d|CN|CNFs?|CNTs?|rGO|GO|N-GO|N-rGO|B,N-GO|S,N-GO)\b',
@@ -2439,7 +2445,7 @@ class NanozymeScorer:
                     score += 5
                 if re.search(r'\d', cand["name"]):
                     score += 2
-                if re.search(r'(?:SA|SAN|SAC|SAzyme)$', cand["name"], re.I):
+                if re.search(r'(?:SA|SAN|SAC|SAzyme|SAEs|SACs)$', cand["name"], re.I):
                     score += 8
                 if re.search(r'Single[-\s]?Atom$', cand["name"], re.I):
                     score -= 3
@@ -2470,7 +2476,7 @@ class NanozymeScorer:
                     r'\b' + re.escape(cand["name"].split('-')[0] if '-' in cand["name"] else cand["name"]) + r'\s+Single[-\s]?Atom\s+Nanozyme',
                     title, re.I
                 )
-                if _sa_in_title and re.search(r'(?:SA|SAN|SAC|SAzyme)$', cand["name"], re.I):
+                if _sa_in_title and re.search(r'(?:SA|SAN|SAC|SAzyme|SAEs|SACs)$', cand["name"], re.I):
                     score += 12
                 _based_match = re.search(
                     re.escape(cand["name"]) + r'-based',
@@ -4993,12 +4999,17 @@ class NumericValidator:
 
     _ANALYTE_ENZYME_COMPATIBILITY = {
         "peroxidase-like": {"h2o2", "tmb", "abts", "opd", "dab", "glucose", "dopamine", "ascorbic acid"},
-        "oxidase-like": {"glucose", "ascorbic acid", "uric acid", "cholesterol", "dopamine"},
+        "oxidase-like": {"glucose", "ascorbic acid", "uric acid", "cholesterol", "dopamine", "xanthine", "epinephrine", "cysteine", "phenol", "pollutants", "pesticides"},
         "catalase-like": {"h2o2"},
         "glucose-oxidase-like": {"glucose", "o2"},
         "superoxide-dismutase-like": {"superoxide", "o2-"},
         "haloperoxidase-like": {"br-", "i-", "h2o2"},
     }
+
+    _BROAD_ANALYTE_PATTERNS = re.compile(
+        r'(?:pollut|pestic|heavy\s+metal|organic|carcinog|bacteri|virus|cancer|tumor|drug|toxin|contaminant|pathogen|biofilm|inflammation|cell)',
+        re.I,
+    )
 
     def validate_nanozyme_kinetics(self, record: Dict[str, Any]) -> List[str]:
         warnings = []
@@ -5064,8 +5075,9 @@ class NumericValidator:
                     analyte.lower() in compat_lower
                     or analyte_clean in compat_lower
                     or any(c in analyte.lower() for c in compat_lower)
+                    or any(analyte.lower() in c for c in compat_lower)
                 )
-                if not analyte_matched:
+                if not analyte_matched and not self._BROAD_ANALYTE_PATTERNS.search(analyte):
                     warnings.append(
                         f"Analyte '{analyte}' may be incompatible with {etype} "
                         f"(expected: {', '.join(sorted(compat))})"
