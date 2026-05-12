@@ -9,6 +9,7 @@ from extraction_prompts import (
     build_application_prompt,
     build_enzyme_type_prompt,
     build_self_augmentation_prompt,
+    build_table_kinetics_prompt,
 )
 from schema_constraints import validate_against_schema, auto_fix_schema_errors
 from dependencies import is_available as _dep_available
@@ -48,7 +49,94 @@ class LLMStructuredExtractor:
         if result:
             result = self._post_process_kinetics(result)
 
+        if table_texts:
+            table_result = await self.extract_from_table(nanozyme_name, table_texts)
+            if table_result:
+                result = self._merge_kinetics_results(result if result else {}, table_result)
+
         return result if result else {}
+
+    async def extract_from_table(
+        self,
+        nanozyme_name: str,
+        table_texts: List[str],
+    ) -> Dict[str, Any]:
+        if not table_texts:
+            return {}
+
+        prepared_tables = self._prepare_table_text(table_texts, max_chars=8000)
+        messages = build_table_kinetics_prompt(nanozyme_name, prepared_tables)
+        result = await self._call_llm_structured(messages, "table_kinetics")
+
+        if result:
+            result = self._post_process_kinetics(result)
+
+        return result if result else {}
+
+    def _prepare_table_text(self, tables: List[str], max_chars: int = 8000) -> str:
+        if not tables:
+            return ""
+        combined = "\n\n".join(tables)
+        if len(combined) <= max_chars:
+            return combined
+
+        lines = combined.split("\n")
+        header_lines = []
+        keyword_lines = []
+        other_lines = []
+
+        km_vmax_keywords = ["km", "vmax", "kcat", "michaelis", "turnover", "kinetic"]
+
+        for i, line in enumerate(lines):
+            lower = line.lower()
+            if i < 3 or lower.startswith("|") and i < 5:
+                header_lines.append(line)
+            elif any(kw in lower for kw in km_vmax_keywords):
+                keyword_lines.append(line)
+            else:
+                other_lines.append(line)
+
+        result_lines = header_lines + keyword_lines
+        current_len = sum(len(l) + 1 for l in result_lines)
+
+        for line in other_lines:
+            if current_len + len(line) + 1 > max_chars:
+                break
+            result_lines.append(line)
+            current_len += len(line) + 1
+
+        return "\n".join(result_lines)
+
+    def _merge_kinetics_results(self, text_result: Dict[str, Any], table_result: Dict[str, Any]) -> Dict[str, Any]:
+        merged = dict(text_result)
+
+        text_kin = merged.get("kinetics", {})
+        table_kin = table_result.get("kinetics", {})
+
+        for key in ["Km", "Km_unit", "Vmax", "Vmax_unit", "kcat", "kcat_unit", "kcat_Km", "kcat_Km_unit", "substrate", "detection_method", "material_variant"]:
+            if text_kin.get(key) is None and table_kin.get(key) is not None:
+                if "kinetics" not in merged or not isinstance(merged["kinetics"], dict):
+                    merged["kinetics"] = {}
+                merged["kinetics"][key] = table_kin[key]
+
+        text_list = merged.get("kinetics_list", [])
+        table_list = table_result.get("kinetics_list", [])
+
+        existing_substrate_material = set()
+        for kl in text_list:
+            if isinstance(kl, dict):
+                key = (kl.get("substrate", ""), kl.get("material_variant", ""))
+                existing_substrate_material.add(key)
+
+        for kl in table_list:
+            if isinstance(kl, dict):
+                key = (kl.get("substrate", ""), kl.get("material_variant", ""))
+                if key not in existing_substrate_material:
+                    text_list.append(kl)
+                    existing_substrate_material.add(key)
+
+        merged["kinetics_list"] = text_list
+        return merged
 
     async def extract_morphology(
         self,

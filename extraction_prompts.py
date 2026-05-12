@@ -819,3 +819,133 @@ def build_ph_temp_prompt(nanozyme_name: str, text: str, include_examples: bool =
         nanozyme_name=nanozyme_name, text=text
     )})
     return messages
+
+
+TABLE_KINETICS_EXTRACTION_PROMPT = """Extract kinetic parameters from the following TABLE data about a nanozyme named "{nanozyme_name}".
+
+This is structured table data. Pay special attention to:
+1. Identify which row belongs to the TARGET nanozyme "{nanozyme_name}" — look for "this work", "our catalyst", the material name, or the first data row
+2. Rows for OTHER materials (HRP, natural enzymes, other nanozymes) are REFERENCE data — extract them ONLY in kinetics_list with material_variant field
+3. Column headers specify units — e.g., "Km (mM)" means the Km values are already in mM
+4. Scientific notation in tables: "4.41 × 10⁻⁵" or "4.41E-05" should be converted to decimal (4.41e-5)
+5. If the table has multiple substrates, extract kinetics for EACH substrate
+
+Table data:
+{text}
+
+Respond in JSON format:
+{{
+  "kinetics": {{
+    "Km": <number or null>,
+    "Km_unit": "<unit or null>",
+    "Vmax": <number or null>,
+    "Vmax_unit": "<unit or null>",
+    "kcat": <number or null>,
+    "kcat_unit": "<unit or null>",
+    "kcat_Km": <number or null>,
+    "kcat_Km_unit": "<unit or null>",
+    "substrate": "<primary substrate or null>",
+    "detection_method": "<method or null>",
+    "material_variant": "<material name or null>"
+  }},
+  "kinetics_list": [
+    {{
+      "Km": <number or null>,
+      "Km_unit": "<unit or null>",
+      "Vmax": <number or null>,
+      "Vmax_unit": "<unit or null>",
+      "kcat": <number or null>,
+      "kcat_unit": "<unit or null>",
+      "kcat_Km": <number or null>,
+      "kcat_Km_unit": "<unit or null>",
+      "substrate": "<substrate name>",
+      "material_variant": "<material name>",
+      "detection_method": "<method or null>"
+    }}
+  ]
+}}"""
+
+TABLE_KINETICS_FEW_SHOT_EXAMPLES = [
+    {
+        "input": """| Catalyst | Substrate | Km (mM) | Vmax (M/s) |
+|----------|-----------|---------|------------|
+| Fe3O4@C (this work) | TMB | 0.35 | 4.41 × 10⁻⁵ |
+| Fe3O4@C (this work) | H2O2 | 0.89 | 7.9 × 10⁻⁸ |
+| HRP | TMB | 0.434 | 2.47 × 10⁻⁷ |""",
+        "output": {
+            "kinetics": {
+                "Km": 0.35, "Km_unit": "mM",
+                "Vmax": 44.1, "Vmax_unit": "μM/s",
+                "kcat": None, "kcat_unit": None,
+                "kcat_Km": None, "kcat_Km_unit": None,
+                "substrate": "TMB",
+                "detection_method": None,
+                "material_variant": "Fe3O4@C"
+            },
+            "kinetics_list": [
+                {"Km": 0.35, "Km_unit": "mM", "Vmax": 44.1, "Vmax_unit": "μM/s", "kcat": None, "kcat_unit": None, "kcat_Km": None, "kcat_Km_unit": None, "substrate": "TMB", "material_variant": "Fe3O4@C", "detection_method": None},
+                {"Km": 0.89, "Km_unit": "mM", "Vmax": 0.079, "Vmax_unit": "μM/s", "kcat": None, "kcat_unit": None, "kcat_Km": None, "kcat_Km_unit": None, "substrate": "H2O2", "material_variant": "Fe3O4@C", "detection_method": None},
+                {"Km": 0.434, "Km_unit": "mM", "Vmax": 0.247, "Vmax_unit": "μM/s", "kcat": None, "kcat_unit": None, "kcat_Km": None, "kcat_Km_unit": None, "substrate": "TMB", "material_variant": "HRP", "detection_method": None}
+            ]
+        }
+    },
+    {
+        "input": """Table 2. Comparison of kinetic parameters.
+| Sample | Km (mM) | Vmax (10⁻⁸ M/s) | kcat (s⁻¹) |
+|--------|---------|------------------|-------------|
+| Au@Pd | 0.35 | 5.6 | 85200 |
+| Au NPs | 0.82 | 2.1 | 34500 |
+| Pd NPs | 1.24 | 1.8 | 22100 |""",
+        "output": {
+            "kinetics": {
+                "Km": 0.35, "Km_unit": "mM",
+                "Vmax": 0.056, "Vmax_unit": "μM/s",
+                "kcat": 85200.0, "kcat_unit": "s⁻¹",
+                "kcat_Km": None, "kcat_Km_unit": None,
+                "substrate": "TMB",
+                "detection_method": None,
+                "material_variant": "Au@Pd"
+            },
+            "kinetics_list": [
+                {"Km": 0.35, "Km_unit": "mM", "Vmax": 0.056, "Vmax_unit": "μM/s", "kcat": 85200.0, "kcat_unit": "s⁻¹", "kcat_Km": None, "kcat_Km_unit": None, "substrate": "TMB", "material_variant": "Au@Pd", "detection_method": None},
+                {"Km": 0.82, "Km_unit": "mM", "Vmax": 0.021, "Vmax_unit": "μM/s", "kcat": 34500.0, "kcat_unit": "s⁻¹", "kcat_Km": None, "kcat_Km_unit": None, "substrate": "TMB", "material_variant": "Au NPs", "detection_method": None},
+                {"Km": 1.24, "Km_unit": "mM", "Vmax": 0.018, "Vmax_unit": "μM/s", "kcat": 22100.0, "kcat_unit": "s⁻¹", "kcat_Km": None, "kcat_Km_unit": None, "substrate": "TMB", "material_variant": "Pd NPs", "detection_method": None}
+            ]
+        }
+    },
+    {
+        "input": """| Material | Substrate | Km | Vmax | kcat/Km |
+|----------|-----------|-----|------|---------|
+| R-MnCo2O4 | TMB | 0.018 mM | 1.2 × 10⁻⁷ M/s | - |
+| MnCo2O4 | TMB | 0.05 mM | 1.7 × 10⁻⁷ M/s | - |""",
+        "output": {
+            "kinetics": {
+                "Km": 0.018, "Km_unit": "mM",
+                "Vmax": 0.12, "Vmax_unit": "μM/s",
+                "kcat": None, "kcat_unit": None,
+                "kcat_Km": None, "kcat_Km_unit": None,
+                "substrate": "TMB",
+                "detection_method": None,
+                "material_variant": "R-MnCo2O4"
+            },
+            "kinetics_list": [
+                {"Km": 0.018, "Km_unit": "mM", "Vmax": 0.12, "Vmax_unit": "μM/s", "kcat": None, "kcat_unit": None, "kcat_Km": None, "kcat_Km_unit": None, "substrate": "TMB", "material_variant": "R-MnCo2O4", "detection_method": None},
+                {"Km": 0.05, "Km_unit": "mM", "Vmax": 0.17, "Vmax_unit": "μM/s", "kcat": None, "kcat_unit": None, "kcat_Km": None, "kcat_Km_unit": None, "substrate": "TMB", "material_variant": "MnCo2O4", "detection_method": None}
+            ]
+        }
+    },
+]
+
+
+def build_table_kinetics_prompt(nanozyme_name: str, text: str, include_examples: bool = True) -> List[Dict[str, str]]:
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    if include_examples:
+        for ex in TABLE_KINETICS_FEW_SHOT_EXAMPLES:
+            messages.append({"role": "user", "content": TABLE_KINETICS_EXTRACTION_PROMPT.format(
+                nanozyme_name=nanozyme_name, text=ex["input"]
+            )})
+            messages.append({"role": "assistant", "content": json.dumps(ex["output"], ensure_ascii=False)})
+    messages.append({"role": "user", "content": TABLE_KINETICS_EXTRACTION_PROMPT.format(
+        nanozyme_name=nanozyme_name, text=text
+    )})
+    return messages

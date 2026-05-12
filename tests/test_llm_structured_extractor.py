@@ -217,3 +217,47 @@ async def test_instructor_fallback_to_json_mode(mock_client):
     result = await ext.extract_kinetics("Fe3O4", ["Km was 0.35 mM"])
     assert result is not None
     assert result["kinetics"]["Km"] == 0.35
+
+
+@pytest.mark.asyncio
+async def test_extract_from_table(mock_client):
+    mock_client.chat_completion_text.return_value = json.dumps({
+        "kinetics": {
+            "Km": 0.35, "Km_unit": "mM",
+            "Vmax": 44.1, "Vmax_unit": "μM/s",
+            "kcat": None, "kcat_unit": None,
+            "kcat_Km": None, "kcat_Km_unit": None,
+            "substrate": "TMB",
+            "detection_method": None,
+            "material_variant": "Fe3O4@C"
+        },
+        "kinetics_list": [
+            {"Km": 0.35, "Km_unit": "mM", "Vmax": 44.1, "Vmax_unit": "μM/s", "kcat": None, "kcat_unit": None, "kcat_Km": None, "kcat_Km_unit": None, "substrate": "TMB", "material_variant": "Fe3O4@C", "detection_method": None}
+        ]
+    })
+    ext = LLMStructuredExtractor(mock_client)
+    result = await ext.extract_from_table("Fe3O4@C", ["| Catalyst | Km (mM) | Vmax (M/s) |", "| Fe3O4@C | 0.35 | 4.41e-5 |"])
+    assert result["kinetics"]["Km"] == 0.35
+
+
+def test_prepare_table_text_smart_truncation():
+    ext = LLMStructuredExtractor(None)
+    tables = ["| Header | Km (mM) | Vmax |\n|---|---|---|\n| Fe3O4 | 0.35 | 44.1 |"]
+    result = ext._prepare_table_text(tables, max_chars=200)
+    assert "Km" in result
+
+
+def test_merge_kinetics_results():
+    ext = LLMStructuredExtractor(None)
+    text_result = {
+        "kinetics": {"Km": None, "Km_unit": None, "Vmax": 44.1, "Vmax_unit": "μM/s"},
+        "kinetics_list": [{"substrate": "TMB", "Km": None}]
+    }
+    table_result = {
+        "kinetics": {"Km": 0.35, "Km_unit": "mM", "Vmax": None, "Vmax_unit": None},
+        "kinetics_list": [{"substrate": "H2O2", "Km": 0.89}]
+    }
+    merged = ext._merge_kinetics_results(text_result, table_result)
+    assert merged["kinetics"]["Km"] == 0.35
+    assert merged["kinetics"]["Vmax"] == 44.1
+    assert len(merged["kinetics_list"]) == 2
