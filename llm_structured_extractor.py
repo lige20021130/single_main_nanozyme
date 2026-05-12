@@ -11,6 +11,7 @@ from extraction_prompts import (
     build_self_augmentation_prompt,
 )
 from schema_constraints import validate_against_schema, auto_fix_schema_errors
+from dependencies import is_available as _dep_available
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +38,7 @@ class LLMStructuredExtractor:
             combined_text += table_combined[:3000]
 
         messages = build_kinetics_prompt(nanozyme_name, combined_text)
-        result = await self._call_llm_structured(messages, "kinetics")
+        result = await self._call_llm_structured(messages, "kinetics", response_model=self._get_kinetics_model())
 
         if self.enable_self_augmentation and result:
             augmented = await self._self_augment(result, combined_text, "kinetics")
@@ -125,10 +126,16 @@ class LLMStructuredExtractor:
         self,
         messages: List[Dict[str, str]],
         task_name: str,
+        response_model=None,
     ) -> Optional[Dict[str, Any]]:
         if not self.client:
             logger.warning(f"[LLM-Ext] No client available for {task_name}")
             return None
+
+        if self.enable_constrained_output and response_model and _dep_available("instructor"):
+            instructor_result = await self._call_with_instructor(messages, task_name, response_model)
+            if instructor_result is not None:
+                return instructor_result
 
         try:
             extra_params = {}
@@ -157,6 +164,43 @@ class LLMStructuredExtractor:
         except Exception as e:
             logger.error(f"[LLM-Ext] {task_name} extraction failed: {e}")
             return None
+
+    async def _call_with_instructor(
+        self,
+        messages: List[Dict[str, str]],
+        task_name: str,
+        response_model,
+    ) -> Optional[Dict[str, Any]]:
+        try:
+            import instructor
+            from openai import AsyncOpenAI
+
+            openai_client = AsyncOpenAI(
+                api_key=self.client.llm_api_key,
+                base_url=self.client.llm_base_url,
+            )
+            inst_client = instructor.from_openai(openai_client)
+
+            result = await inst_client.chat.completions.create(
+                model=self.client.llm_model,
+                messages=messages,
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+                response_model=response_model,
+            )
+
+            logger.info(f"[LLM-Ext] {task_name} extraction succeeded (instructor mode)")
+            return result.model_dump() if hasattr(result, "model_dump") else result
+
+        except Exception as e:
+            logger.warning(f"[LLM-Ext] Instructor mode failed for {task_name}: {e}, falling back to JSON mode")
+            return None
+
+    def _get_kinetics_model(self):
+        from schema_constraints import NanozymeExtractionModel, PYDANTIC_AVAILABLE
+        if PYDANTIC_AVAILABLE:
+            return NanozymeExtractionModel
+        return None
 
     async def _self_augment(
         self,

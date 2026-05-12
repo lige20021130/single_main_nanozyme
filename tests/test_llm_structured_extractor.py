@@ -203,3 +203,17 @@ def test_kinetics_list_vmax_conversion():
     fixed = ext._post_process_kinetics(result)
     assert fixed["kinetics_list"][0]["Vmax_unit"] == "μM/s"
     assert abs(fixed["kinetics_list"][0]["Vmax"] - 10.0) < 0.01
+
+
+@pytest.mark.asyncio
+async def test_instructor_fallback_to_json_mode(mock_client):
+    ext = LLMStructuredExtractor(mock_client)
+    ext.enable_constrained_output = True
+    mock_client.chat_completion_text.return_value = json.dumps({
+        "kinetics": {"Km": 0.35, "Km_unit": "mM", "Vmax": None, "Vmax_unit": None, "kcat": None, "kcat_unit": None, "kcat_Km": None, "kcat_Km_unit": None, "substrate": "TMB"},
+        "kinetics_list": []
+    })
+    ext.enable_self_augmentation = False
+    result = await ext.extract_kinetics("Fe3O4", ["Km was 0.35 mM"])
+    assert result is not None
+    assert result["kinetics"]["Km"] == 0.35
