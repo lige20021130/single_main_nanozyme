@@ -4693,8 +4693,22 @@ class NanozymePreprocessor:
         """
         从 parser JSON 中检测 table 元素，返回完整表格信息列表。
         递归搜索嵌套 kids，兼容多种 parser 输出格式。
+        同时从 paragraph 文本中重建被解析器遗漏的表格。
         """
-        return self._extract_tables_from_kids(self.kids)
+        structured_tables = self._extract_tables_from_kids(self.kids)
+        text_tables = self._reconstruct_text_tables(self.kids)
+        seen_pages = set()
+        merged: List[Dict[str, Any]] = []
+        for t in structured_tables:
+            key = (t.get("page", 0), t.get("caption", "")[:50])
+            seen_pages.add(t.get("page", 0))
+            merged.append(t)
+        for t in text_tables:
+            if t.get("source") == "text_reconstructed":
+                key = (t.get("page", 0), t.get("caption", "")[:50])
+                if key not in {(m.get("page", 0), m.get("caption", "")[:50]) for m in merged}:
+                    merged.append(t)
+        return merged
 
     def _extract_tables_from_kids(
         self, kids: List[Any], parent_page: int = 1
@@ -4743,13 +4757,16 @@ class NanozymePreprocessor:
                         if cell_texts:
                             cells_data.append(cell_texts)
                             if row_idx == 0:
-                                columns = cell_texts  # 第一行作为列名
+                                columns = cell_texts
 
                 raw_text = self._normalize_text(
                     elem.get("content", "") or elem.get("text", "") or ""
                 )
                 if not raw_text and cells_data:
                     raw_text = "\n".join(" | ".join(row) for row in cells_data)
+
+                if self._is_navigation_table(raw_text, cells_data):
+                    return None
 
                 caption = self._normalize_text(
                     elem.get("caption", "") or elem.get("title", "") or ""
@@ -4808,6 +4825,233 @@ class NanozymePreprocessor:
 
         _scan_recursive(kids)
         return tables
+
+    _NAVIGATION_TABLE_PATTERNS = re.compile(
+        r'(?i)(?:view\s*article\s*online|view\s*journal|view\s*issue|'
+        r'paper\s+view\s*article|downloaded\s+from|crossmark|'
+        r'check\s+for\s+updates|cite\s*this|share\s+this|'
+        r'read\s+online|full\s+text|pdf\s+download|'
+        r'previous\s+article|next\s+article|back\s+to)',
+    )
+
+    def _is_navigation_table(self, text: str, cells: List[List[str]]) -> bool:
+        combined = text
+        if not combined and cells:
+            combined = " ".join(" ".join(row) for row in cells)
+        if not combined:
+            return False
+        if self._NAVIGATION_TABLE_PATTERNS.search(combined):
+            return True
+        if cells:
+            total_cells = sum(len(row) for row in cells)
+            empty_cells = sum(1 for row in cells for c in row if not c.strip())
+            if total_cells > 0 and empty_cells / total_cells > 0.7:
+                return True
+            all_text = " ".join(c for row in cells for c in row if c.strip())
+            if len(all_text) < 20 and len(cells) <= 3:
+                return True
+        return False
+
+    def _reconstruct_text_tables(self, kids: List[Any]) -> List[Dict[str, Any]]:
+        """
+        从 paragraph 文本中重建被 PDF 解析器遗漏的表格。
+        策略：
+        1. 找到 "Table N" / "Table SN" 标题行，收集其后的数据行
+        2. 若无标题行，则扫描包含动力学/传感数据的段落，
+           将连续的数据段落组合为虚拟表格
+        """
+        flat_elems: List[Dict[str, Any]] = []
+
+        def _flatten(items: List[Any], depth: int = 0) -> None:
+            for elem in items:
+                if not isinstance(elem, dict):
+                    continue
+                etype = str(elem.get("type", "")).lower()
+                if etype == "table":
+                    continue
+                content = self._normalize_text(
+                    elem.get("content", "") or elem.get("text", "") or ""
+                )
+                if content:
+                    flat_elems.append({
+                        "content": content,
+                        "page": elem.get("page number", 1) or 1,
+                        "type": etype,
+                        "id": elem.get("id"),
+                        "bbox": elem.get("bounding box") or elem.get("bbox") or [],
+                    })
+                nested = elem.get("kids")
+                if isinstance(nested, list) and nested and depth < 8:
+                    _flatten(nested, depth + 1)
+
+        _flatten(kids)
+        tables: List[Dict[str, Any]] = []
+        used_indices: set = set()
+
+        for i, elem in enumerate(flat_elems):
+            content = elem["content"]
+            if not self._is_table_caption_line(content):
+                continue
+
+            caption = content.strip()
+            page = elem["page"]
+            data_lines: List[str] = []
+            data_cells: List[List[str]] = []
+
+            for j in range(i + 1, min(i + 30, len(flat_elems))):
+                next_elem = flat_elems[j]
+                next_content = next_elem["content"].strip()
+                next_page = next_elem["page"]
+
+                if next_page > page + 1:
+                    break
+                if self._is_table_caption_line(next_content):
+                    break
+                if next_elem["type"] == "heading":
+                    break
+                if len(next_content) < 3:
+                    continue
+
+                is_data_row = self._is_table_data_row(next_content)
+                if is_data_row:
+                    cells = self._parse_table_row(next_content)
+                    data_cells.append(cells)
+                    data_lines.append(next_content)
+                    used_indices.add(j)
+                elif data_lines:
+                    break
+
+            if not data_lines:
+                continue
+
+            full_text = caption + "\n" + "\n".join(data_lines)
+            tables.append({
+                "source": "text_reconstructed",
+                "caption": caption,
+                "text": full_text,
+                "cells": data_cells,
+                "columns": data_cells[0] if data_cells else [],
+                "page": page,
+                "bbox": [],
+                "kid_ids": [],
+                "image_path": "",
+                "has_rows": len(data_cells) > 0,
+                "has_columns": len(data_cells[0]) > 0 if data_cells else False,
+            })
+
+        data_paragraphs: List[Dict[str, Any]] = []
+        for i, elem in enumerate(flat_elems):
+            if i in used_indices:
+                continue
+            content = elem["content"]
+            if self._is_table_caption_line(content):
+                continue
+            if self._is_kinetics_data_paragraph(content):
+                data_paragraphs.append(elem)
+
+        if data_paragraphs:
+            grouped = self._group_data_paragraphs(data_paragraphs)
+            for group in grouped:
+                if len(group) < 1:
+                    continue
+                first_page = group[0]["page"]
+                combined_text = "\n".join(e["content"] for e in group)
+                tables.append({
+                    "source": "text_reconstructed",
+                    "caption": f"Kinetics data (page {first_page})",
+                    "text": combined_text,
+                    "cells": [],
+                    "columns": [],
+                    "page": first_page,
+                    "bbox": [],
+                    "kid_ids": [],
+                    "image_path": "",
+                    "has_rows": False,
+                    "has_columns": False,
+                })
+
+        return tables
+
+    _KINETICS_DATA_PATTERNS = [
+        re.compile(r'Km\s*(?:values?|of|=|is|are)\s', re.I),
+        re.compile(r'Vmax\s*(?:values?|of|=|is|are)\s', re.I),
+        re.compile(r'kcat\s*(?:values?|of|=|is|are)\s', re.I),
+        re.compile(r'(?:Km|Vmax|kcat)\s*=\s*\d', re.I),
+        re.compile(r'(?:detection\s+limit|LOD)\s*(?:of|=|is|:)\s*\d', re.I),
+        re.compile(r'linear\s+range\s*(?:of|=|is|:)\s*\d', re.I),
+        re.compile(r'recovery\s*(?:of|=|:)\s*\d', re.I),
+        re.compile(r'RSD\s*(?:of|=|:)\s*\d', re.I),
+    ]
+
+    def _is_kinetics_data_paragraph(self, text: str) -> bool:
+        if len(text) < 20:
+            return False
+        if re.match(r'(?i)^\s*(?:abstract|keywords?|highlights?|graphical\s+abstract|introduction|references?|acknowledg|supporting\s+info|supplementary)\b', text):
+            return False
+        if re.match(r'(?i)^\s*(?:figure|fig\.)\s+\d+', text):
+            return False
+        if re.match(r'(?i)^\s*(?:table|tbl\.?)\s+\d+', text):
+            return False
+        has_kinetics_keyword = False
+        for pat in self._KINETICS_DATA_PATTERNS:
+            if pat.search(text):
+                has_kinetics_keyword = True
+                break
+        if not has_kinetics_keyword:
+            return False
+        has_numeric_value = bool(re.search(
+            r'\d+\.?\d*\s*(?:mM|μM|nM|pM|M\s*s|s−1|min−1|μM\s*s|M\s*s−1|mg|μg|ng|mmol|μmol|nmol|pmol|mol|g|kg|mL|μL|nL|L)',
+            text, re.I
+        ))
+        if not has_numeric_value:
+            return False
+        return True
+
+    def _group_data_paragraphs(self, paragraphs: List[Dict[str, Any]]) -> List[List[Dict[str, Any]]]:
+        if not paragraphs:
+            return []
+        groups: List[List[Dict[str, Any]]] = []
+        current_group: List[Dict[str, Any]] = [paragraphs[0]]
+        for i in range(1, len(paragraphs)):
+            prev = paragraphs[i - 1]
+            curr = paragraphs[i]
+            same_page = curr["page"] == prev["page"]
+            adjacent_page = abs(curr["page"] - prev["page"]) <= 1
+            if same_page or adjacent_page:
+                current_group.append(curr)
+            else:
+                groups.append(current_group)
+                current_group = [curr]
+        groups.append(current_group)
+        return groups
+
+    _TABLE_DATA_ROW_PATTERNS = [
+        re.compile(r'(?:^|\s)\d+\.?\d*\s*(?:mM|μM|nM|pM|M|mg|μg|ng|mmol|μmol|nmol|pmol|mol|g|kg|mL|μL|nL|L|mM/s|μM/s|M/s|s−1|min−1|μmol/s|nmol/s)', re.I),
+        re.compile(r'(?:Km|Kcat|Vmax|Vm|Km,|Vmax,|kcat,)\s', re.I),
+        re.compile(r'(?:substrate|analyte|detection|LOD|linear\s+range|recovery|RSD)', re.I),
+    ]
+
+    _TABLE_ROW_SEPARATOR = re.compile(r'\s*[|│┃┆┇┊┋]\s*|\s{2,}|\t')
+
+    def _is_table_data_row(self, text: str) -> bool:
+        if len(text) < 5:
+            return False
+        num_count = len(re.findall(r'\d+\.?\d*', text))
+        if num_count < 2:
+            return False
+        for pat in self._TABLE_DATA_ROW_PATTERNS:
+            if pat.search(text):
+                return True
+        parts = self._TABLE_ROW_SEPARATOR.split(text)
+        if len(parts) >= 3:
+            numeric_parts = sum(1 for p in parts if re.search(r'\d', p))
+            if numeric_parts >= 2:
+                return True
+        return False
+
+    def _parse_table_row(self, text: str) -> List[str]:
+        parts = self._TABLE_ROW_SEPARATOR.split(text)
+        return [p.strip() for p in parts if p.strip()]
 
     def _is_table_caption_line(self, text: str) -> bool:
         """判断文本行是否是表格标题行"""

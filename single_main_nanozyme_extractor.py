@@ -2509,8 +2509,13 @@ class NanozymeScorer:
             score += self._score_narrative_importance(cand, title, abstract_text)
 
             if cand.get("llm_identified"):
-                score += 25
-                logger.debug(f"[SMN] LLM-identified bonus +25 for '{cand['name']}'")
+                llm_conf = cand.get("llm_confidence", 0.5)
+                if cand.get("sources") == {"llm_identification"}:
+                    score += 50
+                    logger.debug(f"[SMN] LLM-identified (new injection) bonus +50 for '{cand['name']}' (conf={llm_conf})")
+                else:
+                    score += 25
+                    logger.debug(f"[SMN] LLM-identified bonus +25 for '{cand['name']}'")
             if cand.get("llm_related"):
                 score += 5
 
@@ -4998,8 +5003,8 @@ class NumericValidator:
     }
 
     _ANALYTE_ENZYME_COMPATIBILITY = {
-        "peroxidase-like": {"h2o2", "tmb", "abts", "opd", "dab", "glucose", "dopamine", "ascorbic acid"},
-        "oxidase-like": {"glucose", "ascorbic acid", "uric acid", "cholesterol", "dopamine", "xanthine", "epinephrine", "cysteine", "phenol", "pollutants", "pesticides"},
+        "peroxidase-like": {"h2o2", "tmb", "abts", "opd", "dab", "glucose", "dopamine", "ascorbic acid", "gsh", "cysteine", "biothiols"},
+        "oxidase-like": {"glucose", "ascorbic acid", "uric acid", "cholesterol", "dopamine", "xanthine", "epinephrine", "cysteine", "phenol", "pollutants", "pesticides", "cu2+", "fe2+", "fe3+", "hg2+", "pb2+", "cd2+", "ag+", "cr(vi)", "mn2+", "co2+", "ni2+", "zn2+", "al3+", "sulfite", "h2s", "cn-", "biothiols"},
         "catalase-like": {"h2o2"},
         "glucose-oxidase-like": {"glucose", "o2"},
         "superoxide-dismutase-like": {"superoxide", "o2-"},
@@ -5507,6 +5512,25 @@ class SingleMainNanozymePipeline:
                 entry["kcat_Km_unit"] = kin.get("kcat_Km_unit")
             kin_list = [entry]
         record["main_activity"]["kinetics_list"] = kin_list
+
+        deduped = []
+        seen = set()
+        for entry in kin_list:
+            if not isinstance(entry, dict):
+                continue
+            key = (
+                entry.get("Km"), entry.get("Km_unit"),
+                entry.get("Vmax"), entry.get("Vmax_unit"),
+                entry.get("substrate"), entry.get("detection_method"),
+                entry.get("material_variant"),
+            )
+            if key not in seen:
+                seen.add(key)
+                deduped.append(entry)
+        if len(deduped) < len(kin_list):
+            logger.info(f"[SMN] Deduplicated kinetics_list: {len(kin_list)} -> {len(deduped)}")
+        record["main_activity"]["kinetics_list"] = deduped
+
         return record
 
     def _merge_vlm(self, record: Dict[str, Any], vlm_results: List[Dict]) -> Dict[str, Any]:
@@ -5591,6 +5615,11 @@ class SingleMainNanozymePipeline:
                             continue
                         raw_vmax_unit = vmax_item.get("unit", "")
                         vlm_val, raw_vmax_unit = _parse_unit_scientific_prefix(vlm_val, raw_vmax_unit)
+                        if vlm_val > 1e6:
+                            logger.warning(f"[SMN] VLM Vmax={vlm_val} is unrealistically large, demoting to important_values only")
+                            iv["value"] = str(vlm_val)
+                            iv["unit"] = raw_vmax_unit
+                            continue
                         iv["value"] = str(vlm_val)
                         iv["unit"] = raw_vmax_unit
                         rule_vmax = record["main_activity"]["kinetics"].get("Vmax")
@@ -5819,6 +5848,7 @@ class SingleMainNanozymePipeline:
                         existing_types.add(norm_app)
                 record["applications"] = apps
 
+        self._add_vlm_kinetics_to_list(record)
         self._check_multi_figure_consistency(record)
         self._cross_verify_vlm_no_evidence(record)
 
@@ -5893,6 +5923,82 @@ class SingleMainNanozymePipeline:
                 kin[param] = None
                 kin[f"{param}_unit"] = None
                 kin["needs_review"] = True
+
+    def _add_vlm_kinetics_to_list(self, record: Dict[str, Any]) -> None:
+        kin_list = record.get("main_activity", {}).get("kinetics_list", [])
+        if not isinstance(kin_list, list):
+            kin_list = []
+        ivs = record.get("important_values", [])
+        vlm_km_entries = []
+        vlm_vmax_entries = []
+        for iv in ivs:
+            if not isinstance(iv, dict):
+                continue
+            name = iv.get("name", "")
+            if name == "VLM_Km":
+                try:
+                    val = float(iv.get("value", 0))
+                except (ValueError, TypeError):
+                    continue
+                vlm_km_entries.append({
+                    "Km": val,
+                    "Km_unit": iv.get("unit", ""),
+                    "context": iv.get("context", ""),
+                })
+            elif name == "VLM_Vmax":
+                try:
+                    val = float(iv.get("value", 0))
+                except (ValueError, TypeError):
+                    continue
+                if val > 1e6:
+                    continue
+                vlm_vmax_entries.append({
+                    "Vmax": val,
+                    "Vmax_unit": iv.get("unit", ""),
+                    "context": iv.get("context", ""),
+                })
+        if not vlm_km_entries and not vlm_vmax_entries:
+            return
+        existing_keys = set()
+        for entry in kin_list:
+            if not isinstance(entry, dict):
+                continue
+            key = (
+                entry.get("Km"), entry.get("Km_unit"),
+                entry.get("Vmax"), entry.get("Vmax_unit"),
+                entry.get("substrate"), entry.get("detection_method"),
+                entry.get("material_variant"),
+            )
+            existing_keys.add(key)
+        for km_e in vlm_km_entries:
+            km_val = km_e["Km"]
+            km_unit = km_e["Km_unit"]
+            matched_vmax = None
+            for vmax_e in vlm_vmax_entries:
+                if km_e.get("context") == vmax_e.get("context"):
+                    matched_vmax = vmax_e
+                    break
+            new_entry = {
+                "Km": km_val,
+                "Km_unit": _normalize_unit_fn(km_unit) if _normalize_unit_fn and km_unit else km_unit,
+                "Vmax": matched_vmax["Vmax"] if matched_vmax else None,
+                "Vmax_unit": _normalize_unit_fn(matched_vmax["Vmax_unit"]) if matched_vmax and _normalize_unit_fn and matched_vmax.get("Vmax_unit") else (matched_vmax["Vmax_unit"] if matched_vmax else None),
+                "substrate": "TMB",
+                "source": "VLM",
+                "detection_method": "UV-vis",
+                "material_variant": None,
+            }
+            key = (
+                new_entry["Km"], new_entry["Km_unit"],
+                new_entry["Vmax"], new_entry["Vmax_unit"],
+                new_entry["substrate"], new_entry["detection_method"],
+                new_entry["material_variant"],
+            )
+            if key not in existing_keys:
+                kin_list.append(new_entry)
+                existing_keys.add(key)
+                logger.info(f"[SMN] Added VLM kinetics to list: Km={km_val} {km_unit}")
+        record["main_activity"]["kinetics_list"] = kin_list
 
     def _check_multi_figure_consistency(self, record: Dict[str, Any]):
         vlm_kms = []
@@ -6445,6 +6551,7 @@ class SingleMainNanozymePipeline:
         sel_name = record.get("selected_nanozyme", {}).get("name")
 
         record = self._sync_kinetics_list(record)
+        self._add_vlm_kinetics_to_list(record)
 
         logger.info(f"[SMN] Final: status={record['diagnostics']['status']}, "
                      f"confidence={record['diagnostics']['confidence']}, "

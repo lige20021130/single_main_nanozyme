@@ -568,8 +568,8 @@ class NumericValidator:
     }
 
     _ANALYTE_ENZYME_COMPATIBILITY = {
-        "peroxidase-like": {"h2o2", "tmb", "abts", "opd", "dab", "glucose", "dopamine", "ascorbic acid"},
-        "oxidase-like": {"glucose", "ascorbic acid", "uric acid", "cholesterol", "dopamine", "xanthine", "epinephrine", "cysteine", "phenol", "pollutants", "pesticides"},
+        "peroxidase-like": {"h2o2", "tmb", "abts", "opd", "dab", "glucose", "dopamine", "ascorbic acid", "gsh", "cysteine", "biothiols"},
+        "oxidase-like": {"glucose", "ascorbic acid", "uric acid", "cholesterol", "dopamine", "xanthine", "epinephrine", "cysteine", "phenol", "pollutants", "pesticides", "cu2+", "fe2+", "fe3+", "hg2+", "pb2+", "cd2+", "ag+", "cr(vi)", "mn2+", "co2+", "ni2+", "zn2+", "al3+", "sulfite", "h2s", "cn-", "biothiols"},
         "catalase-like": {"h2o2"},
         "glucose-oxidase-like": {"glucose", "o2"},
         "superoxide-dismutase-like": {"superoxide", "o2-"},
