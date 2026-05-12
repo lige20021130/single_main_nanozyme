@@ -660,3 +660,162 @@ def build_self_augmentation_prompt(previous_extraction: str, text: str) -> List[
         previous_extraction=previous_extraction, text=text
     )})
     return messages
+
+
+SYNTHESIS_EXTRACTION_PROMPT = """Extract synthesis information of the nanozyme "{nanozyme_name}" from the following text.
+
+Focus on:
+- Synthesis method (e.g., hydrothermal, solvothermal, co-precipitation, pyrolysis, sol-gel, electrodeposition, microwave-assisted)
+- Temperature (in °C if reported)
+- Time (duration of synthesis step)
+- Precursors (chemical names of starting materials)
+- Solvent (if mentioned, e.g., water, ethanol, DMF)
+- Atmosphere (e.g., Ar, N2, air)
+- Post-treatment (e.g., calcination, annealing, reduction)
+
+Text:
+{text}
+
+Respond in JSON format:
+{{
+  "synthesis_method": "<method or null>",
+  "synthesis_conditions": {{
+    "temperature": <number in °C or null>,
+    "time": "<time string or null>",
+    "precursors": ["<precursor1>", "<precursor2>"],
+    "solvent": "<solvent or null>",
+    "atmosphere": "<atmosphere or null>",
+    "post_treatment": "<treatment or null>"
+  }},
+  "characterization": ["<technique1>", "<technique2>"]
+}}"""
+
+SYNTHESIS_FEW_SHOT_EXAMPLES = [
+    {
+        "input": "The Fe3O4@C nanoparticles were synthesized via a solvothermal method. Briefly, FeCl3·6H2O (1.35 g) and sodium citrate (0.4 g) were dissolved in 40 mL of ethylene glycol under stirring. The mixture was transferred to a Teflon-lined autoclave and heated at 200°C for 10 h. The products were washed with ethanol and dried at 60°C. XRD, TEM, XPS and VSM were used for characterization.",
+        "output": {
+            "synthesis_method": "solvothermal",
+            "synthesis_conditions": {
+                "temperature": 200,
+                "time": "10 h",
+                "precursors": ["FeCl3·6H2O", "sodium citrate"],
+                "solvent": "ethylene glycol",
+                "atmosphere": None,
+                "post_treatment": "dried at 60°C"
+            },
+            "characterization": ["XRD", "TEM", "XPS", "VSM"]
+        }
+    },
+    {
+        "input": "Mo-SAN was prepared by pyrolysis of the Mo-PhIM precursor at 900°C for 2 h under Ar atmosphere, followed by acid etching with 0.5 M H2SO4 to remove unstable Mo species. The final product was washed with deionized water and dried under vacuum. HAADF-STEM, XAFS, and XPS confirmed the atomic dispersion of Mo.",
+        "output": {
+            "synthesis_method": "pyrolysis",
+            "synthesis_conditions": {
+                "temperature": 900,
+                "time": "2 h",
+                "precursors": ["Mo-PhIM"],
+                "solvent": None,
+                "atmosphere": "Ar",
+                "post_treatment": "acid etching with 0.5 M H2SO4"
+            },
+            "characterization": ["HAADF-STEM", "XAFS", "XPS"]
+        }
+    },
+    {
+        "input": "Co-Fe LDH was synthesized by a co-precipitation method. Co(NO3)2·6H2O and Fe(NO3)3·9H2O (molar ratio 3:1) were dissolved in deionized water. NaOH solution (1 M) was added dropwise under vigorous stirring until pH reached 10. The suspension was aged at 60°C for 30 min, then transferred to an autoclave and heated at 120°C for 6 h. The product was collected by centrifugation, washed with water and ethanol, and dried at 60°C overnight.",
+        "output": {
+            "synthesis_method": "co-precipitation with hydrothermal aging",
+            "synthesis_conditions": {
+                "temperature": 120,
+                "time": "6 h",
+                "precursors": ["Co(NO3)2·6H2O", "Fe(NO3)3·9H2O", "NaOH"],
+                "solvent": "deionized water",
+                "atmosphere": None,
+                "post_treatment": "dried at 60°C overnight"
+            },
+            "characterization": []
+        }
+    },
+]
+
+PH_TEMP_EXTRACTION_PROMPT = """Extract optimal pH and temperature conditions for the nanozyme "{nanozyme_name}" from the following text.
+
+Focus on:
+- Optimal pH value (the pH at which catalytic activity is maximum)
+- pH range (the range where activity is measurable, e.g., "3.0-9.0")
+- Optimal temperature (in °C, the temperature at which catalytic activity is maximum)
+- Temperature range (the range where activity is measurable, e.g., "20-80°C")
+
+HOW TO IDENTIFY OPTIMAL VALUES:
+1. Direct statements: "The optimal pH was 4.0" or "maximum activity at pH 4.0"
+2. From figure descriptions: "As shown in Fig. 3b, the activity reached its maximum at pH 4.0"
+3. From comparison: "The activity at pH 4.0 was significantly higher than at other pH values"
+4. From assay conditions: "All kinetic assays were performed at pH 4.0 and 37°C" (when this is the standard condition)
+5. Temperature in °C: convert from K if needed (K - 273.15 = °C)
+
+Text:
+{text}
+
+Respond in JSON format:
+{{
+  "pH_profile": {{
+    "optimal_pH": <number or null>,
+    "pH_range": "<range string or null>"
+  }},
+  "temperature_profile": {{
+    "optimal_temperature": <number in °C or null>,
+    "temperature_range": "<range string or null>"
+  }}
+}}"""
+
+PH_TEMP_FEW_SHOT_EXAMPLES = [
+    {
+        "input": "The effect of pH on the peroxidase-like activity of Fe3O4@C was investigated. As shown in Fig. 4A, the optimal pH was 4.0, and the catalytic activity could be observed in the pH range of 2.0-7.0. The effect of temperature was also studied (Fig. 4B), and the maximum activity was achieved at 40°C with a temperature range of 20-70°C.",
+        "output": {
+            "pH_profile": {"optimal_pH": 4.0, "pH_range": "2.0-7.0"},
+            "temperature_profile": {"optimal_temperature": 40, "temperature_range": "20-70°C"}
+        }
+    },
+    {
+        "input": "All catalytic experiments were performed at 37°C in acetate buffer (pH 3.5) unless otherwise stated. The nanozyme retained 80% of its activity between pH 3.0 and 5.0.",
+        "output": {
+            "pH_profile": {"optimal_pH": 3.5, "pH_range": "3.0-5.0"},
+            "temperature_profile": {"optimal_temperature": 37, "temperature_range": None}
+        }
+    },
+    {
+        "input": "Figure 5 shows the pH-dependent and temperature-dependent activities of the Au@Pd nanozyme. The relative activity reached 100% at pH 4.0 and decreased sharply above pH 6.0. The optimal temperature was determined to be 45°C. The nanozyme maintained over 60% activity from 25 to 65°C.",
+        "output": {
+            "pH_profile": {"optimal_pH": 4.0, "pH_range": None},
+            "temperature_profile": {"optimal_temperature": 45, "temperature_range": "25-65°C"}
+        }
+    },
+]
+
+
+def build_synthesis_prompt(nanozyme_name: str, text: str, include_examples: bool = True) -> List[Dict[str, str]]:
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    if include_examples:
+        for ex in SYNTHESIS_FEW_SHOT_EXAMPLES:
+            messages.append({"role": "user", "content": SYNTHESIS_EXTRACTION_PROMPT.format(
+                nanozyme_name=nanozyme_name, text=ex["input"]
+            )})
+            messages.append({"role": "assistant", "content": json.dumps(ex["output"], ensure_ascii=False)})
+    messages.append({"role": "user", "content": SYNTHESIS_EXTRACTION_PROMPT.format(
+        nanozyme_name=nanozyme_name, text=text
+    )})
+    return messages
+
+
+def build_ph_temp_prompt(nanozyme_name: str, text: str, include_examples: bool = True) -> List[Dict[str, str]]:
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    if include_examples:
+        for ex in PH_TEMP_FEW_SHOT_EXAMPLES:
+            messages.append({"role": "user", "content": PH_TEMP_EXTRACTION_PROMPT.format(
+                nanozyme_name=nanozyme_name, text=ex["input"]
+            )})
+            messages.append({"role": "assistant", "content": json.dumps(ex["output"], ensure_ascii=False)})
+    messages.append({"role": "user", "content": PH_TEMP_EXTRACTION_PROMPT.format(
+        nanozyme_name=nanozyme_name, text=text
+    )})
+    return messages
