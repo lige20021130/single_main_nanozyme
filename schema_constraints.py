@@ -39,6 +39,73 @@ _KCAT_UNIT_ENUM = ["s⁻¹", "s-1", "min⁻¹", "min-1", None]
 
 _KCAT_KM_UNIT_ENUM = ["M⁻¹s⁻¹", "M-1s-1", "M⁻¹min⁻¹", None]
 
+try:
+    from pydantic import BaseModel, Field, field_validator
+    PYDANTIC_AVAILABLE = True
+except ImportError:
+    PYDANTIC_AVAILABLE = False
+    BaseModel = object
+    Field = lambda *a, **kw: None
+    field_validator = lambda *a, **kw: lambda f: f
+
+if PYDANTIC_AVAILABLE:
+    class KineticsEntryModel(BaseModel):
+        Km: float | None = None
+        Km_unit: str | None = None
+        Vmax: float | None = None
+        Vmax_unit: str | None = None
+        kcat: float | None = None
+        kcat_unit: str | None = None
+        kcat_Km: float | None = None
+        kcat_Km_unit: str | None = None
+        substrate: str | None = None
+        detection_method: str | None = None
+        material_variant: str | None = None
+
+    class SynthesisConditionsModel(BaseModel):
+        temperature: float | None = None
+        time: str | None = None
+        precursors: list[str] = Field(default_factory=list)
+        solvent: str | None = None
+        atmosphere: str | None = None
+        post_treatment: str | None = None
+
+    class ApplicationEntryModel(BaseModel):
+        application_type: str | None = None
+        target_analyte: str | None = None
+        detection_limit: float | None = None
+        detection_limit_unit: str | None = None
+        method: str | None = None
+        sample_type: str | None = None
+
+        @field_validator("application_type")
+        @classmethod
+        def validate_app_type(cls, v):
+            if v and v not in _APPLICATION_TYPE_ENUM:
+                raise ValueError(f"application_type '{v}' not in allowed enum")
+            return v
+
+    class NanozymeExtractionModel(BaseModel):
+        enzyme_like_type: str | None = None
+        kinetics: KineticsEntryModel | None = None
+        kinetics_list: list[KineticsEntryModel] = Field(default_factory=list)
+        morphology: str | None = None
+        size: float | None = None
+        size_unit: str | None = None
+        crystal_structure: str | None = None
+        surface_area: str | None = None
+        synthesis_method: str | None = None
+        synthesis_conditions: SynthesisConditionsModel | None = None
+        characterization: list[str] = Field(default_factory=list)
+        applications: list[ApplicationEntryModel] = Field(default_factory=list)
+        pH_profile: dict | None = None
+        temperature_profile: dict | None = None
+else:
+    KineticsEntryModel = None
+    SynthesisConditionsModel = None
+    ApplicationEntryModel = None
+    NanozymeExtractionModel = None
+
 
 NANOZYME_KINETICS_SCHEMA = {
     "type": "object",

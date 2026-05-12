@@ -157,3 +157,47 @@ def test_application_type_enum_string():
     s = get_application_type_enum_string()
     assert "sensing" in s
     assert "therapeutic" in s
+
+
+def test_pydantic_models_available():
+    from schema_constraints import PYDANTIC_AVAILABLE
+    if not PYDANTIC_AVAILABLE:
+        pytest.skip("pydantic not available")
+
+
+def test_kinetics_entry_model_valid():
+    from schema_constraints import KineticsEntryModel, PYDANTIC_AVAILABLE
+    if not PYDANTIC_AVAILABLE:
+        pytest.skip("pydantic not available")
+    entry = KineticsEntryModel(Km=0.35, Km_unit="mM", Vmax=44.1, Vmax_unit="μM/s", substrate="TMB")
+    assert entry.Km == 0.35
+    assert entry.substrate == "TMB"
+
+
+def test_application_entry_model_invalid_type():
+    from schema_constraints import ApplicationEntryModel, PYDANTIC_AVAILABLE
+    if not PYDANTIC_AVAILABLE:
+        pytest.skip("pydantic not available")
+    with pytest.raises(Exception):
+        ApplicationEntryModel(application_type="invalid_type")
+
+
+def test_application_entry_model_valid_type():
+    from schema_constraints import ApplicationEntryModel, PYDANTIC_AVAILABLE
+    if not PYDANTIC_AVAILABLE:
+        pytest.skip("pydantic not available")
+    entry = ApplicationEntryModel(application_type="sensing", target_analyte="glucose")
+    assert entry.application_type == "sensing"
+
+
+def test_nanozyme_extraction_model():
+    from schema_constraints import NanozymeExtractionModel, KineticsEntryModel, PYDANTIC_AVAILABLE
+    if not PYDANTIC_AVAILABLE:
+        pytest.skip("pydantic not available")
+    model = NanozymeExtractionModel(
+        enzyme_like_type="peroxidase-like",
+        kinetics=KineticsEntryModel(Km=0.35, Km_unit="mM"),
+        morphology="spherical"
+    )
+    assert model.enzyme_like_type == "peroxidase-like"
+    assert model.kinetics.Km == 0.35
