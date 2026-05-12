@@ -163,6 +163,98 @@ KINETICS_FEW_SHOT_EXAMPLES = [
             ]
         }
     },
+    {
+        "input": "The steady-state kinetic assay revealed that the kcat of CeO2 NPs for TMB was 3.45 × 10⁵ s⁻¹, and the Km was 0.089 mM. The catalytic efficiency (kcat/Km) was calculated to be 3.88 × 10⁶ M⁻¹s⁻¹.",
+        "output": {
+            "kinetics": {
+                "Km": 0.089, "Km_unit": "mM",
+                "Vmax": None, "Vmax_unit": None,
+                "kcat": 345000.0, "kcat_unit": "s⁻¹",
+                "kcat_Km": 3880000.0, "kcat_Km_unit": "M⁻¹s⁻¹",
+                "substrate": "TMB"
+            },
+            "kinetics_list": [
+                {"Km": 0.089, "Km_unit": "mM", "Vmax": None, "Vmax_unit": None, "kcat": 345000.0, "kcat_unit": "s⁻¹", "kcat_Km": 3880000.0, "kcat_Km_unit": "M⁻¹s⁻¹", "substrate": "TMB", "material_variant": None, "detection_method": None}
+            ]
+        }
+    },
+    {
+        "input": "The optimal pH for the peroxidase-like activity of Au@Pt NPs was 4.0, and the optimal temperature was 40 °C. Under these conditions, the Km for TMB was 0.22 mM and Vmax was 2.15 × 10⁻⁷ M/s.",
+        "output": {
+            "kinetics": {
+                "Km": 0.22, "Km_unit": "mM",
+                "Vmax": 0.215, "Vmax_unit": "μM/s",
+                "kcat": None, "kcat_unit": None,
+                "kcat_Km": None, "kcat_Km_unit": None,
+                "substrate": "TMB"
+            },
+            "kinetics_list": [
+                {"Km": 0.22, "Km_unit": "mM", "Vmax": 0.215, "Vmax_unit": "μM/s", "kcat": None, "kcat_unit": None, "kcat_Km": None, "kcat_Km_unit": None, "substrate": "TMB", "material_variant": None, "detection_method": None}
+            ]
+        }
+    },
+    {
+        "input": "The turnover number (kcat) of Fe-N-C SAzyme for H2O2 substrate was 1.2 × 10³ min⁻¹, and the Km value was 0.56 mM. For TMB substrate, kcat was 8.5 × 10² min⁻¹ and Km was 0.34 mM.",
+        "output": {
+            "kinetics": {
+                "Km": 0.56, "Km_unit": "mM",
+                "Vmax": None, "Vmax_unit": None,
+                "kcat": 1200.0, "kcat_unit": "min⁻¹",
+                "kcat_Km": None, "kcat_Km_unit": None,
+                "substrate": "H2O2"
+            },
+            "kinetics_list": [
+                {"Km": 0.56, "Km_unit": "mM", "Vmax": None, "Vmax_unit": None, "kcat": 1200.0, "kcat_unit": "min⁻¹", "kcat_Km": None, "kcat_Km_unit": None, "substrate": "H2O2", "material_variant": None, "detection_method": None},
+                {"Km": 0.34, "Km_unit": "mM", "Vmax": None, "Vmax_unit": None, "kcat": 850.0, "kcat_unit": "min⁻¹", "kcat_Km": None, "kcat_Km_unit": None, "substrate": "TMB", "material_variant": None, "detection_method": None}
+            ]
+        }
+    },
+    {
+        "input": "Kinetic analysis using Lineweaver-Burk plots gave Km = 1.79 mM and Vmax = 3.72e-8 M/s for Pd nanozyme with TMB as substrate.",
+        "output": {
+            "kinetics": {
+                "Km": 1.79, "Km_unit": "mM",
+                "Vmax": 0.0372, "Vmax_unit": "μM/s",
+                "kcat": None, "kcat_unit": None,
+                "kcat_Km": None, "kcat_Km_unit": None,
+                "substrate": "TMB"
+            },
+            "kinetics_list": [
+                {"Km": 1.79, "Km_unit": "mM", "Vmax": 0.0372, "Vmax_unit": "μM/s", "kcat": None, "kcat_unit": None, "kcat_Km": None, "kcat_Km_unit": None, "substrate": "TMB", "material_variant": None, "detection_method": None}
+            ]
+        }
+    },
+    {
+        "input": "Table 1. Kinetic parameters of different nanozymes. Entry: Cu-HCF SSNEs, Km (mM): 105.0, Vmax (M/s): 8.32e-8, Substrate: TMB. Entry: HRP (natural enzyme), Km (mM): 0.434, Vmax (M/s): 2.47e-7, Substrate: TMB.",
+        "output": {
+            "kinetics": {
+                "Km": 105.0, "Km_unit": "mM",
+                "Vmax": 0.0832, "Vmax_unit": "μM/s",
+                "kcat": None, "kcat_unit": None,
+                "kcat_Km": None, "kcat_Km_unit": None,
+                "substrate": "TMB"
+            },
+            "kinetics_list": [
+                {"Km": 105.0, "Km_unit": "mM", "Vmax": 0.0832, "Vmax_unit": "μM/s", "kcat": None, "kcat_unit": None, "kcat_Km": None, "kcat_Km_unit": None, "substrate": "TMB", "material_variant": "Cu-HCF SSNEs", "detection_method": None}
+            ]
+        }
+    },
+    {
+        "input": "The Michaelis constant of Mo-SAN for TMB was determined to be 0.42 mM with a Vmax of 5.6 × 10⁻⁸ M·s⁻¹, while for H2O2 the Km was 1.24 mM and Vmax was 3.8 × 10⁻⁸ M·s⁻¹. The catalytic efficiency kcat/Km for TMB was 1.5 × 10⁵ M⁻¹s⁻¹.",
+        "output": {
+            "kinetics": {
+                "Km": 0.42, "Km_unit": "mM",
+                "Vmax": 0.056, "Vmax_unit": "μM/s",
+                "kcat": None, "kcat_unit": None,
+                "kcat_Km": 150000.0, "kcat_Km_unit": "M⁻¹s⁻¹",
+                "substrate": "TMB"
+            },
+            "kinetics_list": [
+                {"Km": 0.42, "Km_unit": "mM", "Vmax": 0.056, "Vmax_unit": "μM/s", "kcat": None, "kcat_unit": None, "kcat_Km": 150000.0, "kcat_Km_unit": "M⁻¹s⁻¹", "substrate": "TMB", "material_variant": None, "detection_method": None},
+                {"Km": 1.24, "Km_unit": "mM", "Vmax": 0.038, "Vmax_unit": "μM/s", "kcat": None, "kcat_unit": None, "kcat_Km": None, "kcat_Km_unit": None, "substrate": "H2O2", "material_variant": None, "detection_method": None}
+            ]
+        }
+    },
 ]
 
 MORPHOLOGY_EXTRACTION_PROMPT = """Extract morphology and physical properties of the nanozyme "{nanozyme_name}" from the following text.
