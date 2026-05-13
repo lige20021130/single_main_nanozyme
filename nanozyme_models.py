@@ -39,6 +39,29 @@ _ENZYME_ALIAS_MAP: Dict[str, str] = {
     "invertase-like": "invertase-like",
     "chitinase-like": "chitinase-like",
     "xylanase-like": "xylanase-like",
+    "ferroxidase-like": "ferroxidase-like",
+    "glutathione-reductase-like": "glutathione-reductase-like",
+    "gr-like": "glutathione-reductase-like",
+    "superoxide-oxidase-like": "superoxide-oxidase-like",
+    "soo-like": "superoxide-oxidase-like",
+    "peroxynitritase-like": "peroxynitritase-like",
+    "nadh-peroxidase-like": "NADH-peroxidase-like",
+    "thioredoxin-reductase-like": "thioredoxin-reductase-like",
+    "trxr-like": "thioredoxin-reductase-like",
+    "glutathione-transferase-like": "glutathione-transferase-like",
+    "gst-like": "glutathione-transferase-like",
+    "monooxygenase-like": "monooxygenase-like",
+    "dioxygenase-like": "dioxygenase-like",
+    "sulfite-oxidase-like": "sulfite-oxidase-like",
+    "peroxidase-mimicking": "peroxidase-like",
+    "oxidase-mimicking": "oxidase-like",
+    "catalase-mimicking": "catalase-like",
+    "sod-mimicking": "superoxide-dismutase-like",
+    "gpx-mimicking": "glutathione-peroxidase-like",
+    "gox-mimicking": "glucose-oxidase-like",
+    "peroxidase-mimic": "peroxidase-like",
+    "oxidase-mimic": "oxidase-like",
+    "catalase-mimic": "catalase-like",
 }
 
 
@@ -71,6 +94,16 @@ class EnzymeType(Enum):
     INVERTASE = "invertase-like"
     CHITINASE = "chitinase-like"
     XYLANASE = "xylanase-like"
+    FERROXIDASE = "ferroxidase-like"
+    GLUTATHIONE_REDUCTASE = "glutathione-reductase-like"
+    SUPEROXIDE_OXIDASE = "superoxide-oxidase-like"
+    PEROXYNITRITASE = "peroxynitritase-like"
+    NADH_PEROXIDASE = "NADH-peroxidase-like"
+    THIOREDOXIN_REDUCTASE = "thioredoxin-reductase-like"
+    GLUTATHIONE_TRANSFERASE = "glutathione-transferase-like"
+    MONOOXYGENASE = "monooxygenase-like"
+    DIOXYGENASE = "dioxygenase-like"
+    SULFITE_OXIDASE = "sulfite-oxidase-like"
 
     @classmethod
     def normalize_canonical(cls, value: str) -> str:
@@ -294,23 +327,44 @@ _APPLICATION_TYPE_ALIAS_MAP: Dict[str, str] = {
     "assay": "sensing",
     "diagnostic": "sensing",
     "diagnosis": "sensing",
-    "imaging": "sensing",
+    "imaging": "bioimaging",
+    "bioimaging": "bioimaging",
+    "cell imaging": "bioimaging",
+    "fluorescence imaging": "bioimaging",
+    "mr imaging": "bioimaging",
+    "photoacoustic imaging": "bioimaging",
     "sensor": "sensing",
     "therapy": "therapeutic",
     "antitumor": "therapeutic",
     "tumor therapy": "therapeutic",
     "wound healing": "therapeutic",
     "phototherapy": "therapeutic",
+    "photothermal therapy": "therapeutic",
     "chemodynamic therapy": "therapeutic",
-    "cytoprotection": "antioxidant",
+    "sonodynamic therapy": "therapeutic",
+    "photodynamic therapy": "therapeutic",
+    "starvation therapy": "therapeutic",
+    "gas therapy": "therapeutic",
+    "cytoprotection": "cytoprotection",
+    "cell protection": "cytoprotection",
+    "neuroprotection": "cytoprotection",
+    "cardioprotection": "cytoprotection",
     "anti-inflammation": "antioxidant",
     "ros scavenging": "antioxidant",
+    "free radical scavenging": "antioxidant",
+    "oxidative stress protection": "antioxidant",
+    "radioprotection": "antioxidant",
     "anti-infection": "antibacterial",
     "antibacterial activity": "antibacterial",
     "sterilization": "antibacterial",
+    "bacteriostatic": "antibacterial",
+    "biocidal": "antibacterial",
     "degradation": "environmental",
     "water treatment": "environmental",
     "pollutant removal": "environmental",
+    "organic pollutant degradation": "environmental",
+    "waste water": "environmental",
+    "heavy metal detection": "environmental",
     "biofilm inhibition": "biofilm_inhibition",
     "anti-biofilm": "biofilm_inhibition",
 }
@@ -323,6 +377,8 @@ class ApplicationType(Enum):
     ENVIRONMENTAL = "environmental"
     ANTIOXIDANT = "antioxidant"
     BIOFILM_INHIBITION = "biofilm_inhibition"
+    CYTOPROTECTION = "cytoprotection"
+    BIOIMAGING = "bioimaging"
     OTHER = "other"
 
     @classmethod

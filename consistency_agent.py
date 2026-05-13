@@ -290,9 +290,12 @@ class ConsistencyAgent:
         "peroxidase-like": {
             "glucose": "glucose-oxidase-like",
             "glucose oxidase": "glucose-oxidase-like",
+            "superoxide": "superoxide-dismutase-like",
+            "o2-": "superoxide-dismutase-like",
         },
         "catalase-like": {
             "glucose": "glucose-oxidase-like",
+            "superoxide": "superoxide-dismutase-like",
         },
         "superoxide-dismutase-like": {
             "glucose": "glucose-oxidase-like",
@@ -300,6 +303,14 @@ class ConsistencyAgent:
         },
         "glutathione-peroxidase-like": {
             "glucose": "glucose-oxidase-like",
+            "superoxide": "superoxide-dismutase-like",
+        },
+        "oxidase-like": {
+            "h2o2": "peroxidase-like",
+        },
+        "glucose-oxidase-like": {
+            "h2o2": "peroxidase-like",
+            "superoxide": "superoxide-dismutase-like",
         },
     }
 

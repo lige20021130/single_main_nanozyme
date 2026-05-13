@@ -89,6 +89,10 @@ def normalize_unit(unit: Optional[str]) -> Optional[str]:
         return None
     u = unit.strip()
     u = re.sub(r'\s+', ' ', u)
+    u = re.sub(r'(\w)\u00b7(mL|L)\u207b\u00b9', r'\1/\2', u)
+    u = re.sub(r'(\w)\u00b7(mL|L)\u2212\u00b9', r'\1/\2', u)
+    u = re.sub(r'(\w)\u00b7(s|min)\u207b\u00b9', r'\1/\2', u)
+    u = re.sub(r'(\w)\u00b7(s|min)\u2212\u00b9', r'\1/\2', u)
     u = u.replace('⁻¹', '^-1').replace('⁻²', '^-2')
     u = u.replace('⁻', '^-')
     u = u.replace('−', '-').replace('–', '-')
@@ -130,6 +134,18 @@ def normalize_unit(unit: Optional[str]) -> Optional[str]:
     u = re.sub(r'\bmM/h\b', 'mM h^-1', u)
     u = re.sub(r'\bμM/h\b', 'μM h^-1', u)
     u = re.sub(r'\buM/h\b', 'uM h^-1', u)
+    u = re.sub(r'\bμg/mL\b', 'ug/mL', u)
+    u = re.sub(r'\bng/mL\b', 'ng/mL', u)
+    u = re.sub(r'\bmg/L\b', 'mg/L', u)
+    u = re.sub(r'\bμg/L\b', 'ug/L', u)
+    u = re.sub(r'\bng/L\b', 'ng/L', u)
+    u = re.sub(r'\bμg\u00b7mL[\u207b\u2212\u2013\-]?1\b', 'ug/mL', u)
+    u = re.sub(r'\bng\u00b7mL[\u207b\u2212\u2013\-]?1\b', 'ng/mL', u)
+    u = re.sub(r'\bmg\u00b7L[\u207b\u2212\u2013\-]?1\b', 'mg/L', u)
+    u = re.sub(r'\bμg\u00b7L[\u207b\u2212\u2013\-]?1\b', 'ug/L', u)
+    u = re.sub(r'\bng\u00b7L[\u207b\u2212\u2013\-]?1\b', 'ng/L', u)
+    u = re.sub(r'\bU/mg\b', 'U/mg', u)
+    u = re.sub(r'\bU/mL\b', 'U/mL', u)
     return u
 
 

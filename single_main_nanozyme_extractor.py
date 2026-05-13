@@ -356,6 +356,8 @@ _ENZYME_TYPE_PATTERNS = [
     (re.compile(r'\bsuperoxide\s+dismutase[-\s]?like\b', re.I), "superoxide-dismutase-like"),
     (re.compile(r'\bperoxidase[-\s]?like\b', re.I), "peroxidase-like"),
     (re.compile(r'\bPOD[-\s]?like\b', re.I), "peroxidase-like"),
+    (re.compile(r'\bsuperoxide\s+oxidase[-\s]?like\b', re.I), "superoxide-oxidase-like"),
+    (re.compile(r'\bSOO[-\s]?like\b', re.I), "superoxide-oxidase-like"),
     (re.compile(r'\boxidase[-\s]?like\b', re.I), "oxidase-like"),
     (re.compile(r'\bOXD[-\s]?like\b', re.I), "oxidase-like"),
     (re.compile(r'\bcatalase[-\s]?like\b', re.I), "catalase-like"),
@@ -399,6 +401,28 @@ _ENZYME_TYPE_PATTERNS = [
     (re.compile(r'\binvertase[-\s]?like\b', re.I), "invertase-like"),
     (re.compile(r'\bchitinase[-\s]?like\b', re.I), "chitinase-like"),
     (re.compile(r'\bxylanase[-\s]?like\b', re.I), "xylanase-like"),
+    (re.compile(r'\bperoxidase[-\s]?mimic(?:king)?\b', re.I), "peroxidase-like"),
+    (re.compile(r'\boxidase[-\s]?mimic(?:king)?\b', re.I), "oxidase-like"),
+    (re.compile(r'\bcatalase[-\s]?mimic(?:king)?\b', re.I), "catalase-like"),
+    (re.compile(r'\bSOD[-\s]?mimic(?:king)?\b', re.I), "superoxide-dismutase-like"),
+    (re.compile(r'\bsuperoxide\s+dismutase[-\s]?mimic(?:king)?\b', re.I), "superoxide-dismutase-like"),
+    (re.compile(r'\bGPx[-\s]?mimic(?:king)?\b', re.I), "glutathione-peroxidase-like"),
+    (re.compile(r'\bGOx[-\s]?mimic(?:king)?\b', re.I), "glucose-oxidase-like"),
+    (re.compile(r'\bferroxidase[-\s]?like\b', re.I), "ferroxidase-like"),
+    (re.compile(r'\bglutathione\s+reductase[-\s]?like\b', re.I), "glutathione-reductase-like"),
+    (re.compile(r'\bGR[-\s]?like\b', re.I), "glutathione-reductase-like"),
+    (re.compile(r'\bperoxynitritase[-\s]?like\b', re.I), "peroxynitritase-like"),
+    (re.compile(r'\bchloride\s+peroxidase[-\s]?like\b', re.I), "haloperoxidase-like"),
+    (re.compile(r'\bbromoperoxidase[-\s]?like\b', re.I), "haloperoxidase-like"),
+    (re.compile(r'\biodeperoxidase[-\s]?like\b', re.I), "haloperoxidase-like"),
+    (re.compile(r'\bNADH\s+peroxidase[-\s]?like\b', re.I), "NADH-peroxidase-like"),
+    (re.compile(r'\bthioredoxin\s+reductase[-\s]?like\b', re.I), "thioredoxin-reductase-like"),
+    (re.compile(r'\bTrxR[-\s]?like\b', re.I), "thioredoxin-reductase-like"),
+    (re.compile(r'\bglutathione\s+S-?transferase[-\s]?like\b', re.I), "glutathione-transferase-like"),
+    (re.compile(r'\bGST[-\s]?like\b', re.I), "glutathione-transferase-like"),
+    (re.compile(r'\bmonoxygenase[-\s]?like\b', re.I), "monooxygenase-like"),
+    (re.compile(r'\bdioxygenase[-\s]?like\b', re.I), "dioxygenase-like"),
+    (re.compile(r'\bsulfite\s+oxidase[-\s]?like\b', re.I), "sulfite-oxidase-like"),
 ]
 
 _SUBSTRATE_KEYWORDS = {
@@ -451,6 +475,14 @@ _KM_PATTERNS = [
     re.compile(r'\bMichaelis[^.]{0,30}?constant\b[^.]{0,50}?([\d.]+)\s*(mM|μM|uM|M)', re.I),
     re.compile(r'\bKm\b[^.]{0,15}?determined\b[^.]{0,30}?([\d.]+)\s*(mM|μM|uM|M)', re.I),
     re.compile(r'\bKm\b[^.]{0,40}?([\d.]+)\s*[eE][\-−]?\d+\s*(mM|μM|uM|M)', re.I),
+    re.compile(r'\bK[_\s]?m\b[^.]{0,30}?(?:was|=|:|≈|~)\s*([\d.]+)\s*(mM|μM|uM|M|nM|pM)', re.I),
+    re.compile(r'\bK[_\s]?m\s*[\(（]\s*(\w[\w\d\-]*)\s*[\)）]\s*(?:was|=|:|≈|~)\s*([\d.]+)\s*(mM|μM|uM|M|nM)', re.I),
+    re.compile(r'\bapp(?:arent)?\s*[-]?\s*K[_\s]?m\b[^.]{0,20}?(?:was|=|:|≈|~)\s*([\d.]+)\s*(mM|μM|uM|M|nM)', re.I),
+    re.compile(r'\bKm\s*[\(（]\s*app(?:arent)?\s*[\)）]\s*(?:was|=|:|≈|~)\s*([\d.]+)\s*(mM|μM|uM|M|nM)', re.I),
+    re.compile(r'\bKm\b[^.]{0,30}?([\d.]+)\s*(nmol/L|umol/L|pmol/L|fmol/L)', re.I),
+    re.compile(r'\bKm\b[^.]{0,30}?([\d.]+)\s*[×x\u00d7]\s*10[\u207b\u2212\u2013\-]?\s*(\d+)\s*(nmol/L|umol/L|pmol/L)', re.I),
+    re.compile(r'\baffinity\s*(?:constant|for)\b[^.]{0,40}?([\d.]+)\s*(mM|μM|uM|M|nM)', re.I),
+    re.compile(r'\bKm\b\s*[^.\d]{0,20}?([\d.]+)\s*[×x\u00d7]\s*10[\u207b\u2212\u2013\-](\d+)\s*(nmol/L|umol/L|mmol/L)', re.I),
 ]
 
 _KM_VMAX_JOINT_PATTERNS = [
@@ -465,6 +497,9 @@ _KM_VMAX_JOINT_PATTERNS = [
     re.compile(r'\bKm\b\s+(?:and|&)\s+V\s*max\b\s+(?:were|was|are|is)\s+(?:calculated|found|determined)?\s*(?:to\s+be\s+)?([\d.]+)\s*(mM|μM|uM|M|mmol)\s+(?:and|,)\s+([\d.]+)\s*[×x\u00d7]\s*10[\^⁻\-\u207b\u2212\u2013]?\s*([\d]+)\s*(M\s*[sS][\-\u207b\u2212\u2013]?1|M/?s|mM/?s|μM/?s|M\s+s-1)', re.I),
     re.compile(r'\bV\s*max\b.*?\bKm\b.*?(?:can\s+be\s+)?(?:calculated|found|determined)\s+(?:to\s+be\s+|as\s+)?([\d.]+(?:[eE][\-−\u2212]?\d+)?)\s*(mM|μM|uM|M)\s+(?:and|,)\s+([\d.]+(?:[eE][\-−\u2212]?\d+)?)\s*(M\s*[sS][\^⁻\-–]?[\-]?1|M/?s|mM/?s|μM/?s|M\s+s-1|s\u207b\u00b9)', re.I),
     re.compile(r'\bV\s*max\b[^.]{0,30}?\bKm\b[^.]{0,30}?(?:calculated|found|was)\s+(?:to\s+be\s+|as\s+)?([\d.]+(?:[eE][\-−\u2212]?\d+)?)\s*(mM|μM|uM|M)\s+(?:and|,)\s+([\d.]+(?:[eE][\-−\u2212]?\d+)?)\s*(M\s*[sS][\^⁻\-–]?[\-]?1|M/?s|mM/?s|μM/?s|M\s+s-1|s\u207b\u00b9)', re.I),
+    re.compile(r'\bK[_\s]?m\s*=\s*([\d.]+)\s*(mM|μM|uM|M|nM)\s*[,;]?\s*V[_\s]?max\s*=\s*([\d.]+(?:[eE][\-−]?\d+)?)\s*(M\s*[sS][\^⁻\-–]?[\-]?1|M/?s|mM/?s|μM/?s|M\s+s-1)', re.I),
+    re.compile(r'\bKm\b[^.]{0,30}?([\d.]+)\s*(mM|μM|uM|M|nM)\s+.*?\bV\s*max\b[^.]{0,20}?([\d.]+)\s*(M\s*[sS][\u207b\u2212\u2013\-]?1|M/?s|mM/?s|μM/?s|M\u00b7s|mM\u00b7s)', re.I),
+    re.compile(r'\bKm\b\s+(?:and|&)\s+V\s*max\b\s+(?:were|was|are|is)\s+(?:found|determined|calculated)?\s*(?:to\s+be\s+)?([\d.]+)\s*(mM|μM|uM|M|nM)\s+(?:and|,)\s+([\d.]+)\s*(M\s*[sS][\u207b\u2212\u2013\-]?1|M/?s|mM/?s|μM/?s|M\u00b7s|mM\u00b7s)', re.I),
 ]
 
 _KCAT_PATTERNS = [
@@ -487,13 +522,16 @@ _KCAT_PATTERNS = [
     re.compile(r'\bkcat\b[^.=]{0,20}?([\d.]+)\s*s\u207b\u00b9', re.I),
     re.compile(r'\bKcat\b[^.]{0,50}?([\d.]+)\s*(s[\u207b\u2212\u2013\-]?1|s-1)', re.I),
     re.compile(r'\bturnover\s+(?:number|frequency)\b[^.]{0,50}?([\d.]+)\s*(s[\u207b\u2212\u2013\-]?1|s-1|min[\u207b\u2212\u2013\-]?1)', re.I),
+    re.compile(r'\bk[_\s]?cat(?!\s*/\s*Km)\b[^.]{0,30}?(?:was|=|:|≈|~)\s*([\d.]+(?:[eE][\-−]?\d+)?)\s*(s[\u207b\u2212\u2013\-]?1|s-1|min[\u207b\u2212\u2013\-]?1)', re.I),
+    re.compile(r'\bkcat\s*[\(（]\s*app(?:arent)?\s*[\)）]\s*(?:was|=|:|≈|~)\s*([\d.]+(?:[eE][\-−]?\d+)?)\s*(s[\u207b\u2212\u2013\-]?1|s-1)', re.I),
+    re.compile(r'\bcatalytic\s+efficiency\b[^.]{0,30}?(?:was|=|:|≈|~)\s*([\d.]+(?:[eE][\-−]?\d+)?)\s*(s[\u207b\u2212\u2013\-]?1|s-1)', re.I),
 ]
 
 _KCAT_KM_PATTERNS = [
     re.compile(r'\bkcat/Km\s*[\(（]\s*(\w[\w\d\-]*)\s*[\)）]\s*(?:was|=|:|≈|~)\s*([\d.]+(?:\s*[×x]\s*10[\^⁻\-–]?\s*[-]?\d+)?)\s*(M[\^⁻\-–]?1\s*s[\^⁻\-–]?1|mM[\^⁻\-–]?1\s*s[\^⁻\-–]?1|μM[\^⁻\-–]?1\s*s[\^⁻\-–]?1)', re.I),
     re.compile(r'\bkcat/Km\s+(?:for\s+)?(\w[\w\d\-]*)?\s*(?:was|=|:|≈|~)\s*([\d.]+(?:\s*[×x]\s*10[\^⁻\-–]?\s*[-]?\d+)?)\s*(M[\^⁻\-–]?1\s*s[\^⁻\-–]?1|mM[\^⁻\-–]?1\s*s[\^⁻\-–]?1|μM[\^⁻\-–]?1\s*s[\^⁻\-–]?1)', re.I),
     re.compile(r'\bspecificity\s+constant\s*(?:for\s+)?(\w[\w\d\-]*)?\s*(?:was|=|:|≈|~)\s*([\d.]+(?:\s*[×x]\s*10[\^⁻\-–]?\s*[-]?\d+)?)\s*(M[\^⁻\-–]?1\s*s[\^⁻\-–]?1|mM[\^⁻\-–]?1\s*s[\^⁻\-–]?1|μM[\^⁻\-–]?1\s*s[\^⁻\-–]?1)', re.I),
-    re.compile(r'\bcatalytic\s+efficiency\s*(?:for\s+)?(\w[\w\d\-]*)?\s*(?:was|=|:|≈|~)\s*([\d.]+(?:\s*[×x]\s*10[\^⁻\-–]?\s*[-]?\d+)?)\s*(M[\^⁻\-–]?1\s*s[\^⁻\-–]?1|mM[\^⁻\-–]?1\s*s[\^⁻\-–]?1|μM[\^⁻\-–]?1\s*s[\^⁻\-–]?1)', re.I),
+    re.compile(r'\bcatalytic\s+efficiency\s*(?:for\s+)?(\w[\w\d\-]*)?\s*(?:was|=|:|≈|~|of)\s*([\d.]+(?:\s*[×x]\s*10[\^⁻\-–]?\s*[-]?\d+)?)\s*(M[\^⁻\-–]?1\s*s[\^⁻\-–]?1|mM[\^⁻\-–]?1\s*s[\^⁻\-–]?1|μM[\^⁻\-–]?1\s*s[\^⁻\-–]?1)', re.I),
     re.compile(r'\bkcat/Km\s*(?:was|=|:|≈|~|\u2248)\s*([\d.]+(?:\s*[×x\u00d7]\s*10[\u207b⁻\-–\u2212\u2013]?\s*[-]?\d+)?)\s*(M[\u207b⁻\-–\u2212\u2013]?1\s*[·\u00b7]?\s*s[\u207b⁻\-–\u2212\u2013]?1|M\s*/?\s*s[\u207b⁻\-–\u2212\u2013]?1|M[\^⁻\-–]?1\s*s[\^⁻\-–]?1|mM[\u207b⁻\-–\u2212\u2013]?1\s*[·\u00b7]?\s*s[\u207b⁻\-–\u2212\u2013]?1|M\u207b\u00b9\s*s\u207b\u00b9)', re.I),
     re.compile(r'\bkcat/Km\s*[\(（]\s*(\w[\w\d\-]*)\s*[\)）]\s*=\s*([\d.]+(?:\s*[×x\u00d7]\s*10[\u207b⁻\-–\u2212\u2013]?\s*[-]?\d+)?)\s*(M[\u207b⁻\-–\u2212\u2013]?1\s*[·\u00b7]?\s*s[\u207b⁻\-–\u2212\u2013]?1|M\s*/?\s*s[\u207b⁻\-–\u2212\u2013]?1|M[\^⁻\-–]?1\s*s[\^⁻\-–]?1|M\u207b\u00b9\s*s\u207b\u00b9)', re.I),
     re.compile(r'\bkcat/Km\b[^.=]{0,20}?(?:was|=|:|≈|~|\u2248)\s*([\d.]+)\s*[eE]\s*([\-−\u2212]?\d+)\s*(M[\u207b⁻\-–\u2212\u2013]?1\s*[·\u00b7]?\s*s[\u207b⁻\-–\u2212\u2013]?1|M\s*/?\s*s[\u207b⁻\-–\u2212\u2013]?1)', re.I),
@@ -562,7 +600,16 @@ def _normalize_ocr_scientific(text: str) -> str:
     t = _RE_VMAX.sub('Vmax', t)
     t = _RE_VM_NOAX.sub('Vmax', t)
     t = _RE_KCAT.sub('kcat', t)
+    t = t.replace('\u207b\u00b9', '-1')
+    t = t.replace('\u207b\u00b2', '-2')
+    t = t.replace('\u207b\u00b3', '-3')
+    t = t.replace('\u207a\u00b9', '+1')
+    t = t.replace('\u207a\u00b2', '+2')
     t = t.replace('\ufffd', '\u25a1')
+    t = t.replace('\u00b5', '\u03bc')
+    t = re.sub(r'\buM\b', '\u03bcM', t)
+    t = re.sub(r'\bum\b', '\u03bcm', t)
+    t = t.replace('\u25a1', '')
     t = _RE_10_SQ_NUM.sub(lambda m: '10\u207b' + m.group(1), t)
     t = _RE_NUM_SQ_10.sub(lambda m: m.group(1) + ' \u00d710', t)
     t = _RE_ALPHA_SQ_NUM.sub(lambda m: m.group(1) + '\u207b' + m.group(2), t)
@@ -585,7 +632,6 @@ def _normalize_ocr_scientific(text: str) -> str:
     t = _RE_NUM_X10_BARE.sub(lambda m: m.group(1) + ' \u00d7 10' + m.group(2), t)
     t = _RE_NUM_10_M_S.sub(lambda m: m.group(1) + ' \u00d7 10\u207b' + m.group(2) + ' M/s', t)
     t = _RE_NUM_10_MS.sub(lambda m: m.group(1) + ' \u00d7 10\u207b' + m.group(2) + ' M/s', t)
-    t = t.replace('\u25a1', '')
     return t
 
 
@@ -657,6 +703,8 @@ _VMAX_PATTERNS = [
     re.compile(r'\bmaximum\s+velocity\b[^.]{0,50}?([\d.]+)\s*(M\s*[sS][\u207b\u2212\u2013\-]?1|M/?s|mM/?s|μM/?s)', re.I),
     re.compile(r'\bV\s*max\b[^.]{0,15}?determined\b[^.]{0,30}?([\d.]+)\s*(M\s*[sS][\u207b\u2212\u2013\-]?1|M/?s|mM/?s|μM/?s)', re.I),
     re.compile(r'\bV\s*max\b[^.]{0,40}?([\d.]+)\s*[eE][\-−]?\d+\s*(M\s*[sS][\u207b\u2212\u2013\-]?1|M/?s|mM/?s|μM/?s)', re.I),
+    re.compile(r'\bV[_\s]?max\b[^.]{0,30}?([\d.]+)\s*(M\u00b7s|mM\u00b7s|μM\u00b7s|M\u00b7s\u207b\u00b9|mM\u00b7s\u207b\u00b9)', re.I),
+    re.compile(r'\bV[_\s]?max\b[^.]{0,30}?(?:was|=|:|≈|~)\s*([\d.]+)\s*(M/s|mM/s|μM/s)', re.I),
 ]
 
 _VMAX_OCR_PATTERNS = [
@@ -667,6 +715,10 @@ _VMAX_OCR_PATTERNS = [
     re.compile(r'\bV\s*max\s*[\(（\[]\s*10[\u207b⁻\-–\u2212\u2013]\s*(\d+)\s*(?:M\s*[sS]|mM\s*[sS])\s*[\)）\]]\s*([\d.]+)', re.I),
     re.compile(r'\bV\s*max\b[^.=]{0,20}?(?:was|=|:|≈|~|\u2248)\s*([\d.]+)\s*[eE]\s*([\-−\u2212]?\d+)', re.I),
     re.compile(r'\bV\s*max\b[^.=]{0,30}?([\d.]+)\s*[eE]\s*([\-−\u2212]?\d+)\s*(?:M\s*[sS]|mM\s*[sS]|M/?s|mM/?s)', re.I),
+    re.compile(r'\bV[_\s]?max\b[^.]{0,30}?(?:was|=|:|≈|~)\s*([\d.]+(?:[eE][\-−]?\d+)?)\s*(M\s*[sS][\u207b\u2212\u2013\-]?1|M/?s|mM/?s|μM/?s|M\u00b7s|mM\u00b7s)', re.I),
+    re.compile(r'\bmaximum\s+(?:catalytic\s+)?rate\b[^.]{0,30}?(?:was|=|:|≈|~)\s*([\d.]+(?:[eE][\-−]?\d+)?)\s*(M\s*[sS][\u207b\u2212\u2013\-]?1|M/?s|mM/?s|μM/?s|M\u00b7s)', re.I),
+    re.compile(r'\bV\s*max\b[^.]{0,30}?([\d.]+)\s*(M\u00b7s|mM\u00b7s|μM\u00b7s)', re.I),
+    re.compile(r'\bV\s*max\b[^.]{0,20}?([\d.]+)\s*[×x\u00d7]\s*10[\u207b\u2212\u2013\-](\d+)\s*(M\u00b7s|mM\u00b7s)', re.I),
 ]
 
 _VMAX_UNIT_CONTEXT = re.compile(
@@ -899,6 +951,26 @@ _LOD_PATTERNS = [
         r'(?:the\s+)?(?:lowest\s+)?(?:detect(?:able|ed))\s+(?:concentration|level|amount)\s*(?:was|is|=|:)\s*([\d.]+)\s*(nM|μM|uM|mM|M|pg/mL|ng/mL|μg/mL|mg/L|ppb|ppm)',
         re.I,
     ),
+    re.compile(
+        r'(?:LOD|detection\s+limit)\s*(?:of|=|:|≈|~|was|is)\s*([\d.]+)\s*[×x\u00d7]\s*10[\u207b\u2212\u2013\-]?\s*(\d+)?\s*(μg\u00b7mL[\u207b\u2212\u2013\-]?1|ng\u00b7mL[\u207b\u2212\u2013\-]?1|mg\u00b7L[\u207b\u2212\u2013\-]?1|μg\u00b7L[\u207b\u2212\u2013\-]?1|ng\u00b7L[\u207b\u2212\u2013\-]?1)',
+        re.I,
+    ),
+    re.compile(
+        r'(?:LOD|detection\s+limit)\s*(?:of|=|:|≈|~|was|is)\s*([\d.]+)\s*(μg\u00b7mL[\u207b\u2212\u2013\-]?1|ng\u00b7mL[\u207b\u2212\u2013\-]?1|mg\u00b7L[\u207b\u2212\u2013\-]?1|μg\u00b7L[\u207b\u2212\u2013\-]?1|ng\u00b7L[\u207b\u2212\u2013\-]?1|nmol\u00b7L[\u207b\u2212\u2013\-]?1|pmol\u00b7L[\u207b\u2212\u2013\-]?1)',
+        re.I,
+    ),
+    re.compile(
+        r'(?:limit\s+of\s+detection|LOD)\s*(?:for|of)\s+\S+\s+(?:was|is|=|:|≈|~)\s*([\d.]+)\s*(nM|μM|uM|mM|M|pg/mL|ng/mL|μg/mL|mg/L|ppb|ppm|pM|fM)',
+        re.I,
+    ),
+    re.compile(
+        r'(?:detectable|achieved)\s+(?:concentration|level)\s*(?:of|was|=|:)\s*([\d.]+)\s*(nM|μM|uM|mM|M|pg/mL|ng/mL|μg/mL|mg/L|ppb|ppm|pM|fM)',
+        re.I,
+    ),
+    re.compile(
+        r'(?:LOD|detection\s+limit)\s*(?:of|=|:|≈|~|was|is)\s*([\d.]+)\s*(nmol/L|pmol/L|fmol/L|μmol/L)',
+        re.I,
+    ),
 ]
 _LINEAR_RANGE_PATTERNS = [
     re.compile(
@@ -939,6 +1011,18 @@ _LINEAR_RANGE_PATTERNS = [
     ),
     re.compile(
         r'(?:quantif|determin|measur)\s+(?:from|between|in\s+the\s+range)\s*([\d.]+)\s*(?:to|[-–—~])\s*([\d.]+)\s*(nM|μM|uM|mM|M|pg/mL|ng/mL|μg/mL|mg/L)',
+        re.I,
+    ),
+    re.compile(
+        r'(?:linear\s+range|detection\s+range)\s*(?:of|=|:|≈|~|was|is)\s*([\d.]+)\s*[×x\u00d7]\s*10[\u207b\u2212\u2013\-]?\s*(\d+)?\s*(?:to|[-–—~])\s*([\d.]+)\s*[×x\u00d7]?\s*10?[\u207b\u2212\u2013\-]?\s*(\d+)?\s*(nM|μM|uM|mM|M|pg/mL|ng/mL|μg/mL|mg/L)',
+        re.I,
+    ),
+    re.compile(
+        r'(?:linear|calibration)\s+(?:range\s+)?(?:of\s+)?([\d.]+)\s*[-–—~]\s*([\d.]+)\s*(nmol/L|umol/L|mmol/L|pmol/L)',
+        re.I,
+    ),
+    re.compile(
+        r'(?:range)\s*(?:of|=|:)\s*([\d.]+)\s*[×x\u00d7]\s*10[\u207b\u2212\u2013\-](\d+)\s*(?:to|[-–—~])\s*([\d.]+)\s*[×x\u00d7]?\s*10?[\u207b\u2212\u2013\-]?(\d+)?\s*(nM|μM|uM|mM|M)',
         re.I,
     ),
 ]
@@ -1109,6 +1193,10 @@ _PH_PATTERNS = {
         re.compile(r'\bpH\s+optimum\s*(?:was|=|:|≈|~)\s*([\d.]+)', re.I),
         re.compile(r'\bmaximum\s+activity\s*(?:at|was\s+observed\s+at)\s*pH\s*([\d.]+)', re.I),
         re.compile(r'\b(?:best|highest)\s+(?:catalytic\s+)?activity\s*(?:at|was)\s*pH\s*([\d.]+)', re.I),
+        re.compile(r'\bpH\s*=\s*([\d.]+)\s*(?:was|is)\s+(?:the\s+)?(?:optimal|optimum|best)', re.I),
+        re.compile(r'\bpH\s*([\d.]+)\s+(?:was|is)\s+(?:the\s+)?optimal', re.I),
+        re.compile(r'\bpH\s+([\d.]+)\s+showed\s+(?:the\s+)?(?:highest|maximum|best)\s+(?:relative\s+)?activity', re.I),
+        re.compile(r'\bpH\s*([\d.]+)\s*\([^)]*(?:optimal|optimum|best|max)[^)]*\)', re.I),
     ],
     "pH_range": [
         re.compile(r'\bpH\s+range\s*(?:of|=|:|≈|~|was|from)\s*([\d.]+)\s*[-–—~to]+\s*([\d.]+)', re.I),
@@ -1141,6 +1229,11 @@ _TEMPERATURE_PATTERNS = {
         re.compile(r'\btemperature\s+optimum\b[^.]{0,20}?([\d.]+)\s*[\u02da\u00b0\u00ba\u25e6]\s*C', re.I),
         re.compile(r'\bmaximum\s+activity\s*(?:at|was\s+observed\s+at)\s*([\d.]+)\s*[\u02da\u00b0\u00ba\u25e6]\s*C', re.I),
         re.compile(r'\b(?:best|highest)\s+(?:catalytic\s+)?activity\s*(?:at|was)\s*([\d.]+)\s*[\u02da\u00b0\u00ba\u25e6]\s*C', re.I),
+        re.compile(r'\btemperature\s*=\s*([\d.]+)\s*°?C\s*(?:was|is)\s+(?:the\s+)?(?:optimal|optimum|best)', re.I),
+        re.compile(r'\b([\d.]+)\s*°?C\s+(?:was|is)\s+(?:the\s+)?(?:optimal|optimum|best)\s+(?:reaction\s+)?temperature', re.I),
+        re.compile(r'\broom\s+temperature\b', re.I),
+        re.compile(r'\b([\d.]+)\s*°\s*C\b[^.]{0,30}?(?:optimal|optimum|best|maximum\s+activity)', re.I),
+        re.compile(r'\boptimal\s+temp\b[^.]{0,10}?([\d.]+)\s*°?C', re.I),
     ],
     "temperature_range": [
         re.compile(r'\btemperature\s+range\s*(?:of|=|:|≈|~|was|from)\s*([\d.]+)\s*[-–—~to]+\s*([\d.]+)\s*°?C', re.I),
@@ -1148,6 +1241,7 @@ _TEMPERATURE_PATTERNS = {
         re.compile(r'\btemperature\s+([\d.]+)\s*[-–—~to]+\s*([\d.]+)\s*°C\s+(?:with|showed)', re.I),
         re.compile(r'\b(?:within|over|in)\s+(?:the\s+)?temperature\s+(?:range\s+)?(?:of\s+)?([\d.]+)\s*[-–—~to]+\s*([\d.]+)\s*°?C', re.I),
         re.compile(r'\b([\d.]+)\s*[-–—]\s*([\d.]+)\s*°C\s+(?:was|were)\s+(?:the\s+)?(?:optimal|active|best)', re.I),
+        re.compile(r'\btemperature\s+(?:from|between)\s*([\d.]+)\s*(?:to|[-–—~])\s*([\d.]+)\s*°?C', re.I),
     ],
 }
 
@@ -1171,6 +1265,11 @@ _SIZE_PATTERNS = [
     re.compile(r'\b(?:lattice|crystallite)\s+(?:size|parameter|spacing)\s*(?:of|was|=|:|≈|~)\s*([\d.]+)\s*(nm|Å|Å)\b', re.I),
     re.compile(r'\baverage\s+([\d.]+)\s*[-–—~]\s*([\d.]+)\s*(nm|μm|um)\b', re.I),
     re.compile(r'\b(?:approximately|about|around|ca\.?|~|≈)\s*([\d.]+)\s*[-–—~]\s*([\d.]+)\s*(nm|μm|um)\b', re.I),
+    re.compile(r'\bparticle\s+size\s*[\(（]\s*([\d.]+)\s*[-–—~]\s*([\d.]+)\s*(nm|μm|um)\s*[\)）]', re.I),
+    re.compile(r'\b(?:mean|avg)\s+(?:particle\s+)?(?:size|diameter)\s*(?:of|was|=|:|≈|~)\s*([\d.]+)\s*(nm|μm|um)', re.I),
+    re.compile(r'\b([\d.]+)\s*±\s*[\d.]+\s*(nm|μm|um)\s+(?:in\s+)?(?:size|diameter)', re.I),
+    re.compile(r'\bcore\s+(?:size|diameter)\s*(?:of|was|=|:|≈|~)\s*([\d.]+)\s*(nm|μm|um)', re.I),
+    re.compile(r'\bshell\s+(?:thickness|size)\s*(?:of|was|=|:|≈|~)\s*([\d.]+)\s*(nm|μm|um)', re.I),
 ]
 
 _SURFACE_AREA_PATTERNS = [

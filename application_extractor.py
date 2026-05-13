@@ -8,22 +8,29 @@ APPLICATION_TYPES = {
     "biosensing", "colorimetric_sensing", "fluorescence_sensing",
     "electrochemical_sensing", "SERS_sensing", "therapeutic",
     "antibacterial", "antioxidant", "environmental_detection",
-    "food_safety", "diagnostic", "other",
+    "food_safety", "diagnostic", "cytoprotection", "bioimaging",
+    "other",
 }
 
 APPLICATION_TYPE_PATTERNS = {
     "colorimetric_sensing": [
         r'(?i)colorimetric\s+(?:detection|sensing|assay|sensor)',
         r'(?i)colorimetric\s+determination',
+        r'(?i)visual\s+(?:detection|sensing|determination)',
+        r'(?i)color\s+(?:change|imetric)\s+(?:detection|assay)',
     ],
     "fluorescence_sensing": [
         r'(?i)fluorescen\w*\s+(?:detection|sensing|assay|sensor|probe)',
         r'(?i)fluorometric\s+(?:detection|assay)',
+        r'(?i)fluorimetric\s+(?:detection|assay)',
+        r'(?i)turn.on\s+fluorescen',
     ],
     "electrochemical_sensing": [
         r'(?i)electrochem\w*\s+(?:detection|sensing|sensor|assay)',
         r'(?i)amperometric\s+(?:detection|sensor)',
         r'(?i)voltammetric\s+(?:detection|sensor)',
+        r'(?i)impedimetric\s+(?:detection|sensor)',
+        r'(?i)potentiometric\s+(?:detection|sensor)',
     ],
     "SERS_sensing": [
         r'(?i)SERS\s+(?:detection|sensing|sensor|assay|substrate)',
@@ -32,6 +39,8 @@ APPLICATION_TYPE_PATTERNS = {
     "biosensing": [
         r'(?i)biosens(?:or|ing)',
         r'(?i)sensing\s+platform',
+        r'(?i)detect\w*\s+platform',
+        r'(?i)point.of.care\s+(?:test|detection|diagnostic)',
     ],
     "therapeutic": [
         r'(?i)therap\w+',
@@ -39,12 +48,24 @@ APPLICATION_TYPE_PATTERNS = {
         r'(?i)cancer\s+therapy',
         r'(?i)wound\s+heal',
         r'(?i)anti.?tumor',
+        r'(?i)photothermal\s+therap',
+        r'(?i)chemodynamic\s+therap',
+        r'(?i)sonodynamic\s+therap',
+        r'(?i)photodynamic\s+therap',
+        r'(?i)radiotherap\w*',
+        r'(?i)chemo\w*\s+therap',
+        r'(?i)immuno\w*\s+therap',
+        r'(?i)starvation\s+therap',
+        r'(?i)gas\s+therap',
     ],
     "antibacterial": [
         r'(?i)antibacteri\w+',
         r'(?i)bacteri\w*\s+kill',
         r'(?i)disinfect',
         r'(?i)anti.?microbial',
+        r'(?i)steriliz\w+',
+        r'(?i)bacteriostatic',
+        r'(?i)biocidal',
     ],
     "antioxidant": [
         r'(?i)antioxidant',
@@ -52,21 +73,44 @@ APPLICATION_TYPE_PATTERNS = {
         r'(?i)cytoprotect',
         r'(?i)anti.?inflammatory',
         r'(?i)radical\s+scaveng',
+        r'(?i)free\s+radical\s+(?:scaveng|remov|elimin)',
+        r'(?i)oxidative\s+stress\s+(?:protect|reduc|reliev|mitig)',
+        r'(?i)radioprotect\w+',
     ],
     "environmental_detection": [
         r'(?i)environment\w*\s+(?:detection|monitor)',
         r'(?i)pollutant\s+(?:detection|degrad)',
         r'(?i)water\s+(?:treatment|monitor|detection)',
         r'(?i)degrad\w+\s+pollutant',
+        r'(?i)organic\s+pollutant\s+(?:remov|degrad|detect)',
+        r'(?i)waste\s+water',
+        r'(?i)heavy\s+metal\s+(?:detection|remov)',
     ],
     "food_safety": [
         r'(?i)food\s+safety',
         r'(?i)food\s+(?:detection|quality|monitor)',
+        r'(?i)milk\s+(?:detection|quality)',
+        r'(?i)beverage\s+(?:detection|quality)',
     ],
     "diagnostic": [
         r'(?i)diagnos\w+',
         r'(?i)clinical\s+(?:detection|assay|test)',
         r'(?i)point.of.care',
+        r'(?i)bioassay',
+        r'(?i)immunoassay',
+    ],
+    "cytoprotection": [
+        r'(?i)cytoprotect\w+',
+        r'(?i)cell\s+protect',
+        r'(?i)neuroprotect\w+',
+        r'(?i)cardioprotect\w+',
+    ],
+    "bioimaging": [
+        r'(?i)bioimag\w+',
+        r'(?i)cell\s+imag\w+',
+        r'(?i)fluorescen\w*\s+imag\w+',
+        r'(?i)MR\s+imag\w+',
+        r'(?i)photoacoustic\s+imag\w+',
     ],
 }
 

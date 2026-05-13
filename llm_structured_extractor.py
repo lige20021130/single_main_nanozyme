@@ -447,6 +447,8 @@ class LLMStructuredExtractor:
             content = re.sub(r'\n?```$', '', content)
             content = content.strip()
 
+        content = self._pre_clean_json(content)
+
         try:
             return json.loads(content)
         except json.JSONDecodeError:
@@ -457,6 +459,35 @@ class LLMStructuredExtractor:
             try:
                 return json.loads(json_match.group())
             except json.JSONDecodeError:
-                pass
+                cleaned = self._fix_json_string(json_match.group())
+                if cleaned:
+                    try:
+                        return json.loads(cleaned)
+                    except json.JSONDecodeError:
+                        pass
 
         return None
+
+    @staticmethod
+    def _pre_clean_json(text: str) -> str:
+        t = text
+        t = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', t)
+        t = t.replace('\u00b5', '\u03bc')
+        t = re.sub(r',\s*([}\]])', r'\1', t)
+        t = re.sub(r'"\s*\n\s*"', '" "', t)
+        return t
+
+    @staticmethod
+    def _fix_json_string(s: str) -> Optional[str]:
+        try:
+            fixed = s
+            fixed = re.sub(r'(?<=[\w\s])\s*"\s*:\s*(?![\s{\["\d\-tnf])', '": "', fixed)
+            fixed = re.sub(r'(?<=[\]}])\s*,\s*([}\]])', r'\1', fixed)
+            fixed = re.sub(r'\\(?!["\\/bfnrtu])', '', fixed)
+            if not fixed.endswith('}'):
+                open_braces = fixed.count('{') - fixed.count('}')
+                if open_braces > 0:
+                    fixed += '}' * open_braces
+            return fixed
+        except Exception:
+            return None
