@@ -213,6 +213,13 @@ class LLMExtractor:
         self.client = client
         self.batch_size = batch_size
         self.json_fixer = JSONFixer()
+        self._engine = None
+
+    def _get_engine(self):
+        if self._engine is None:
+            from constrained_decoding import ConstrainedDecodingEngine
+            self._engine = ConstrainedDecodingEngine(self.client)
+        return self._engine
 
     @staticmethod
     def _ensure_candidate_structure(result: Dict) -> Dict:
@@ -261,6 +268,21 @@ class LLMExtractor:
             ]
 
             logger.info(f"[LLM] 正在调用 API (temperature=0.1, max_tokens=8192)...")
+            engine = self._get_engine()
+            constrained_result = await engine.call(
+                messages=messages,
+                task_name="full_extraction",
+                temperature=0.1,
+                max_tokens=8192,
+            )
+            if constrained_result:
+                constrained_result = self._ensure_candidate_structure(constrained_result)
+                logger.info(
+                    f"[LLM] {chunk_label} constrained extraction succeeded, "
+                    f"fields: {list(constrained_result.keys())}"
+                )
+                return constrained_result
+
             response = await self.client.chat_completion_text(
                 messages,
                 temperature=0.1,

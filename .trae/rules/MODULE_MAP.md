@@ -24,10 +24,10 @@ PDF输入 → 预处理 → 规则/LLM/VLM多源提取 → 交叉验证 → 一�
 |----------|-----------|------|---------|
 | `extraction_agents.py` | `KineticsAgent`, `MorphologyAgent`, `SynthesisAgent`, `ApplicationAgent`, `RuleExtractorAdapter` | 4个专业提取Agent + 适配器，替代原始RuleExtractor | single_main_nanozyme_extractor(正则模式), numeric_validator |
 | `material_identifier.py` | `MaterialIdentifier`, `PROBE_MOLECULES` | LLM-First材料识别器，识别主纳米酶和关联体系，探针分子黑名单 | api_client |
-| `llm_extractor.py` | `LLMExtractor`, `TableExtractor`, `JSONFixer` | LLM文本提取（全文+表格），JSON修复 | api_client |
-| `llm_structured_extractor.py` | `LLMStructuredExtractor` | LLM结构化提取核心模块（LLM-First模式），分任务提取（动力学/形态/应用/酶类型），self-augmentation两步提取，Vmax自动单位转换，Km量级校验 | extraction_prompts, schema_constraints, api_client |
+| `llm_extractor.py` | `LLMExtractor`, `TableExtractor`, `JSONFixer`, `_get_engine()` | LLM文本提取（全文+表格），JSON修复，ConstrainedDecodingEngine集成 | api_client, constrained_decoding |
+| `llm_structured_extractor.py` | `LLMStructuredExtractor`, `_get_engine()` | LLM结构化提取核心模块（LLM-First模式），分任务提取（动力学/形态/应用/酶类型），self-augmentation两步提取，Vmax自动单位转换，Km量级校验，ConstrainedDecodingEngine集成 | extraction_prompts, schema_constraints, api_client, constrained_decoding |
 | `extraction_prompts.py` | `build_kinetics_prompt()`, `build_morphology_prompt()`, `build_application_prompt()`, `build_enzyme_type_prompt()`, `build_self_augmentation_prompt()` | LLM提取prompt模板库，包含few-shot examples和纳米酶领域知识 | schema_constraints |
-| `schema_constraints.py` | `validate_against_schema()`, `auto_fix_schema_errors()`, `get_schema_for_openai()`, `NANOZYME_EXTRACTION_SCHEMA` | JSON schema约束定义，用于constrained decoding和输出验证 | 无外部依赖 |
+| `schema_constraints.py` | `validate_against_schema()`, `auto_fix_schema_errors()`, `get_schema_for_openai()`, `get_task_schema_for_openai()`, `NANOZYME_EXTRACTION_SCHEMA`, `TASK_SCHEMAS`, `_fix_numeric_strings()`, `_remove_unknown_fields()`, `_fix_enum_values()` | JSON schema约束定义，用于constrained decoding和输出验证，6个子任务Schema，增强auto_fix | 无外部依赖 |
 | `vlm_extractor.py` | `VLMExtractor` | 视觉语言模型图像提取（动力学图表/形态图） | api_client |
 | `activity_selector.py` | `ActivitySelector` | 催化活性类型选择与匹配 | 无外部依赖 |
 | `application_extractor.py` | `ApplicationExtractor`, `extract_method()`, `extract_sample_type()` | 应用信息提取（类型/方法/样品） | 无外部依赖 |
@@ -58,8 +58,9 @@ PDF输入 → 预处理 → 规则/LLM/VLM多源提取 → 交叉验证 → 一�
 |----------|-----------|------|---------|
 | `dependencies.py` | `is_available()`, `get_module()`, `get_attr()`, `require()`, `clear_cache()` | 统一依赖管理，替代散布的try/except ImportError | importlib |
 | `logging_setup.py` | `setup_logging()`, `get_logger()`, `ColoredFormatter`, `GUILogHandler` | 统一日志配置，RotatingFileHandler，模块级日志级别 | logging |
-| `api_client.py` | `APIClient`, `RateLimitConfig`, `TokenBucket` | LLM/VLM API调用，令牌桶限流，重试机制 | config_manager |
+| `api_client.py` | `APIClient`, `RateLimitConfig`, `TokenBucket`, `supports_json_schema()` | LLM/VLM API调用，令牌桶限流，重试机制，json_schema支持检测 | config_manager, constrained_decoding |
 | `config_manager.py` | `ConfigManager`, `LLMConfig`, `VLMConfig`, `PipelineConfig`, `FieldDefinition`, `RateLimitConfig`, `CacheConfig`, `PreprocessorConfig`, `ImageFilterConfig`, `QueueConfig` | 全局配置管理，YAML加载，默认值 | yaml |
+| `constrained_decoding.py` | `ConstrainedDecodingEngine`, `SUPPORTED_JSON_SCHEMA_PREFIXES` | 多层约束解码引擎：json_schema模式→json_object模式→后验证+auto_fix，模型能力检测，Schema Prompt注入 | schema_constraints, api_client |
 
 ## GUI层
 
@@ -106,6 +107,7 @@ PDF输入 → 预处理 → 规则/LLM/VLM多源提取 → 交叉验证 → 一�
 5. **一致性修正**: `ConsistencyAgent.normalize_output` → 酶类型/材料名/应用/单位归一化 → `check_analyte_enzyme_consistency` 分析物-酶类型兼容性检查
 6. **数值校验**: `NumericValidator.validate` → 量级范围检查 → 单位验证 → 诊断标记
 7. **Schema验证**: `validate_schema` → 字段完整性 → EnzymeType/ApplicationType枚举校验 → 状态/置信度赋值
+8. **约束解码**: `ConstrainedDecodingEngine.call` → 模型能力检测(`_detect_json_schema_support`) → json_schema模式(OpenAI兼容) / json_object模式(通用) → `_inject_schema_prompt` Schema约束注入 → `_validate_and_fix` 后验证+auto_fix
 
 ## 更新规则
 

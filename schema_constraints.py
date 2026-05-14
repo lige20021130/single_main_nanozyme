@@ -107,22 +107,34 @@ else:
     NanozymeExtractionModel = None
 
 
+_KINETICS_PROPERTIES = {
+    "Km": {"type": ["number", "null"]},
+    "Km_unit": {"type": ["string", "null"], "enum": _KM_UNIT_ENUM},
+    "Vmax": {"type": ["number", "null"]},
+    "Vmax_unit": {"type": ["string", "null"], "enum": _VMAX_UNIT_ENUM},
+    "kcat": {"type": ["number", "null"]},
+    "kcat_unit": {"type": ["string", "null"], "enum": _KCAT_UNIT_ENUM},
+    "kcat_Km": {"type": ["number", "null"]},
+    "kcat_Km_unit": {"type": ["string", "null"], "enum": _KCAT_KM_UNIT_ENUM},
+    "substrate": {"type": ["string", "null"]},
+    "detection_method": {"type": ["string", "null"]},
+    "material_variant": {"type": ["string", "null"]},
+}
+
 NANOZYME_KINETICS_SCHEMA = {
     "type": "object",
-    "properties": {
-        "Km": {"type": ["number", "null"]},
-        "Km_unit": {"type": ["string", "null"]},
-        "Vmax": {"type": ["number", "null"]},
-        "Vmax_unit": {"type": ["string", "null"]},
-        "kcat": {"type": ["number", "null"]},
-        "kcat_unit": {"type": ["string", "null"]},
-        "kcat_Km": {"type": ["number", "null"]},
-        "kcat_Km_unit": {"type": ["string", "null"]},
-        "substrate": {"type": ["string", "null"]},
-        "detection_method": {"type": ["string", "null"]},
-        "material_variant": {"type": ["string", "null"]},
-    },
+    "properties": _KINETICS_PROPERTIES,
     "required": [],
+    "additionalProperties": False,
+}
+
+_APPLICATION_ENTRY_PROPERTIES = {
+    "application_type": {"type": ["string", "null"], "enum": _APPLICATION_TYPE_ENUM + [None]},
+    "target_analyte": {"type": ["string", "null"]},
+    "detection_limit": {"type": ["number", "null"]},
+    "detection_limit_unit": {"type": ["string", "null"]},
+    "method": {"type": ["string", "null"]},
+    "sample_type": {"type": ["string", "null"]},
 }
 
 NANOZYME_EXTRACTION_SCHEMA = {
@@ -134,7 +146,7 @@ NANOZYME_EXTRACTION_SCHEMA = {
                 "name": {"type": ["string", "null"]},
                 "morphology": {"type": ["string", "null"]},
                 "size": {"type": ["number", "string", "null"]},
-                "size_unit": {"type": ["string", "null"]},
+                "size_unit": {"type": ["string", "null"], "enum": _SIZE_UNIT_ENUM},
                 "crystal_structure": {"type": ["string", "null"]},
                 "surface_area": {"type": ["string", "null"]},
                 "synthesis_method": {"type": ["string", "null"]},
@@ -147,20 +159,26 @@ NANOZYME_EXTRACTION_SCHEMA = {
                             "type": "array",
                             "items": {"type": "string"}
                         },
+                        "solvent": {"type": ["string", "null"]},
+                        "atmosphere": {"type": ["string", "null"]},
+                        "post_treatment": {"type": ["string", "null"]},
                     },
+                    "additionalProperties": False,
                 },
                 "characterization": {
                     "type": "array",
                     "items": {"type": "string"}
                 },
             },
-            "required": ["name"]
+            "required": ["name"],
+            "additionalProperties": False,
         },
         "main_activity": {
             "type": "object",
             "properties": {
                 "enzyme_like_type": {
                     "type": ["string", "null"],
+                    "enum": _ENZYME_TYPE_ENUM + [None],
                 },
                 "substrates": {
                     "type": "array",
@@ -177,6 +195,7 @@ NANOZYME_EXTRACTION_SCHEMA = {
                         "optimal_pH": {"type": ["number", "null"]},
                         "pH_range": {"type": ["string", "null"]},
                     },
+                    "additionalProperties": False,
                 },
                 "temperature_profile": {
                     "type": "object",
@@ -184,25 +203,22 @@ NANOZYME_EXTRACTION_SCHEMA = {
                         "optimal_temperature": {"type": ["number", "null"]},
                         "temperature_range": {"type": ["string", "null"]},
                     },
+                    "additionalProperties": False,
                 },
             },
+            "additionalProperties": False,
         },
         "applications": {
             "type": "array",
             "items": {
                 "type": "object",
-                "properties": {
-                    "application_type": {"type": ["string", "null"]},
-                    "target_analyte": {"type": ["string", "null"]},
-                    "detection_limit": {"type": ["number", "null"]},
-                    "detection_limit_unit": {"type": ["string", "null"]},
-                    "method": {"type": ["string", "null"]},
-                    "sample_type": {"type": ["string", "null"]},
-                },
+                "properties": _APPLICATION_ENTRY_PROPERTIES,
+                "additionalProperties": False,
             }
         },
     },
-    "required": ["selected_nanozyme", "main_activity"]
+    "required": ["selected_nanozyme", "main_activity"],
+    "additionalProperties": False,
 }
 
 
@@ -276,7 +292,73 @@ def validate_against_schema(data: Dict[str, Any]) -> List[str]:
     return errors
 
 
+def _fix_numeric_strings(obj: Any) -> Any:
+    if isinstance(obj, dict):
+        return {k: _fix_numeric_strings(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_fix_numeric_strings(v) for v in obj]
+    if isinstance(obj, str):
+        try:
+            if "." in obj:
+                return float(obj)
+            return int(obj)
+        except (ValueError, TypeError):
+            return obj
+    return obj
+
+
+def _remove_unknown_fields(data: Dict[str, Any], schema: Dict[str, Any]) -> Dict[str, Any]:
+    if not isinstance(data, dict) or schema.get("type") != "object":
+        return data
+    allowed = set(schema.get("properties", {}).keys())
+    if not allowed:
+        return data
+    cleaned = {}
+    for k, v in data.items():
+        if k not in allowed:
+            logger.debug("auto_fix: removing unknown field '%s'", k)
+            continue
+        prop_schema = schema["properties"].get(k, {})
+        if isinstance(v, dict) and prop_schema.get("type") == "object":
+            cleaned[k] = _remove_unknown_fields(v, prop_schema)
+        elif isinstance(v, list) and prop_schema.get("type") == "array":
+            item_schema = prop_schema.get("items", {})
+            if item_schema.get("type") == "object":
+                cleaned[k] = [_remove_unknown_fields(item, item_schema) for item in v if isinstance(item, dict)]
+            else:
+                cleaned[k] = v
+        else:
+            cleaned[k] = v
+    return cleaned
+
+
+def _fix_enum_values(data: Dict[str, Any], schema: Dict[str, Any]) -> Dict[str, Any]:
+    if not isinstance(data, dict) or schema.get("type") != "object":
+        return data
+    props = schema.get("properties", {})
+    for key, prop_def in props.items():
+        if key not in data or data[key] is None:
+            continue
+        enum_values = prop_def.get("enum")
+        if enum_values and data[key] not in enum_values:
+            logger.debug("auto_fix: resetting invalid enum field '%s' value '%s' to None", key, data[key])
+            data[key] = None
+        prop_type = prop_def.get("type")
+        is_object = (prop_type == "object") or (isinstance(prop_type, list) and "object" in prop_type)
+        if is_object and isinstance(data[key], dict):
+            data[key] = _fix_enum_values(data[key], prop_def)
+        if prop_type == "array" and isinstance(data[key], list):
+            item_schema = prop_def.get("items", {})
+            if item_schema.get("type") == "object":
+                data[key] = [_fix_enum_values(item, item_schema) for item in data[key] if isinstance(item, dict)]
+    return data
+
+
 def auto_fix_schema_errors(data: Dict[str, Any], errors: List[str]) -> Dict[str, Any]:
+    data = _fix_numeric_strings(data)
+    data = _remove_unknown_fields(data, NANOZYME_EXTRACTION_SCHEMA)
+    data = _fix_enum_values(data, NANOZYME_EXTRACTION_SCHEMA)
+
     for err in errors:
         if "unrealistically large" in err and "Km" in err:
             kin = data.get("main_activity", {}).get("kinetics", {})
@@ -295,4 +377,151 @@ def auto_fix_schema_errors(data: Dict[str, Any], errors: List[str]) -> Dict[str,
                     elif vmax_u in ("mM/s", "mM·s-1"):
                         kin["Vmax"] = vmax * 1e3
                         kin["Vmax_unit"] = "μM/s"
+        elif "not in allowed enum" in err:
+            if "enzyme_like_type" in err:
+                ma = data.get("main_activity", {})
+                if isinstance(ma, dict):
+                    ma["enzyme_like_type"] = None
+            elif "application_type" in err:
+                import re
+                m = re.search(r"applications\[(\d+)\]", err)
+                if m:
+                    idx = int(m.group(1))
+                    apps = data.get("applications", [])
+                    if idx < len(apps) and isinstance(apps[idx], dict):
+                        apps[idx]["application_type"] = None
     return data
+
+
+KINETICS_TASK_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "kinetics": NANOZYME_KINETICS_SCHEMA,
+        "kinetics_list": {
+            "type": "array",
+            "items": NANOZYME_KINETICS_SCHEMA,
+        },
+    },
+    "required": [],
+    "additionalProperties": False,
+}
+
+MORPHOLOGY_TASK_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "morphology": {"type": ["string", "null"]},
+        "size": {"type": ["number", "string", "null"]},
+        "size_unit": {"type": ["string", "null"], "enum": _SIZE_UNIT_ENUM},
+        "crystal_structure": {"type": ["string", "null"]},
+        "surface_area": {"type": ["string", "null"]},
+    },
+    "required": [],
+    "additionalProperties": False,
+}
+
+SYNTHESIS_TASK_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "synthesis_method": {"type": ["string", "null"]},
+        "synthesis_conditions": {
+            "type": "object",
+            "properties": {
+                "temperature": {"type": ["number", "string", "null"]},
+                "time": {"type": ["string", "null"]},
+                "precursors": {
+                    "type": "array",
+                    "items": {"type": "string"}
+                },
+                "solvent": {"type": ["string", "null"]},
+                "atmosphere": {"type": ["string", "null"]},
+                "post_treatment": {"type": ["string", "null"]},
+            },
+            "additionalProperties": False,
+        },
+        "characterization": {
+            "type": "array",
+            "items": {"type": "string"}
+        },
+    },
+    "required": [],
+    "additionalProperties": False,
+}
+
+APPLICATION_TASK_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "applications": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": _APPLICATION_ENTRY_PROPERTIES,
+                "additionalProperties": False,
+            }
+        },
+    },
+    "required": [],
+    "additionalProperties": False,
+}
+
+ENZYME_TYPE_TASK_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "enzyme_like_type": {
+            "type": ["string", "null"],
+            "enum": _ENZYME_TYPE_ENUM + [None],
+        },
+        "substrates": {
+            "type": "array",
+            "items": {"type": "string"}
+        },
+    },
+    "required": [],
+    "additionalProperties": False,
+}
+
+PH_PROFILE_TASK_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "pH_profile": {
+            "type": "object",
+            "properties": {
+                "optimal_pH": {"type": ["number", "null"]},
+                "pH_range": {"type": ["string", "null"]},
+            },
+            "additionalProperties": False,
+        },
+        "temperature_profile": {
+            "type": "object",
+            "properties": {
+                "optimal_temperature": {"type": ["number", "null"]},
+                "temperature_range": {"type": ["string", "null"]},
+            },
+            "additionalProperties": False,
+        },
+    },
+    "required": [],
+    "additionalProperties": False,
+}
+
+TASK_SCHEMAS = {
+    "kinetics": KINETICS_TASK_SCHEMA,
+    "morphology": MORPHOLOGY_TASK_SCHEMA,
+    "synthesis": SYNTHESIS_TASK_SCHEMA,
+    "application": APPLICATION_TASK_SCHEMA,
+    "enzyme_type": ENZYME_TYPE_TASK_SCHEMA,
+    "ph_profile": PH_PROFILE_TASK_SCHEMA,
+}
+
+
+def get_task_schema_for_openai(task_name: str) -> Optional[Dict[str, Any]]:
+    schema = TASK_SCHEMAS.get(task_name)
+    if schema is None:
+        return None
+    return {
+        "type": "json_schema",
+        "json_schema": {
+            "name": f"nanozyme_{task_name}",
+            "strict": True,
+            "schema": schema,
+        }
+    }

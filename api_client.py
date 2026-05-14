@@ -404,6 +404,11 @@ class APIClient:
                 raise Exception(f"{model_type} API 返回无效响应: choices 为 null 或缺失")
             return self._extract_provider_text_fallback(result, model_type)
 
+    def supports_json_schema(self) -> bool:
+        from constrained_decoding import SUPPORTED_JSON_SCHEMA_PREFIXES
+        model_lower = self.llm_model.lower()
+        return any(model_lower.startswith(prefix) for prefix in SUPPORTED_JSON_SCHEMA_PREFIXES)
+
     async def chat_completion_text(
         self,
         messages: List[Dict],

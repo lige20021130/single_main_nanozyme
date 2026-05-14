@@ -270,10 +270,17 @@ class LLMStructuredExtractor:
             logger.warning(f"[LLM-Ext] No client available for {task_name}")
             return None
 
-        if self.enable_constrained_output and response_model and _dep_available("instructor"):
-            instructor_result = await self._call_with_instructor(messages, task_name, response_model)
-            if instructor_result is not None:
-                return instructor_result
+        if self.enable_constrained_output:
+            engine = self._get_engine()
+            result = await engine.call(
+                messages=messages,
+                task_name=task_name,
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+            )
+            if result is not None:
+                logger.info(f"[LLM-Ext] {task_name} extraction succeeded (constrained mode)")
+                return result
 
         try:
             extra_params = {}
@@ -302,6 +309,12 @@ class LLMStructuredExtractor:
         except Exception as e:
             logger.error(f"[LLM-Ext] {task_name} extraction failed: {e}")
             return None
+
+    def _get_engine(self):
+        if not hasattr(self, '_engine') or self._engine is None:
+            from constrained_decoding import ConstrainedDecodingEngine
+            self._engine = ConstrainedDecodingEngine(self.client, self.config)
+        return self._engine
 
     async def _call_with_instructor(
         self,
