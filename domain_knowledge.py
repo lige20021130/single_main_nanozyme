@@ -1,6 +1,7 @@
 import logging
+import re
 from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Tuple
 
 import yaml
 
@@ -126,6 +127,44 @@ class DomainKnowledge:
     def generate_probe_molecule_prompt_snippet(self) -> str:
         names = [pm["name"] for pm in self.probe_molecules.get("examples", [])]
         return ", ".join(names)
+
+    def get_enzyme_type_regex_patterns(self) -> List[Tuple[re.Pattern, str]]:
+        if hasattr(self, '_regex_patterns_cache') and self._regex_patterns_cache is not None:
+            return self._regex_patterns_cache
+        patterns: List[Tuple[re.Pattern, str]] = []
+        for entry in self._data.get("enzyme_type_regex_patterns", []):
+            canonical = entry["canonical"]
+            for pat_str in entry.get("patterns", []):
+                patterns.append((re.compile(rf'\b{pat_str}\b', re.I), canonical))
+        self._regex_patterns_cache = patterns
+        return patterns
+
+    def get_enzyme_specific_km_ranges(self) -> Dict[str, Tuple[float, float, str]]:
+        result: Dict[str, Tuple[float, float, str]] = {}
+        for etype, info in self._data.get("enzyme_specific_km_ranges", {}).items():
+            result[etype] = (info["min"], info["max"], info["unit"])
+        return result
+
+    def get_enzyme_specific_vmax_ranges(self) -> Dict[str, Tuple[float, float, str]]:
+        result: Dict[str, Tuple[float, float, str]] = {}
+        for etype, info in self._data.get("enzyme_specific_vmax_ranges", {}).items():
+            result[etype] = (info["min"], info["max"], info["unit"])
+        return result
+
+    def get_analyte_enzyme_incompatibility(self) -> Dict[str, Dict[str, str]]:
+        return self._data.get("analyte_enzyme_incompatibility", {})
+
+    def get_analyte_enzyme_compatibility(self) -> Dict[str, List[str]]:
+        raw = self._data.get("analyte_enzyme_compatibility", {})
+        return {k: [v.lower() for v in vs] for k, vs in raw.items()}
+
+    def generate_substrate_knowledge_prompt(self) -> str:
+        lines = []
+        for et in self.enzyme_types:
+            substrates = et.get("substrates", [])
+            if substrates:
+                lines.append(f"Common substrates for {et['value']}: {', '.join(substrates)}")
+        return "\n".join(lines)
 
 
 def get_domain_knowledge() -> DomainKnowledge:

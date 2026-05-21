@@ -297,3 +297,129 @@ common_substrate_enzyme_mapping:
   ascorbic_acid: ["ascorbate-oxidase-like"]
   urea: ["urease-like"]
   L_DOPA: ["tyrosinase-like"]
+
+enzyme_type_regex_patterns:
+  - canonical: "glutathione-peroxidase-like"
+    patterns: ["glutathione\\s+peroxidase[-\\s]?like", "GPx[-\\s]?like", "GPx[-\\s]?mimic(?:king)?"]
+  - canonical: "glutathione-oxidase-like"
+    patterns: ["glutathione\\s+oxidase[-\\s]?like", "GSHOx[-\\s]?like"]
+  - canonical: "glucose-oxidase-like"
+    patterns: ["glucose\\s+oxidase[-\\s]?like", "GOx[-\\s]?like", "GOx[-\\s]?mimic(?:king)?"]
+  - canonical: "NADH-oxidase-like"
+    patterns: ["NADH\\s+oxidase[-\\s]?like"]
+  - canonical: "superoxide-dismutase-like"
+    patterns: ["superoxide\\s+dismutase[-\\s]?like", "SOD[-\\s]?like", "SOD[-\\s]?mimic(?:king)?", "superoxide\\s+dismutase[-\\s]?mimic(?:king)?"]
+  - canonical: "superoxide-oxidase-like"
+    patterns: ["superoxide\\s+oxidase[-\\s]?like", "SOO[-\\s]?like"]
+  - canonical: "peroxidase-like"
+    patterns: ["peroxidase[-\\s]?like", "POD[-\\s]?like", "peroxidase[-\\s]?mimic(?:king)?"]
+  - canonical: "oxidase-like"
+    patterns: ["oxidase[-\\s]?like", "OXD[-\\s]?like", "oxidase[-\\s]?mimic(?:king)?"]
+  - canonical: "catalase-like"
+    patterns: ["catalase[-\\s]?like", "CAT[-\\s]?like", "catalase[-\\s]?mimic(?:king)?"]
+  - canonical: "esterase-like"
+    patterns: ["esterase[-\\s]?like"]
+  - canonical: "phosphatase-like"
+    patterns: ["phosphatase[-\\s]?like", "ALP[-\\s]?like"]
+  - canonical: "nitroreductase-like"
+    patterns: ["nitroreductase[-\\s]?like", "NTR[-\\s]?like"]
+  - canonical: "hydrolase-like"
+    patterns: ["hydrolase[-\\s]?like"]
+  - canonical: "laccase-like"
+    patterns: ["laccase[-\\s]?like"]
+  - canonical: "haloperoxidase-like"
+    patterns: ["haloperoxidase[-\\s]?like", "chloroperoxidase[-\\s]?like", "chloride\\s+peroxidase[-\\s]?like", "bromoperoxidase[-\\s]?like", "iodeperoxidase[-\\s]?like"]
+  - canonical: "tyrosinase-like"
+    patterns: ["tyrosinase[-\\s]?like"]
+  - canonical: "ribozyme-like"
+    patterns: ["ribozyme[-\\s]?like"]
+  - canonical: "cellulase-like"
+    patterns: ["cellulase[-\\s]?like"]
+  - canonical: "amylase-like"
+    patterns: ["amylase[-\\s]?like"]
+  - canonical: "protease-like"
+    patterns: ["protease[-\\s]?like"]
+  - canonical: "lipase-like"
+    patterns: ["lipase[-\\s]?like"]
+  - canonical: "urease-like"
+    patterns: ["urease[-\\s]?like"]
+  - canonical: "ascorbate-oxidase-like"
+    patterns: ["ascorbate\\s+oxidase[-\\s]?like", "AAO[-\\s]?like"]
+  - canonical: "dehydrogenase-like"
+    patterns: ["formate\\s+dehydrogenase[-\\s]?like", "alcohol\\s+dehydrogenase[-\\s]?like", "glucose\\s+dehydrogenase[-\\s]?like"]
+  - canonical: "nuclease-like"
+    patterns: ["DNAse[-\\s]?like", "DNase[-\\s]?like", "RNase[-\\s]?like"]
+  - canonical: "invertase-like"
+    patterns: ["invertase[-\\s]?like"]
+  - canonical: "chitinase-like"
+    patterns: ["chitinase[-\\s]?like"]
+  - canonical: "xylanase-like"
+    patterns: ["xylanase[-\\s]?like"]
+  - canonical: "ferroxidase-like"
+    patterns: ["ferroxidase[-\\s]?like"]
+  - canonical: "glutathione-reductase-like"
+    patterns: ["glutathione\\s+reductase[-\\s]?like", "GR[-\\s]?like"]
+  - canonical: "peroxynitritase-like"
+    patterns: ["peroxynitritase[-\\s]?like"]
+  - canonical: "NADH-peroxidase-like"
+    patterns: ["NADH\\s+peroxidase[-\\s]?like"]
+  - canonical: "thioredoxin-reductase-like"
+    patterns: ["thioredoxin\\s+reductase[-\\s]?like", "TrxR[-\\s]?like"]
+  - canonical: "glutathione-transferase-like"
+    patterns: ["glutathione\\s+S-?transferase[-\\s]?like", "GST[-\\s]?like"]
+  - canonical: "monooxygenase-like"
+    patterns: ["monoxygenase[-\\s]?like"]
+  - canonical: "dioxygenase-like"
+    patterns: ["dioxygenase[-\\s]?like"]
+  - canonical: "sulfite-oxidase-like"
+    patterns: ["sulfite\\s+oxidase[-\\s]?like"]
+  - canonical: "multi-enzyme-like"
+    patterns: ["multi[-\\s]?enzyme[-\\s]?like", "dual[-\\s]?enzyme[-\\s]?like", "triple[-\\s]?enzyme[-\\s]?like", "peroxidase\\s+and\\s+oxidase[-\\s]?like", "peroxidase[-\\s]?oxidase[-\\s]?like", "POD[-\\s]?like\\s+and\\s+OXD[-\\s]?like", "catalase\\s+and\\s+peroxidase[-\\s]?like"]
+  - canonical: "cascade-enzymatic"
+    patterns: ["cascade\\s+enzym\\w+\\s+activ"]
+
+enzyme_specific_km_ranges:
+  peroxidase-like: {min: 0.001, max: 500, unit: "mM"}
+  oxidase-like: {min: 0.01, max: 200, unit: "mM"}
+  catalase-like: {min: 0.1, max: 1000, unit: "mM"}
+  superoxide-dismutase-like: {min: 0.01, max: 100, unit: "mM"}
+  glucose-oxidase-like: {min: 0.1, max: 500, unit: "mM"}
+  haloperoxidase-like: {min: 0.01, max: 100, unit: "mM"}
+  phosphatase-like: {min: 0.001, max: 200, unit: "mM"}
+  laccase-like: {min: 0.01, max: 50, unit: "mM"}
+  nitroreductase-like: {min: 0.001, max: 100, unit: "mM"}
+
+enzyme_specific_vmax_ranges:
+  peroxidase-like: {min: 0.0001, max: 1000000, unit: "μM/s"}
+  oxidase-like: {min: 0.001, max: 100000, unit: "μM/s"}
+  catalase-like: {min: 0.01, max: 1000000, unit: "μM/s"}
+  glucose-oxidase-like: {min: 0.001, max: 100000, unit: "μM/s"}
+
+analyte_enzyme_incompatibility:
+  peroxidase-like:
+    glucose: "glucose-oxidase-like"
+    "glucose oxidase": "glucose-oxidase-like"
+    superoxide: "superoxide-dismutase-like"
+    "o2-": "superoxide-dismutase-like"
+  catalase-like:
+    glucose: "glucose-oxidase-like"
+    superoxide: "superoxide-dismutase-like"
+  superoxide-dismutase-like:
+    glucose: "glucose-oxidase-like"
+    h2o2: "peroxidase-like"
+  glutathione-peroxidase-like:
+    glucose: "glucose-oxidase-like"
+    superoxide: "superoxide-dismutase-like"
+  oxidase-like:
+    h2o2: "peroxidase-like"
+  glucose-oxidase-like:
+    h2o2: "peroxidase-like"
+    superoxide: "superoxide-dismutase-like"
+
+analyte_enzyme_compatibility:
+  peroxidase-like: ["h2o2", "tmb", "abts", "opd", "dab", "glucose", "dopamine", "ascorbic acid", "gsh", "cysteine", "biothiols"]
+  oxidase-like: ["glucose", "ascorbic acid", "uric acid", "cholesterol", "dopamine", "xanthine", "epinephrine", "cysteine", "phenol", "pollutants", "pesticides", "cu2+", "fe2+", "fe3+", "hg2+", "pb2+", "cd2+", "ag+", "cr(vi)", "mn2+", "co2+", "ni2+", "zn2+", "al3+", "sulfite", "h2s", "cn-", "biothiols"]
+  catalase-like: ["h2o2"]
+  glucose-oxidase-like: ["glucose", "o2"]
+  superoxide-dismutase-like: ["superoxide", "o2-"]
+  haloperoxidase-like: ["br-", "i-", "h2o2"]

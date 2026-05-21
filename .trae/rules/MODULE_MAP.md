@@ -26,7 +26,7 @@ PDF输入 → 预处理 → 规则/LLM/VLM多源提取 → 交叉验证 → 一�
 | `material_identifier.py` | `MaterialIdentifier`, `PROBE_MOLECULES` | LLM-First材料识别器，识别主纳米酶和关联体系，探针分子黑名单从domain_knowledge加载 | api_client, domain_knowledge |
 | `llm_extractor.py` | `LLMExtractor`, `TableExtractor`, `JSONFixer`, `_get_engine()` | LLM文本提取（全文+表格），JSON修复，ConstrainedDecodingEngine集成 | api_client, constrained_decoding |
 | `llm_structured_extractor.py` | `LLMStructuredExtractor`, `_get_engine()` | LLM结构化提取核心模块（LLM-First模式），分任务提取（动力学/形态/应用/酶类型），self-augmentation两步提取，Vmax自动单位转换，Km量级校验，ConstrainedDecodingEngine集成 | extraction_prompts, schema_constraints, api_client, constrained_decoding |
-| `extraction_prompts.py` | `build_kinetics_prompt()`, `build_morphology_prompt()`, `build_application_prompt()`, `build_enzyme_type_prompt()`, `build_self_augmentation_prompt()` | LLM提取prompt模板库，包含few-shot examples和纳米酶领域知识 | schema_constraints |
+| `extraction_prompts.py` | `build_kinetics_prompt()`, `build_morphology_prompt()`, `build_application_prompt()`, `build_enzyme_type_prompt()`, `build_self_augmentation_prompt()` | LLM提取prompt模板库，底物知识从domain_knowledge动态注入 | schema_constraints, domain_knowledge |
 | `schema_constraints.py` | `validate_against_schema()`, `auto_fix_schema_errors()`, `get_schema_for_openai()`, `get_task_schema_for_openai()`, `NANOZYME_EXTRACTION_SCHEMA`, `TASK_SCHEMAS`, `_fix_numeric_strings()`, `_remove_unknown_fields()`, `_fix_enum_values()` | JSON schema约束定义，用于constrained decoding和输出验证，6个子任务Schema，增强auto_fix | domain_knowledge |
 | `vlm_extractor.py` | `VLMExtractor` | 视觉语言模型图像提取（动力学图表/形态图） | api_client |
 | `activity_selector.py` | `ActivitySelector` | 催化活性类型选择与匹配 | 无外部依赖 |
@@ -39,11 +39,11 @@ PDF输入 → 预处理 → 规则/LLM/VLM多源提取 → 交叉验证 → 一�
 | 模块文件 | 核心类/函数 | 职责 | 关键依赖 |
 |----------|-----------|------|---------|
 | `cross_validation_agent.py` | `CrossValidationAgent`, `check_multi_figure_kinetics_consistency()` | 多源(Rule/LLM/VLM)交叉验证，冲突检测与合并，多图间动力学一致性检查 | 无外部依赖 |
-| `consistency_agent.py` | `ConsistencyAgent`, `check_analyte_enzyme_consistency()`, `_ANALYTE_ENZYME_INCOMPATIBILITY` | 输出一致性修正：酶类型归一化、材料名去后缀、应用去重、单位归一化、分析物-酶类型兼容性检查 | nanozyme_models |
+| `consistency_agent.py` | `ConsistencyAgent`, `check_analyte_enzyme_consistency()`, `_ANALYTE_ENZYME_INCOMPATIBILITY` | 输出一致性修正：酶类型归一化、材料名去后缀、应用去重、单位归一化、分析物-酶类型兼容性检查(从domain_knowledge加载) | nanozyme_models, domain_knowledge |
 | `consistency_guard.py` | `ConsistencyGuard` | 对比表/他人物质检测，防止提取非目标纳米酶数据 | 无外部依赖 |
 | `consistency_guard_agentic.py` | `AgenticConsistencyGuard`, `IssueSeverity`, `GuardIssue`, `GuardCheckResult` | 智能一致性守卫，LLM辅助裁决冲突 | nanozyme_models, api_client |
 | `extraction_verifier.py` | `ExtractionVerifier` | 提取结果验证，字段与原文证据交叉核对 | 无外部依赖 |
-| `numeric_validator.py` | `NumericValidator`, `normalize_unit()`, `is_concentration_unit()`, `is_rate_unit()`, `calibrate_magnitude_ranges()`, `validate_nanozyme_kinetics()` | 数值范围校验、单位归一化、量级标定、纳米酶领域知识验证（酶类型-量级范围-分析物兼容性） | 无外部依赖 |
+| `numeric_validator.py` | `NumericValidator`, `normalize_unit()`, `is_concentration_unit()`, `is_rate_unit()`, `calibrate_magnitude_ranges()`, `validate_nanozyme_kinetics()` | 数值范围校验、单位归一化、量级标定、纳米酶领域知识验证（酶类型-量级范围-分析物兼容性，从domain_knowledge加载） | domain_knowledge |
 
 ## 数据模型层
 

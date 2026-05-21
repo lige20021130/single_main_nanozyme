@@ -2,7 +2,11 @@ import re
 import logging
 from typing import Dict, List, Optional, Any, Tuple
 
+from domain_knowledge import get_domain_knowledge as _get_dk
+
 logger = logging.getLogger(__name__)
+
+_DK = _get_dk()
 
 SOURCE_PRIORITY = {
     "text": 4,
@@ -564,33 +568,11 @@ class NumericValidator:
     def get_important_values(self) -> List[Dict[str, Any]]:
         return self.important_values
 
-    _NANOZYME_KM_RANGES = {
-        "peroxidase-like": (0.001, 500, "mM"),
-        "oxidase-like": (0.01, 200, "mM"),
-        "catalase-like": (0.1, 1000, "mM"),
-        "superoxide-dismutase-like": (0.01, 100, "mM"),
-        "glucose-oxidase-like": (0.1, 500, "mM"),
-        "haloperoxidase-like": (0.01, 100, "mM"),
-        "phosphatase-like": (0.001, 200, "mM"),
-        "laccase-like": (0.01, 50, "mM"),
-        "nitroreductase-like": (0.001, 100, "mM"),
-    }
+    _NANOZYME_KM_RANGES = _DK.get_enzyme_specific_km_ranges()
 
-    _NANOZYME_VMAX_RANGES = {
-        "peroxidase-like": (1e-4, 1e6, "μM/s"),
-        "oxidase-like": (1e-3, 1e5, "μM/s"),
-        "catalase-like": (1e-2, 1e6, "μM/s"),
-        "glucose-oxidase-like": (1e-3, 1e5, "μM/s"),
-    }
+    _NANOZYME_VMAX_RANGES = _DK.get_enzyme_specific_vmax_ranges()
 
-    _ANALYTE_ENZYME_COMPATIBILITY = {
-        "peroxidase-like": {"h2o2", "tmb", "abts", "opd", "dab", "glucose", "dopamine", "ascorbic acid", "gsh", "cysteine", "biothiols"},
-        "oxidase-like": {"glucose", "ascorbic acid", "uric acid", "cholesterol", "dopamine", "xanthine", "epinephrine", "cysteine", "phenol", "pollutants", "pesticides", "cu2+", "fe2+", "fe3+", "hg2+", "pb2+", "cd2+", "ag+", "cr(vi)", "mn2+", "co2+", "ni2+", "zn2+", "al3+", "sulfite", "h2s", "cn-", "biothiols"},
-        "catalase-like": {"h2o2"},
-        "glucose-oxidase-like": {"glucose", "o2"},
-        "superoxide-dismutase-like": {"superoxide", "o2-"},
-        "haloperoxidase-like": {"br-", "i-", "h2o2"},
-    }
+    _ANALYTE_ENZYME_COMPATIBILITY = _DK.get_analyte_enzyme_compatibility()
 
     _BROAD_ANALYTE_PATTERNS = re.compile(
         r'(?:pollut|pestic|heavy\s+metal|organic|carcinog|bacteri|virus|cancer|tumor|drug|toxin|contaminant|pathogen|biofilm|inflammation|cell)',

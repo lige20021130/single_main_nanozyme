@@ -4,8 +4,11 @@ import logging
 from typing import Dict, List, Any, Tuple
 
 from nanozyme_models import EnzymeType, ApplicationType
+from domain_knowledge import get_domain_knowledge as _get_dk
 
 logger = logging.getLogger(__name__)
+
+_DK = _get_dk()
 
 _NANO_SUFFIXES = re.compile(
     r'\s+'
@@ -286,33 +289,7 @@ class ConsistencyAgent:
                 app["needs_review"] = True
         return record, warnings
 
-    _ANALYTE_ENZYME_INCOMPATIBILITY = {
-        "peroxidase-like": {
-            "glucose": "glucose-oxidase-like",
-            "glucose oxidase": "glucose-oxidase-like",
-            "superoxide": "superoxide-dismutase-like",
-            "o2-": "superoxide-dismutase-like",
-        },
-        "catalase-like": {
-            "glucose": "glucose-oxidase-like",
-            "superoxide": "superoxide-dismutase-like",
-        },
-        "superoxide-dismutase-like": {
-            "glucose": "glucose-oxidase-like",
-            "h2o2": "peroxidase-like",
-        },
-        "glutathione-peroxidase-like": {
-            "glucose": "glucose-oxidase-like",
-            "superoxide": "superoxide-dismutase-like",
-        },
-        "oxidase-like": {
-            "h2o2": "peroxidase-like",
-        },
-        "glucose-oxidase-like": {
-            "h2o2": "peroxidase-like",
-            "superoxide": "superoxide-dismutase-like",
-        },
-    }
+    _ANALYTE_ENZYME_INCOMPATIBILITY = _DK.get_analyte_enzyme_incompatibility()
 
     def check_analyte_enzyme_consistency(self, record: Dict) -> Tuple[Dict, List[str]]:
         warnings = []

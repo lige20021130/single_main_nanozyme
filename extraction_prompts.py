@@ -5,6 +5,9 @@ from schema_constraints import (
     get_enzyme_type_enum_string,
     get_application_type_enum_string,
 )
+from domain_knowledge import get_domain_knowledge as _get_dk
+
+_DK = _get_dk()
 
 SYSTEM_PROMPT = """You are an expert nanozyme data extractor. Your task is to extract structured data from scientific literature about nanozymes (nanomaterials with enzyme-like catalytic activity).
 
@@ -14,8 +17,7 @@ CRITICAL DOMAIN KNOWLEDGE:
 3. Application types include: {app_types}
 4. Km (Michaelis constant) for nanozymes is typically 0.001-500 mM; values >1 M or >1000 mM are likely errors
 5. Vmax is typically reported in μM/s or mM/s; M/s values <1.0 should be converted to μM/s (multiply by 1e6)
-6. Common substrates for peroxidase-like: TMB, ABTS, DAB, OPD, H2O2
-7. Common substrates for oxidase-like: glucose, ascorbic acid, uric acid
+{substrate_knowledge}
 8. When multiple substrates are tested, extract kinetics for EACH substrate separately into kinetics_list
 9. Material names with @ or / (e.g., Fe3O4@C, Co-N-C) are composite/doped materials — these are MORE specific than simple oxide names
 10. Morphology should be specific (e.g., "uniform hollow polyhedral", "core-shell spherical"), NOT generic (e.g., "nanoparticle")
@@ -48,6 +50,7 @@ HARD RULES:
 """.format(
     enzyme_types=get_enzyme_type_enum_string(),
     app_types=get_application_type_enum_string(),
+    substrate_knowledge=_DK.generate_substrate_knowledge_prompt(),
 )
 
 KINETICS_EXTRACTION_PROMPT = """Extract kinetic parameters from the following text about a nanozyme named "{nanozyme_name}".
