@@ -5153,6 +5153,8 @@ class SingleMainNanozymePipeline:
             logger.warning("[SMN] diagnostics_builder not available, using inline diagnostics")
         self._guard: Optional[Any] = None
         self._agentic_guard: Optional[Any] = None
+        self._llm_kinetics_list_saved: Optional[List[Dict]] = None
+        self._vlm_sensing_data: Optional[Dict] = None
         if is_available("cross_validation_agent"):
             from cross_validation_agent import CrossValidationAgent
             self.cross_validator = CrossValidationAgent()
@@ -5932,81 +5934,143 @@ class SingleMainNanozymePipeline:
                 kin[f"{param}_unit"] = None
                 kin["needs_review"] = True
 
-    def _add_vlm_kinetics_to_list(self, record: Dict[str, Any]) -> None:
-        kin_list = record.get("main_activity", {}).get("kinetics_list", [])
-        if not isinstance(kin_list, list):
-            kin_list = []
-        ivs = record.get("important_values", [])
-        vlm_km_entries = []
-        vlm_vmax_entries = []
-        for iv in ivs:
-            if not isinstance(iv, dict):
+    def _build_vlm_kinetics_entries(self, vlm_results: List[Dict]) -> List[Dict]:
+        if not vlm_results:
+            return []
+
+        grouped = {}
+        for vr in vlm_results:
+            if not isinstance(vr, dict):
                 continue
-            name = iv.get("name", "")
-            if name == "VLM_Km":
+            ev = vr.get("extracted_values", {})
+            if not isinstance(ev, dict):
+                ev = {}
+            caption = vr.get("caption", "") or vr.get("_source_caption", "")
+
+            km_items = ev.get("Km", [])
+            vmax_items = ev.get("Vmax", [])
+            kcat_items = ev.get("kcat", [])
+            kcat_km_items = ev.get("kcat_Km", [])
+
+            if not isinstance(km_items, list):
+                km_items = [km_items] if isinstance(km_items, dict) and km_items.get("value") is not None else []
+            if not isinstance(vmax_items, list):
+                vmax_items = [vmax_items] if isinstance(vmax_items, dict) and vmax_items.get("value") is not None else []
+            if not isinstance(kcat_items, list):
+                kcat_items = [kcat_items] if isinstance(kcat_items, dict) and kcat_items.get("value") is not None else []
+            if not isinstance(kcat_km_items, list):
+                kcat_km_items = [kcat_km_items] if isinstance(kcat_km_items, dict) and kcat_km_items.get("value") is not None else []
+
+            for km_item in km_items:
+                if not isinstance(km_item, dict) or km_item.get("value") is None:
+                    continue
                 try:
-                    val = float(iv.get("value", 0))
+                    km_val = float(km_item["value"])
                 except (ValueError, TypeError):
                     continue
-                vlm_km_entries.append({
-                    "Km": val,
-                    "Km_unit": iv.get("unit", ""),
-                    "context": iv.get("context", ""),
-                })
-            elif name == "VLM_Vmax":
+                material = km_item.get("material") or None
+                substrate = km_item.get("substrate") or None
+                detection_method = km_item.get("detection_method") or None
+
+                if not substrate and caption:
+                    sub_match = re.search(r'(?:for|using|with)\s+([A-Z0-9][A-Za-z0-9\-]+)', caption)
+                    if sub_match:
+                        substrate = sub_match.group(1)
+
+                key = (substrate or "", material or "", detection_method or "")
+                if key not in grouped:
+                    grouped[key] = {
+                        "substrate": substrate,
+                        "material_variant": material,
+                        "detection_method": detection_method,
+                        "source": "VLM",
+                        "needs_review": True,
+                    }
+                grouped[key]["Km"] = km_val
+                km_unit = km_item.get("unit", "")
+                if km_unit and _normalize_unit_fn:
+                    km_unit = _normalize_unit_fn(km_unit)
+                grouped[key]["Km_unit"] = km_unit
+                grouped[key]["_vlm_caption"] = caption[:200] if caption else ""
+
+            for vmax_item in vmax_items:
+                if not isinstance(vmax_item, dict) or vmax_item.get("value") is None:
+                    continue
                 try:
-                    val = float(iv.get("value", 0))
+                    vmax_val = float(vmax_item["value"])
                 except (ValueError, TypeError):
                     continue
-                if val > 1e6:
+                if vmax_val > 1e6:
                     continue
-                vlm_vmax_entries.append({
-                    "Vmax": val,
-                    "Vmax_unit": iv.get("unit", ""),
-                    "context": iv.get("context", ""),
-                })
-        if not vlm_km_entries and not vlm_vmax_entries:
-            return
-        existing_keys = set()
-        for entry in kin_list:
-            if not isinstance(entry, dict):
-                continue
-            key = (
-                entry.get("Km"), entry.get("Km_unit"),
-                entry.get("Vmax"), entry.get("Vmax_unit"),
-                entry.get("substrate"), entry.get("detection_method"),
-                entry.get("material_variant"),
-            )
-            existing_keys.add(key)
-        for km_e in vlm_km_entries:
-            km_val = km_e["Km"]
-            km_unit = km_e["Km_unit"]
-            matched_vmax = None
-            for vmax_e in vlm_vmax_entries:
-                if km_e.get("context") == vmax_e.get("context"):
-                    matched_vmax = vmax_e
-                    break
-            new_entry = {
-                "Km": km_val,
-                "Km_unit": _normalize_unit_fn(km_unit) if _normalize_unit_fn and km_unit else km_unit,
-                "Vmax": matched_vmax["Vmax"] if matched_vmax else None,
-                "Vmax_unit": _normalize_unit_fn(matched_vmax["Vmax_unit"]) if matched_vmax and _normalize_unit_fn and matched_vmax.get("Vmax_unit") else (matched_vmax["Vmax_unit"] if matched_vmax else None),
-                "substrate": "TMB",
-                "source": "VLM",
-                "detection_method": "UV-vis",
-                "material_variant": None,
-            }
-            key = (
-                new_entry["Km"], new_entry["Km_unit"],
-                new_entry["Vmax"], new_entry["Vmax_unit"],
-                new_entry["substrate"], new_entry["detection_method"],
-                new_entry["material_variant"],
-            )
-            if key not in existing_keys:
-                kin_list.append(new_entry)
-                existing_keys.add(key)
-                logger.info(f"[SMN] Added VLM kinetics to list: Km={km_val} {km_unit}")
-        record["main_activity"]["kinetics_list"] = kin_list
+                material = vmax_item.get("material") or None
+                substrate = vmax_item.get("substrate") or None
+                detection_method = vmax_item.get("detection_method") or None
+
+                key = (substrate or "", material or "", detection_method or "")
+                if key not in grouped:
+                    grouped[key] = {
+                        "substrate": substrate,
+                        "material_variant": material,
+                        "detection_method": detection_method,
+                        "source": "VLM",
+                        "needs_review": True,
+                    }
+                grouped[key]["Vmax"] = vmax_val
+                vmax_unit = vmax_item.get("unit", "")
+                if vmax_unit and _normalize_unit_fn:
+                    vmax_unit = _normalize_unit_fn(vmax_unit)
+                grouped[key]["Vmax_unit"] = vmax_unit
+
+            for kcat_item in kcat_items:
+                if not isinstance(kcat_item, dict) or kcat_item.get("value") is None:
+                    continue
+                try:
+                    kcat_val = float(kcat_item["value"])
+                except (ValueError, TypeError):
+                    continue
+                material = kcat_item.get("material") or None
+                substrate = kcat_item.get("substrate") or None
+                detection_method = kcat_item.get("detection_method") or None
+
+                key = (substrate or "", material or "", detection_method or "")
+                if key not in grouped:
+                    grouped[key] = {
+                        "substrate": substrate,
+                        "material_variant": material,
+                        "detection_method": detection_method,
+                        "source": "VLM",
+                        "needs_review": True,
+                    }
+                grouped[key]["kcat"] = kcat_val
+                grouped[key]["kcat_unit"] = kcat_item.get("unit", "s⁻¹")
+
+            for kcat_km_item in kcat_km_items:
+                if not isinstance(kcat_km_item, dict) or kcat_km_item.get("value") is None:
+                    continue
+                try:
+                    kcat_km_val = float(kcat_km_item["value"])
+                except (ValueError, TypeError):
+                    continue
+                material = kcat_km_item.get("material") or None
+                substrate = kcat_km_item.get("substrate") or None
+                detection_method = kcat_km_item.get("detection_method") or None
+
+                key = (substrate or "", material or "", detection_method or "")
+                if key not in grouped:
+                    grouped[key] = {
+                        "substrate": substrate,
+                        "material_variant": material,
+                        "detection_method": detection_method,
+                        "source": "VLM",
+                        "needs_review": True,
+                    }
+                grouped[key]["kcat_Km"] = kcat_km_val
+                grouped[key]["kcat_Km_unit"] = kcat_km_item.get("unit", "M⁻¹s⁻¹")
+
+        entries = list(grouped.values())
+        if entries:
+            logger.info(f"[SMN] Built {len(entries)} VLM kinetics entries from {len(vlm_results)} VLM results")
+        return entries
 
     def _check_multi_figure_consistency(self, record: Dict[str, Any]):
         vlm_kms = []
@@ -6047,6 +6111,9 @@ class SingleMainNanozymePipeline:
     async def extract(self, mid_json: Dict[str, Any]) -> Dict[str, Any]:
         record = make_empty_record()
         warnings: List[str] = []
+        self._llm_kinetics_list_saved = None
+        self._vlm_sensing_data = None
+        all_vlm_results = []
 
         doc = PreprocessedDocument(mid_json)
 
@@ -6297,6 +6364,12 @@ class SingleMainNanozymePipeline:
                                         f"[SMN] LLM conflict resolved: {resolved.field} -> {resolved.resolved_by}"
                                     )
                 if self.cross_validator:
+                    self._llm_kinetics_list_saved = []
+                    llm_act = llm_result.get("main_activity", {}) if isinstance(llm_result, dict) else {}
+                    if isinstance(llm_act, dict):
+                        llm_kl = llm_act.get("kinetics_list", [])
+                        if isinstance(llm_kl, list):
+                            self._llm_kinetics_list_saved = [e for e in llm_kl if isinstance(e, dict)]
                     record = self.cross_validator.merge_results(record, llm_result, [])
                     logger.info("[SMN] LLM merged via CrossValidationAgent")
                 else:
@@ -6330,6 +6403,13 @@ class SingleMainNanozymePipeline:
                 all_vlm_results.extend(table_vlm_results)
 
             if all_vlm_results:
+                self._vlm_sensing_data = None
+                for vr in all_vlm_results:
+                    if isinstance(vr, dict):
+                        ev = vr.get("extracted_values", {})
+                        if isinstance(ev, dict) and ev.get("sensing_performance"):
+                            self._vlm_sensing_data = ev["sensing_performance"]
+                            break
                 if self.cross_validator:
                     record = self.cross_validator.merge_results(record, {}, all_vlm_results)
                     inconsistencies = self.cross_validator.check_multi_figure_kinetics_consistency(all_vlm_results)
@@ -6558,8 +6638,47 @@ class SingleMainNanozymePipeline:
 
         sel_name = record.get("selected_nanozyme", {}).get("name")
 
+        if self.cross_validator and self._llm_kinetics_list_saved is not None:
+            rule_kl = record.get("main_activity", {}).get("kinetics_list", [])
+            llm_kl = self._llm_kinetics_list_saved
+            vlm_kl = self._build_vlm_kinetics_entries(all_vlm_results if self.config.enable_vlm and self.client and doc.vlm_tasks else [])
+            if rule_kl or llm_kl or vlm_kl:
+                validated_kl = self.cross_validator.validate_kinetics_list(rule_kl, llm_kl, vlm_kl)
+                record["main_activity"]["kinetics_list"] = validated_kl
+                logger.info(f"[SMN] kinetics_list cross-validated: rule={len(rule_kl)}, llm={len(llm_kl)}, vlm={len(vlm_kl)}, merged={len(validated_kl)}")
+            self._llm_kinetics_list_saved = None
+        elif not self.cross_validator:
+            vlm_kl = self._build_vlm_kinetics_entries(all_vlm_results if self.config.enable_vlm and self.client and doc.vlm_tasks else [])
+            if vlm_kl:
+                existing_kl = record.get("main_activity", {}).get("kinetics_list", [])
+                existing_keys = set()
+                for entry in existing_kl:
+                    if isinstance(entry, dict):
+                        key = (entry.get("substrate"), entry.get("material_variant"), entry.get("detection_method"))
+                        existing_keys.add(key)
+                for vlm_entry in vlm_kl:
+                    key = (vlm_entry.get("substrate"), vlm_entry.get("material_variant"), vlm_entry.get("detection_method"))
+                    if key not in existing_keys:
+                        existing_kl.append(vlm_entry)
+                        existing_keys.add(key)
+                        logger.info(f"[SMN] Added VLM kinetics entry: substrate={vlm_entry.get('substrate')}, material={vlm_entry.get('material_variant')}")
+                    else:
+                        for ek in existing_kl:
+                            if isinstance(ek, dict) and (ek.get("substrate"), ek.get("material_variant"), ek.get("detection_method")) == key:
+                                for fk, fv in vlm_entry.items():
+                                    if fv is not None and ek.get(fk) is None:
+                                        ek[fk] = fv
+                                break
+                record["main_activity"]["kinetics_list"] = existing_kl
+
+        if self.cross_validator and self._vlm_sensing_data:
+            current_apps = record.get("applications", [])
+            validated_apps = self.cross_validator.validate_sensing_performance(current_apps, self._vlm_sensing_data)
+            record["applications"] = validated_apps
+            logger.info("[SMN] Sensing performance cross-validated via CrossValidationAgent")
+            self._vlm_sensing_data = None
+
         record = self._sync_kinetics_list(record)
-        self._add_vlm_kinetics_to_list(record)
 
         logger.info(f"[SMN] Final: status={record['diagnostics']['status']}, "
                      f"confidence={record['diagnostics']['confidence']}, "

@@ -420,6 +420,212 @@ class CrossValidationAgent:
             apps.append(new_app)
             record["applications"] = apps
 
+    @staticmethod
+    def _build_match_key(entry: Dict) -> Tuple:
+        sub = (entry.get("substrate") or "").strip().lower()
+        mv = (entry.get("material_variant") or "").strip().lower()
+        dm = (entry.get("detection_method") or "").strip().lower()
+        return (sub, mv, dm)
+
+    def _merge_kinetics_entry(self, rule_entry: Optional[Dict], llm_entry: Optional[Dict], vlm_entry: Optional[Dict]) -> Dict:
+        merged = {}
+        sources_used = []
+        if rule_entry:
+            merged.update(rule_entry)
+            sources_used.append("rule")
+        if llm_entry:
+            for k, v in llm_entry.items():
+                if v is not None and merged.get(k) is None:
+                    merged[k] = v
+            sources_used.append("llm")
+        if vlm_entry:
+            for k, v in vlm_entry.items():
+                if v is not None and merged.get(k) is None:
+                    merged[k] = v
+            sources_used.append("vlm")
+
+        for param in ("Km", "Vmax", "kcat", "kcat_Km"):
+            rule_val = rule_entry.get(param) if rule_entry else None
+            rule_unit = rule_entry.get(f"{param}_unit") if rule_entry else None
+            llm_val = llm_entry.get(param) if llm_entry else None
+            llm_unit = llm_entry.get(f"{param}_unit") if llm_entry else None
+            vlm_val = vlm_entry.get(param) if vlm_entry else None
+            vlm_unit = vlm_entry.get(f"{param}_unit") if vlm_entry else None
+
+            result = self.validate_kinetics(rule_val, llm_val, vlm_val, param, rule_unit, llm_unit)
+            if result.get("final_value") is not None:
+                merged[param] = result["final_value"]
+                if result.get("final_unit"):
+                    merged[f"{param}_unit"] = result["final_unit"]
+                merged[f"_confidence_{param}"] = result.get("confidence", "low")
+                merged[f"_reason_{param}"] = result.get("reason", "")
+                if result.get("source"):
+                    merged["source"] = result["source"]
+                if result.get("needs_review"):
+                    merged["needs_review"] = True
+                if result.get("_alternative"):
+                    merged[f"_llm_{param}_alternative"] = result["_alternative"]["value"]
+            elif rule_val is not None:
+                merged[param] = rule_val
+                merged[f"{param}_unit"] = rule_unit
+
+        if not merged.get("source"):
+            merged["source"] = "+".join(sources_used) if sources_used else "unknown"
+        if len(sources_used) >= 2:
+            merged["_cross_validated"] = True
+        return merged
+
+    def validate_kinetics_list(
+        self,
+        rule_list: List[Dict],
+        llm_list: List[Dict],
+        vlm_list: List[Dict],
+    ) -> List[Dict]:
+        rule_map = {}
+        for entry in rule_list:
+            if not isinstance(entry, dict):
+                continue
+            key = self._build_match_key(entry)
+            rule_map[key] = entry
+
+        llm_map = {}
+        for entry in llm_list:
+            if not isinstance(entry, dict):
+                continue
+            key = self._build_match_key(entry)
+            if key not in llm_map:
+                llm_map[key] = entry
+            else:
+                for k, v in entry.items():
+                    if v is not None and llm_map[key].get(k) is None:
+                        llm_map[key][k] = v
+
+        vlm_map = {}
+        for entry in vlm_list:
+            if not isinstance(entry, dict):
+                continue
+            key = self._build_match_key(entry)
+            if key not in vlm_map:
+                vlm_map[key] = entry
+            else:
+                for k, v in entry.items():
+                    if v is not None and vlm_map[key].get(k) is None:
+                        vlm_map[key][k] = v
+
+        all_keys = list(dict.fromkeys(list(rule_map.keys()) + list(llm_map.keys()) + list(vlm_map.keys())))
+        merged_list = []
+        for key in all_keys:
+            r = rule_map.get(key)
+            l = llm_map.get(key)
+            v = vlm_map.get(key)
+            merged = self._merge_kinetics_entry(r, l, v)
+            merged_list.append(merged)
+
+        rule_primary = None
+        for entry in rule_list:
+            if isinstance(entry, dict) and entry.get("substrate") and not entry.get("material_variant"):
+                rule_primary = entry
+                break
+        if rule_primary:
+            pk = self._build_match_key(rule_primary)
+            for i, entry in enumerate(merged_list):
+                if self._build_match_key(entry) == pk:
+                    merged_list.insert(0, merged_list.pop(i))
+                    break
+
+        logger.info(
+            f"[CVA] validate_kinetics_list: rule={len(rule_map)}, llm={len(llm_map)}, "
+            f"vlm={len(vlm_map)}, merged={len(merged_list)}"
+        )
+        return merged_list
+
+    def validate_sensing_performance(
+        self,
+        rule_apps: List[Dict],
+        vlm_sensing: Dict,
+    ) -> List[Dict]:
+        if not isinstance(vlm_sensing, dict):
+            return rule_apps
+
+        def _flatten_sensing_val(val):
+            if val is None:
+                return None
+            if isinstance(val, dict):
+                v = val.get("value")
+                u = val.get("unit")
+                if v is not None and u is not None:
+                    return f"{v} {u}"
+                return str(v) if v is not None else None
+            return str(val)
+
+        vlm_lod = _flatten_sensing_val(vlm_sensing.get("LOD") or vlm_sensing.get("detection_limit"))
+        vlm_lr = _flatten_sensing_val(vlm_sensing.get("linear_range"))
+        vlm_analyte = vlm_sensing.get("target_analyte")
+        vlm_method = vlm_sensing.get("method")
+
+        if vlm_analyte:
+            from application_extractor import is_valid_analyte
+            if not is_valid_analyte(str(vlm_analyte)):
+                vlm_analyte = None
+
+        if not vlm_lod and not vlm_lr and not vlm_analyte:
+            return rule_apps
+
+        result_apps = copy.deepcopy(rule_apps)
+        matched = False
+        for app in result_apps:
+            if not isinstance(app, dict):
+                continue
+            is_sensing = app.get("application_type") in ("sensing", "biosensing", "detection")
+            analyte_match = vlm_analyte and (app.get("target_analyte") or "").lower() == str(vlm_analyte).lower()
+            if vlm_analyte and analyte_match:
+                matched = True
+            elif not vlm_analyte and is_sensing:
+                matched = True
+            else:
+                continue
+            if vlm_lod and app.get("detection_limit") is None:
+                app["detection_limit"] = str(vlm_lod)
+                app["_lod_source"] = "VLM"
+                app["_lod_confidence"] = "low"
+            elif vlm_lod and app.get("detection_limit"):
+                rule_lod_str = str(app["detection_limit"])
+                try:
+                    rule_lod_val = float(re.sub(r'[^\d.]', '', rule_lod_str.split()[0]) if rule_lod_str else '0')
+                    vlm_lod_val = float(re.sub(r'[^\d.]', '', str(vlm_lod).split()[0]))
+                    if rule_lod_val > 0 and vlm_lod_val > 0:
+                        rel_diff = abs(rule_lod_val - vlm_lod_val) / max(rule_lod_val, vlm_lod_val)
+                        if rel_diff < 0.3:
+                            app["_lod_confidence"] = "high"
+                            app["_lod_cross_validated"] = True
+                        else:
+                            app["_lod_confidence"] = "low"
+                            app["_vlm_lod_alternative"] = str(vlm_lod)
+                except (ValueError, IndexError):
+                    pass
+            if vlm_lr and app.get("linear_range") is None:
+                app["linear_range"] = str(vlm_lr)
+                app["_lr_source"] = "VLM"
+            if vlm_method and app.get("method") is None:
+                app["method"] = vlm_method
+            break
+
+        if not matched and (vlm_lod or vlm_lr or vlm_analyte):
+            new_app = {
+                "application_type": "detection",
+                "target_analyte": str(vlm_analyte) if vlm_analyte else None,
+                "method": vlm_method,
+                "detection_limit": str(vlm_lod) if vlm_lod else None,
+                "linear_range": str(vlm_lr) if vlm_lr else None,
+                "sample_type": None,
+                "notes": "from VLM sensing_performance",
+                "_lod_source": "VLM" if vlm_lod else None,
+                "_lod_confidence": "low" if vlm_lod else None,
+            }
+            result_apps.append(new_app)
+
+        return result_apps
+
     def check_multi_figure_kinetics_consistency(self, vlm_results) -> List[Dict[str, Any]]:
         if not vlm_results or len(vlm_results) < 2:
             return []
