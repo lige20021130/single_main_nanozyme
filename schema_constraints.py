@@ -2,25 +2,15 @@ import json
 import logging
 from typing import Dict, Any, List, Optional
 
+from domain_knowledge import get_domain_knowledge
+
 logger = logging.getLogger(__name__)
 
-_ENZYME_TYPE_ENUM = [
-    "peroxidase-like", "oxidase-like", "catalase-like",
-    "superoxide-dismutase-like", "glutathione-peroxidase-like",
-    "esterase-like", "nitroreductase-like", "hydrolase-like",
-    "phosphatase-like", "laccase-like", "haloperoxidase-like",
-    "glucose-oxidase-like", "glutathione-oxidase-like",
-    "nuclease-like", "tyrosinase-like", "cascade-enzymatic",
-    "multi-enzyme-like", "ribozyme-like", "cellulase-like",
-    "amylase-like", "protease-like", "lipase-like", "urease-like",
-    "ascorbate-oxidase-like", "dehydrogenase-like", "invertase-like",
-    "chitinase-like", "xylanase-like",
-]
+_dk = get_domain_knowledge()
 
-_APPLICATION_TYPE_ENUM = [
-    "sensing", "therapeutic", "antibacterial", "environmental",
-    "antioxidant", "biofilm_inhibition", "other",
-]
+_ENZYME_TYPE_ENUM = _dk.get_enzyme_type_values()
+
+_APPLICATION_TYPE_ENUM = _dk.get_application_type_values()
 
 _SIZE_UNIT_ENUM = ["nm", "μm", "um", "mm", "μM", None]
 

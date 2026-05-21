@@ -3,6 +3,8 @@ import logging
 import re
 from typing import Dict, List, Any, Optional
 
+from domain_knowledge import get_domain_knowledge as _get_dk
+
 logger = logging.getLogger(__name__)
 
 MATERIAL_IDENTIFICATION_SYSTEM_PROMPT = """You are an expert at identifying the PRIMARY nanozyme material from scientific literature about nanozymes (nanomaterials with enzyme-like catalytic activity).
@@ -44,25 +46,7 @@ Abstract and key text:
 
 Respond with strict JSON only."""
 
-PROBE_MOLECULES = {
-    "crystal violet", "cv+", "cv",
-    "methylene blue", "mb",
-    "rhodamine b", "rhb",
-    "rhodamine 6g", "r6g",
-    "4-nitrophenol", "4-np",
-    "congo red",
-    "methyl orange",
-    "methyl red",
-    "eosin y",
-    "fluorescein",
-    "janus green b",
-    "nile blue",
-    "nile red",
-    "acridine orange",
-    "proflavine",
-    "safranin",
-    "neutral red",
-}
+PROBE_MOLECULES = _get_dk().get_probe_molecule_names()
 
 
 class MaterialIdentifier:

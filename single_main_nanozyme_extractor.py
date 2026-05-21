@@ -425,23 +425,8 @@ _ENZYME_TYPE_PATTERNS = [
     (re.compile(r'\bsulfite\s+oxidase[-\s]?like\b', re.I), "sulfite-oxidase-like"),
 ]
 
-_SUBSTRATE_KEYWORDS = {
-    "TMB", "ABTS", "OPD", "H2O2", "DCFH", "DCFH-DA",
-    "guaiacol", "pyrogallol", "catechol",
-    "DAP", "DAPI", "DAF-FM", "Amplex Red", "Resorufin",
-    "NADH", "NADPH", "DHA", "L-DOPA", "dopamine",
-    "4-AAP", "phenol", "4-aminoantipyrine",
-    "Terephthalic acid", "TA", "HPF", "SOSG",
-    "DHE", "dihydroethidium", "NBT", "nitroblue tetrazolium",
-    "X-Gal", "BCIP", "o-nitrophenyl", "ONPG", "p-nitrophenyl", "pNPP",
-    "DTNB", "Ellman", "GSH", "glutathione",
-    "ferrocyanide", "ferricyanide", "K4Fe(CN)6", "K3Fe(CN)6",
-    "methanol", "ethanol", "formaldehyde",
-    "glucose", "cholesterol", "uric acid", "lactate",
-    "ascorbic acid", "cysteine", "bilirubin",
-    "acetylcholine", "choline", "xanthine", "hypoxanthine",
-    "urea", "hydroquinone", "benzoquinone",
-}
+from domain_knowledge import get_domain_knowledge as _get_dk
+_SUBSTRATE_KEYWORDS = set(_get_dk().get_all_substrates())
 
 _KM_PATTERNS = [
     re.compile(r'\bKm\s*[\(（]\s*(\w[\w\d\-]*)\s*[\)）]\s*(?:was|=|:|≈|~)\s*([\d.]+)\s*(?:±\s*[\d.]+\s*)?(mM|μM|uM|M|mmol|umol|nmol|mmol/L|umol/L|nmol/L)', re.I),
@@ -3817,7 +3802,7 @@ class RuleExtractor:
         if km_candidates:
             km_candidates.sort(key=lambda c: c[0])
             best = km_candidates[0]
-            if kin.get("Km") is None or best[0] < 5:
+            if kin.get("Km") is None:
                 kin["Km"] = best[1]
                 _nu = _norm_unit(best[2]) if _norm_unit and best[2] else best[2]
                 kin["Km_unit"] = _nu if _nu else best[2]
@@ -3829,7 +3814,7 @@ class RuleExtractor:
         if vmax_candidates:
             vmax_candidates.sort(key=lambda c: (c[0], 0 if c[3] == "text" else 1))
             best = vmax_candidates[0]
-            if kin.get("Vmax") is None or best[0] < 5 or (best[0] == 5 and best[3] == "text" and kin.get("source", "").endswith("fallback")):
+            if kin.get("Vmax") is None:
                 kin["Vmax"] = best[1]
                 _nu = _norm_unit(best[2]) if _norm_unit and best[2] else best[2]
                 kin["Vmax_unit"] = _nu if _nu else best[2]

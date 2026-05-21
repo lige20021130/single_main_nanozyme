@@ -16,18 +16,18 @@ PDF输入 → 预处理 → 规则/LLM/VLM多源提取 → 交叉验证 → 一�
 | `run_extraction.py` | `main()` | 系统入口，CLI参数解析，PDF→JSON全流程调度 | extraction_pipeline, nanozyme_preprocessor_midjson, opendataloader_pdf |
 | `extraction_pipeline.py` | `ExtractionPipeline` | 管道编排，超时控制，缓存/配置/队列集成，批量处理 | api_client, single_main_nanozyme_extractor, config_manager, cache_manager, task_queue |
 | `nanozyme_preprocessor_midjson.py` | `NanozymePreprocessor`, `BlockInfo`, `FigureInfo`, `SentenceInfo` | PDF中JSON预处理，分块/分句/分表/分图，结构化文档对象 | 无外部依赖 |
-| `single_main_nanozyme_extractor.py` | `SingleMainNanozymePipeline`, `SMNConfig`, `PreprocessedDocument`, `RuleExtractor`, `NanozymeScorer`, `EvidenceBucketBuilder`, `TableProcessor`, `FigureProcessor`, `NumericValidator`, `DiagnosticsBuilder`, `PaperMetadataExtractor`, `CandidateRecaller`, `LanguageRuleAdapter` | **核心大文件(6400+行)**：单主纳米酶提取全流程，含正则模式库、候选筛选、规则提取、LLM精炼、VLM调用、动力学回填、Schema验证 | extraction_agents, cross_validation_agent, consistency_agent, consistency_guard_agentic, extraction_verifier, vlm_extractor, llm_refinement, numeric_validator |
+| `single_main_nanozyme_extractor.py` | `SingleMainNanozymePipeline`, `SMNConfig`, `PreprocessedDocument`, `RuleExtractor`, `NanozymeScorer`, `EvidenceBucketBuilder`, `TableProcessor`, `FigureProcessor`, `NumericValidator`, `DiagnosticsBuilder`, `PaperMetadataExtractor`, `CandidateRecaller`, `LanguageRuleAdapter` | **核心大文件(6400+行)**：单主纳米酶提取全流程，含正则模式库、候选筛选、规则提取(LLM-First兜底)、LLM精炼、VLM调用、动力学回填、Schema验证 | extraction_agents, cross_validation_agent, consistency_agent, consistency_guard_agentic, extraction_verifier, vlm_extractor, llm_refinement, numeric_validator, domain_knowledge |
 
 ## 提取引擎层
 
 | 模块文件 | 核心类/函数 | 职责 | 关键依赖 |
 |----------|-----------|------|---------|
 | `extraction_agents.py` | `KineticsAgent`, `MorphologyAgent`, `SynthesisAgent`, `ApplicationAgent`, `RuleExtractorAdapter` | 4个专业提取Agent + 适配器，替代原始RuleExtractor | single_main_nanozyme_extractor(正则模式), numeric_validator |
-| `material_identifier.py` | `MaterialIdentifier`, `PROBE_MOLECULES` | LLM-First材料识别器，识别主纳米酶和关联体系，探针分子黑名单 | api_client |
+| `material_identifier.py` | `MaterialIdentifier`, `PROBE_MOLECULES` | LLM-First材料识别器，识别主纳米酶和关联体系，探针分子黑名单从domain_knowledge加载 | api_client, domain_knowledge |
 | `llm_extractor.py` | `LLMExtractor`, `TableExtractor`, `JSONFixer`, `_get_engine()` | LLM文本提取（全文+表格），JSON修复，ConstrainedDecodingEngine集成 | api_client, constrained_decoding |
 | `llm_structured_extractor.py` | `LLMStructuredExtractor`, `_get_engine()` | LLM结构化提取核心模块（LLM-First模式），分任务提取（动力学/形态/应用/酶类型），self-augmentation两步提取，Vmax自动单位转换，Km量级校验，ConstrainedDecodingEngine集成 | extraction_prompts, schema_constraints, api_client, constrained_decoding |
 | `extraction_prompts.py` | `build_kinetics_prompt()`, `build_morphology_prompt()`, `build_application_prompt()`, `build_enzyme_type_prompt()`, `build_self_augmentation_prompt()` | LLM提取prompt模板库，包含few-shot examples和纳米酶领域知识 | schema_constraints |
-| `schema_constraints.py` | `validate_against_schema()`, `auto_fix_schema_errors()`, `get_schema_for_openai()`, `get_task_schema_for_openai()`, `NANOZYME_EXTRACTION_SCHEMA`, `TASK_SCHEMAS`, `_fix_numeric_strings()`, `_remove_unknown_fields()`, `_fix_enum_values()` | JSON schema约束定义，用于constrained decoding和输出验证，6个子任务Schema，增强auto_fix | 无外部依赖 |
+| `schema_constraints.py` | `validate_against_schema()`, `auto_fix_schema_errors()`, `get_schema_for_openai()`, `get_task_schema_for_openai()`, `NANOZYME_EXTRACTION_SCHEMA`, `TASK_SCHEMAS`, `_fix_numeric_strings()`, `_remove_unknown_fields()`, `_fix_enum_values()` | JSON schema约束定义，用于constrained decoding和输出验证，6个子任务Schema，增强auto_fix | domain_knowledge |
 | `vlm_extractor.py` | `VLMExtractor` | 视觉语言模型图像提取（动力学图表/形态图） | api_client |
 | `activity_selector.py` | `ActivitySelector` | 催化活性类型选择与匹配 | 无外部依赖 |
 | `application_extractor.py` | `ApplicationExtractor`, `extract_method()`, `extract_sample_type()` | 应用信息提取（类型/方法/样品） | 无外部依赖 |
@@ -49,7 +49,9 @@ PDF输入 → 预处理 → 规则/LLM/VLM多源提取 → 交叉验证 → 一�
 
 | 模块文件 | 核心类/函数 | 职责 | 关键依赖 |
 |----------|-----------|------|---------|
-| `nanozyme_models.py` | `EnzymeType(Enum)`, `ApplicationType(Enum)`, `normalize_canonical()`, `_ENZYME_ALIAS_MAP`, `_APPLICATION_TYPE_ALIAS_MAP`, `get_application_type_enum_string()` | 酶类型+应用类型枚举与归一化映射（单一真相源） | 无外部依赖 |
+| `domain_knowledge.yaml` | (YAML数据) | 领域知识单一真相源：38种酶类型、9种应用类型、17种探针分子、底物映射、数值范围、单位转换 | 无外部依赖 |
+| `domain_knowledge.py` | `DomainKnowledge`, `get_domain_knowledge()` | 领域知识加载器，提供别名映射、枚举值、Prompt片段生成等统一接口，单例模式 | yaml |
+| `nanozyme_models.py` | `EnzymeType(Enum)`, `ApplicationType(Enum)`, `normalize_canonical()`, `_ENZYME_ALIAS_MAP`, `_APPLICATION_TYPE_ALIAS_MAP`, `get_application_type_enum_string()` | 酶类型+应用类型枚举与归一化映射，动态从domain_knowledge加载 | domain_knowledge |
 | `single_main_nanozyme_extractor.py` 顶层 | `EMPTY_RECORD`, `validate_schema()`, `_SCHEMA_TOP_KEYS` | 输出JSON Schema定义与验证（含EnzymeType/ApplicationType枚举校验） | nanozyme_models |
 
 ## 基础设施层
@@ -85,6 +87,7 @@ PDF输入 → 预处理 → 规则/LLM/VLM多源提取 → 交叉验证 → 一�
 | `tests/test_dependencies.py` | dependencies模块单元测试 |
 | `tests/test_dependencies_migration.py` | 依赖迁移验证测试 |
 | `tests/test_enzyme_type_normalization.py` | 酶类型归一化测试 |
+| `tests/test_domain_knowledge.py` | 领域知识加载器测试 |
 | `tests/test_logging_setup.py` | 日志配置测试 |
 | `tests/test_pipeline_timeout.py` | 管道超时测试 |
 | `test_single_main_nanozyme.py` | 核心提取器集成测试（旧式） |

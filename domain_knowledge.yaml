@@ -1,0 +1,299 @@
+enzyme_types:
+  - value: "peroxidase-like"
+    aliases: ["POD-like", "peroxidase-mimicking", "peroxidase-mimic", "peroxidase (POD)-like"]
+    substrates: ["TMB", "ABTS", "OPD", "guaiacol", "pyrogallol", "o-phenylenediamine"]
+    assay_keywords: ["TMB assay", "ABTS assay", "colorimetric assay"]
+
+  - value: "oxidase-like"
+    aliases: ["OXD-like", "OX-like", "oxidase-mimicking", "oxidase-mimic", "oxidase (OXD)-like"]
+    substrates: ["TMB", "ABTS", "OPD", "DHF", "catechol"]
+    assay_keywords: ["oxidase assay", "TMB oxidation"]
+
+  - value: "catalase-like"
+    aliases: ["CAT-like", "catalase-mimicking", "catalase-mimic", "catalase (CAT)-like"]
+    substrates: ["H2O2"]
+    assay_keywords: ["H2O2 decomposition", "catalase assay", "O2 evolution"]
+
+  - value: "superoxide-dismutase-like"
+    aliases: ["SOD-like", "SOD-mimicking", "SOD-mimic", "superoxide dismutase (SOD)-like"]
+    substrates: ["superoxide", "O2-"]
+    assay_keywords: ["SOD assay", "NBT", "pyrogallol autoxidation"]
+
+  - value: "glutathione-peroxidase-like"
+    aliases: ["GPx-like", "GPx-mimicking", "GPx-mimic", "glutathione peroxidase (GPx)-like"]
+    substrates: ["H2O2", "GSH"]
+    assay_keywords: ["GPx assay", "NADPH consumption"]
+
+  - value: "esterase-like"
+    aliases: ["esterase-mimicking", "esterase-mimic"]
+    substrates: ["p-NPA", "p-nitrophenyl acetate"]
+    assay_keywords: ["esterase assay", "p-NPA hydrolysis"]
+
+  - value: "nitroreductase-like"
+    aliases: ["NTR-like", "NTR-mimicking", "NTR-mimic", "nitroreductase (NTR)-like"]
+    substrates: ["nitrofurazone", "nitroaromatics", "4-nitrophenol"]
+    assay_keywords: ["nitroreductase assay", "nitro reduction"]
+
+  - value: "hydrolase-like"
+    aliases: ["hydrolase-mimicking", "hydrolase-mimic"]
+    substrates: ["p-NPA", "esters", "peptides"]
+    assay_keywords: ["hydrolase assay", "hydrolysis"]
+
+  - value: "phosphatase-like"
+    aliases: ["ALP-like", "ACP-like", "phosphatase-mimicking", "phosphatase-mimic", "phosphatase (ALP)-like"]
+    substrates: ["p-NPP", "BCIP", "pnpp"]
+    assay_keywords: ["phosphatase assay", "p-NPP hydrolysis"]
+
+  - value: "laccase-like"
+    aliases: ["laccase-mimicking", "laccase-mimic"]
+    substrates: ["ABTS", "syringaldazine", "guaiacol", "2,6-DMP"]
+    assay_keywords: ["laccase assay", "ABTS oxidation"]
+
+  - value: "haloperoxidase-like"
+    aliases: ["VHPO-like", "haloperoxidase-mimicking", "haloperoxidase-mimic", "chloroperoxidase-like", "bromoperoxidase-like", "iodoperoxidase-like", "chloride peroxidase-like"]
+    substrates: ["Br-", "I-", "Cl-"]
+    assay_keywords: ["haloperoxidase assay", "halogenation"]
+
+  - value: "glucose-oxidase-like"
+    aliases: ["GOx-like", "GOx-mimicking", "GOx-mimic", "glucose oxidase (GOx)-like"]
+    substrates: ["glucose", "O2"]
+    assay_keywords: ["glucose oxidase assay", "glucose detection"]
+
+  - value: "glutathione-oxidase-like"
+    aliases: ["GSHOx-like", "glutathione oxidase-mimicking", "glutathione oxidase (GSHOx)-like"]
+    substrates: ["GSH", "O2"]
+    assay_keywords: ["glutathione oxidase assay", "GSH oxidation"]
+
+  - value: "nuclease-like"
+    aliases: ["DNase-like", "RNase-like", "nuclease-mimicking", "nuclease-mimic", "DNAse-like"]
+    substrates: ["DNA", "RNA", "oligonucleotides", "plasmid DNA"]
+    assay_keywords: ["nuclease assay", "DNA cleavage assay", "gel electrophoresis"]
+
+  - value: "tyrosinase-like"
+    aliases: ["tyrosinase-mimicking", "tyrosinase-mimic", "polyphenol oxidase-like"]
+    substrates: ["L-DOPA", "tyrosine", "phenol", "catechol"]
+    assay_keywords: ["tyrosinase assay", "L-DOPA oxidation"]
+
+  - value: "cascade-enzymatic"
+    aliases: ["cascade enzymatic", "enzyme cascade"]
+    substrates: []
+    assay_keywords: ["cascade assay", "sequential reaction"]
+
+  - value: "multi-enzyme-like"
+    aliases: ["dual-enzyme-like", "triple-enzyme-like", "multi-enzyme-mimicking"]
+    substrates: ["TMB", "H2O2", "ABTS", "OPD"]
+    assay_keywords: ["multi-enzyme assay", "dual-enzyme activity"]
+
+  - value: "ribozyme-like"
+    aliases: ["ribozyme-mimicking", "ribozyme-mimic"]
+    substrates: ["RNA", "DNA", "oligonucleotides"]
+    assay_keywords: ["ribozyme assay", "RNA cleavage"]
+
+  - value: "cellulase-like"
+    aliases: ["cellulase-mimicking", "cellulase-mimic"]
+    substrates: ["CMC", "carboxymethyl cellulose", "cellulose", "filter paper"]
+    assay_keywords: ["cellulase assay", "CMC hydrolysis", "DNS assay"]
+
+  - value: "amylase-like"
+    aliases: ["amylase-mimicking", "amylase-mimic", "α-amylase-like"]
+    substrates: ["starch", "amylose", "amylopectin", "soluble starch"]
+    assay_keywords: ["amylase assay", "starch hydrolysis", "DNS method"]
+
+  - value: "protease-like"
+    aliases: ["protease-mimicking", "protease-mimic"]
+    substrates: ["casein", "BSA", "gelatin", "peptide"]
+    assay_keywords: ["protease assay", "casein hydrolysis"]
+
+  - value: "lipase-like"
+    aliases: ["lipase-mimicking", "lipase-mimic"]
+    substrates: ["p-NPB", "p-nitrophenyl butyrate", "triolein", "olive oil"]
+    assay_keywords: ["lipase assay", "p-NPB hydrolysis", "ester hydrolysis"]
+
+  - value: "urease-like"
+    aliases: ["urease-mimicking", "urease-mimic"]
+    substrates: ["urea"]
+    assay_keywords: ["urease assay", "urea hydrolysis", "phenol red method"]
+
+  - value: "ascorbate-oxidase-like"
+    aliases: ["AAO-like", "ascorbate oxidase-mimicking"]
+    substrates: ["ascorbic acid", "AA", "vitamin C"]
+    assay_keywords: ["ascorbate oxidase assay", "AA oxidation"]
+
+  - value: "dehydrogenase-like"
+    aliases: ["dehydrogenase-mimicking", "formate dehydrogenase-like", "alcohol dehydrogenase-like", "glucose dehydrogenase-like"]
+    substrates: ["NADH", "NAD+", "formate", "ethanol", "glucose"]
+    assay_keywords: ["dehydrogenase assay", "NADH oxidation"]
+
+  - value: "invertase-like"
+    aliases: ["invertase-mimicking", "sucrase-like"]
+    substrates: ["sucrose", "saccharose"]
+    assay_keywords: ["invertase assay", "sucrose hydrolysis", "DNS method"]
+
+  - value: "chitinase-like"
+    aliases: ["chitinase-mimicking", "chitinase-mimic"]
+    substrates: ["chitin", "colloidal chitin", "CM-chitin"]
+    assay_keywords: ["chitinase assay", "chitin hydrolysis"]
+
+  - value: "xylanase-like"
+    aliases: ["xylanase-mimicking", "xylanase-mimic"]
+    substrates: ["xylan", "beechwood xylan", "birchwood xylan"]
+    assay_keywords: ["xylanase assay", "xylan hydrolysis", "DNS method"]
+
+  - value: "ferroxidase-like"
+    aliases: ["ferroxidase-mimicking"]
+    substrates: ["Fe2+", "iron"]
+    assay_keywords: ["ferroxidase assay", "iron oxidation"]
+
+  - value: "glutathione-reductase-like"
+    aliases: ["GR-like", "glutathione reductase-mimicking"]
+    substrates: ["GSSG", "NADPH"]
+    assay_keywords: ["glutathione reductase assay", "NADPH consumption"]
+
+  - value: "superoxide-oxidase-like"
+    aliases: ["SOO-like", "superoxide oxidase-mimicking"]
+    substrates: ["superoxide", "O2-"]
+    assay_keywords: ["superoxide oxidase assay"]
+
+  - value: "peroxynitritase-like"
+    aliases: ["peroxynitritase-mimicking"]
+    substrates: ["ONOO-"]
+    assay_keywords: ["peroxynitritase assay"]
+
+  - value: "NADH-peroxidase-like"
+    aliases: ["NADH peroxidase-mimicking"]
+    substrates: ["NADH", "H2O2"]
+    assay_keywords: ["NADH peroxidase assay"]
+
+  - value: "thioredoxin-reductase-like"
+    aliases: ["TrxR-like", "thioredoxin reductase-mimicking"]
+    substrates: ["thioredoxin", "NADPH"]
+    assay_keywords: ["thioredoxin reductase assay"]
+
+  - value: "glutathione-transferase-like"
+    aliases: ["GST-like", "glutathione S-transferase-like", "glutathione transferase-mimicking"]
+    substrates: ["GSH", "CDNB"]
+    assay_keywords: ["GST assay", "CDNB conjugation"]
+
+  - value: "monooxygenase-like"
+    aliases: ["monooxygenase-mimicking"]
+    substrates: []
+    assay_keywords: ["monooxygenase assay"]
+
+  - value: "dioxygenase-like"
+    aliases: ["dioxygenase-mimicking"]
+    substrates: []
+    assay_keywords: ["dioxygenase assay"]
+
+  - value: "sulfite-oxidase-like"
+    aliases: ["sulfite oxidase-mimicking"]
+    substrates: ["sulfite", "SO3 2-"]
+    assay_keywords: ["sulfite oxidase assay"]
+
+application_types:
+  - value: "sensing"
+    aliases: ["detection", "colorimetric detection", "colorimetric sensing", "biosensing", "biosensor", "determination", "monitoring", "assay", "diagnostic", "diagnosis", "sensor"]
+
+  - value: "therapeutic"
+    aliases: ["therapy", "antitumor", "tumor therapy", "wound healing", "phototherapy", "photothermal therapy", "chemodynamic therapy", "sonodynamic therapy", "photodynamic therapy", "starvation therapy", "gas therapy"]
+
+  - value: "antibacterial"
+    aliases: ["anti-infection", "antibacterial activity", "sterilization", "bacteriostatic", "biocidal"]
+
+  - value: "environmental"
+    aliases: ["degradation", "water treatment", "pollutant removal", "organic pollutant degradation", "waste water", "heavy metal detection"]
+
+  - value: "antioxidant"
+    aliases: ["anti-inflammation", "ROS scavenging", "free radical scavenging", "oxidative stress protection", "radioprotection"]
+
+  - value: "biofilm_inhibition"
+    aliases: ["anti-biofilm"]
+
+  - value: "cytoprotection"
+    aliases: ["cytoprotection", "cell protection", "neuroprotection", "cardioprotection"]
+
+  - value: "bioimaging"
+    aliases: ["imaging", "cell imaging", "fluorescence imaging", "MR imaging", "photoacoustic imaging"]
+
+  - value: "other"
+    aliases: []
+
+probe_molecules:
+  description: "Signal indicator molecules used in assays, NOT target analytes. These generate the measurable signal but are not the substance being detected."
+  examples:
+    - name: "crystal violet"
+      aliases: ["CV+", "CV"]
+    - name: "methylene blue"
+      aliases: ["MB"]
+    - name: "rhodamine B"
+      aliases: ["RhB"]
+    - name: "rhodamine 6G"
+      aliases: ["R6G"]
+    - name: "4-nitrophenol"
+      aliases: ["4-NP"]
+    - name: "congo red"
+      aliases: []
+    - name: "methyl orange"
+      aliases: []
+    - name: "methyl red"
+      aliases: []
+    - name: "eosin Y"
+      aliases: []
+    - name: "fluorescein"
+      aliases: []
+    - name: "janus green B"
+      aliases: []
+    - name: "nile blue"
+      aliases: []
+    - name: "nile red"
+      aliases: []
+    - name: "acridine orange"
+      aliases: []
+    - name: "proflavine"
+      aliases: []
+    - name: "safranin"
+      aliases: []
+    - name: "neutral red"
+      aliases: []
+
+numeric_ranges:
+  Km:
+    typical_min: 0.001
+    typical_max: 500
+    unit: "mM"
+    warning_if_above: 1000
+    description: "Michaelis constant, typically 0.001-500 mM for nanozymes"
+  Vmax:
+    typical_min: 0.001
+    typical_max: 10000
+    unit: "μM/s"
+    description: "Maximum velocity"
+  kcat:
+    typical_min: 0.001
+    typical_max: 10000
+    unit: "s⁻¹"
+    description: "Turnover number"
+  LOD:
+    typical_min: 0.0001
+    typical_max: 1000
+    unit: "μM"
+    description: "Limit of detection"
+
+unit_conversion:
+  M_to_mM: 1000
+  M_to_uM: 1000000
+  mM_to_uM: 1000
+  M_per_s_to_uM_per_s: 1000000
+  M_per_s_to_mM_per_s: 1000
+  per_min_to_per_s: 0.01667
+
+common_substrate_enzyme_mapping:
+  TMB: ["peroxidase-like", "oxidase-like"]
+  ABTS: ["peroxidase-like", "oxidase-like", "laccase-like"]
+  OPD: ["peroxidase-like", "oxidase-like"]
+  H2O2: ["peroxidase-like", "catalase-like", "glutathione-peroxidase-like"]
+  glucose: ["glucose-oxidase-like"]
+  GSH: ["glutathione-peroxidase-like", "glutathione-oxidase-like", "glutathione-transferase-like"]
+  NADH: ["dehydrogenase-like", "NADH-peroxidase-like"]
+  ascorbic_acid: ["ascorbate-oxidase-like"]
+  urea: ["urease-like"]
+  L_DOPA: ["tyrosinase-like"]
