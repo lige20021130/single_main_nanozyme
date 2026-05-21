@@ -2,29 +2,19 @@ import re
 import logging
 from typing import Dict, List, Optional, Any
 
+from domain_knowledge import get_domain_knowledge as _get_dk
 from single_main_nanozyme_extractor import _normalize_ocr_scientific, _parse_scientific_notation
+
+_DK = _get_dk()
 
 logger = logging.getLogger(__name__)
 
 _CAPTION_MATCH_THRESHOLD = 0.4
 
-_KINETICS_CAPTION_PATTERNS = [
-    r'(?i)\bkinetic', r'(?i)\bKm\b', r'(?i)\bVmax\b',
-    r'(?i)\bMichaelis', r'(?i)\bLineweaver',
-    r'(?i)\bcatalytic\s+efficiency',
-]
-
-_APPLICATION_CAPTION_PATTERNS = [
-    r'(?i)\bdetection\b', r'(?i)\bsensing\b', r'(?i)\bLOD\b',
-    r'(?i)\blinear\s+range\b', r'(?i)\bcalibrat',
-    r'(?i)\bselectivity\b', r'(?i)\binterfer',
-]
-
-_MORPHOLOGY_CAPTION_PATTERNS = [
-    r'(?i)\bSEM\b', r'(?i)\bTEM\b', r'(?i)\bAFM\b',
-    r'(?i)\bmorpholog', r'(?i)\bsurface\b', r'(?i)\bXRD\b',
-    r'(?i)\bXPS\b', r'(?i)\bFT.?IR\b',
-]
+_CAPTION_PATTERNS = _DK.get_figure_caption_patterns()
+_KINETICS_CAPTION_PATTERNS = _CAPTION_PATTERNS.get("kinetics", [])
+_APPLICATION_CAPTION_PATTERNS = _CAPTION_PATTERNS.get("application", [])
+_MORPHOLOGY_CAPTION_PATTERNS = _CAPTION_PATTERNS.get("morphology", [])
 
 
 def assess_caption_match(
@@ -37,9 +27,9 @@ def assess_caption_match(
     fig_type = (vlm_result.get("figure_type") or "").lower()
     caption_lower = caption.lower()
 
-    caption_suggests_kinetics = any(re.search(p, caption_lower) for p in _KINETICS_CAPTION_PATTERNS)
-    caption_suggests_application = any(re.search(p, caption_lower) for p in _APPLICATION_CAPTION_PATTERNS)
-    caption_suggests_morphology = any(re.search(p, caption_lower) for p in _MORPHOLOGY_CAPTION_PATTERNS)
+    caption_suggests_kinetics = any(p.search(caption_lower) for p in _KINETICS_CAPTION_PATTERNS)
+    caption_suggests_application = any(p.search(caption_lower) for p in _APPLICATION_CAPTION_PATTERNS)
+    caption_suggests_morphology = any(p.search(caption_lower) for p in _MORPHOLOGY_CAPTION_PATTERNS)
 
     vlm_suggests_kinetics = "kinetic" in fig_type or "michaelis" in fig_type
     vlm_suggests_application = "application" in fig_type or "sensing" in fig_type or "calibrat" in fig_type

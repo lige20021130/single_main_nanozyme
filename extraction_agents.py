@@ -3,6 +3,7 @@ import logging
 from typing import Dict, List, Any, Optional
 
 from dependencies import get_attr
+from domain_knowledge import get_domain_knowledge as _get_dk
 from single_main_nanozyme_extractor import (
     _KM_PATTERNS, _KM_VMAX_JOINT_PATTERNS, _VMAX_PATTERNS, _VMAX_OCR_PATTERNS,
     _KCAT_PATTERNS, _KCAT_KM_PATTERNS, _LOD_PATTERNS, _LINEAR_RANGE_PATTERNS,
@@ -14,6 +15,8 @@ from single_main_nanozyme_extractor import (
     _normalize_ocr_scientific, _parse_scientific_notation, _extract_vmax_fallback,
     _RATE_UNITS,
 )
+
+_DK = _get_dk()
 
 logger = logging.getLogger(__name__)
 
@@ -28,16 +31,7 @@ def _norm_unit(unit):
     return unit
 
 
-_FULLTEXT_MECHANISM_PATTERNS = [
-    re.compile(r'\b(?:electron|radical|Fenton|Haber[-\s]?Weiss|Schottky|piezo|photo|sono|electro)cataly', re.I),
-    re.compile(r'\bROS\s+(?:generation|production|mediat)', re.I),
-    re.compile(r'\b(?:hydroxyl|superoxide|singlet\s+oxygen)\s+radical', re.I),
-    re.compile(r'\b(?:oxygen\s+)?vacancy[-\s]*(?:mediated|induced|driven|catalyzed|promoted)', re.I),
-    re.compile(r'\b(?:active\s+)?(?:site|center)s?\s+(?:for|of)\s+(?:cataly|oxid)', re.I),
-    re.compile(r'\b(?:charge|electron)\s+transfer\b', re.I),
-    re.compile(r'\b(?:catalytic|reaction)\s+mechanism\b', re.I),
-    re.compile(r'\b(?:peroxidase|oxidase|catalase|SOD)\s*[-\s]*(?:like\s+)?(?:mechanism|pathway|process)', re.I),
-]
+_FULLTEXT_MECHANISM_PATTERNS = _DK.get_mechanism_regex_patterns()
 
 
 def _is_concentration_unit(unit):
@@ -158,13 +152,13 @@ class KineticsAgent:
     ]
 
     _ENZYME_TYPE_KM_PATTERNS = [
-        re.compile(r'\bKm\s*[\(（]\s*(peroxidase|oxidase|catalase|SOD|GPx|GOx|laccase|phosphatase|esterase|haloperoxidase|NTR|hydrolase|nuclease|tyrosinase|catalytic)\s*[-\s]?\s*like\s*[\)）]\s*(?:was|=|:|≈|~)\s*([\d.]+)\s*(mM|μM|uM|M)', re.I),
-        re.compile(r'\bKm\s*(?:for|of)\s+(?:the\s+)?(peroxidase|oxidase|catalase|SOD|GPx|GOx|laccase|phosphatase|esterase|haloperoxidase|NTR|hydrolase|nuclease|tyrosinase|catalytic)\s*[-\s]?\s*like\s+activity\s*(?:was|=|:|≈|~)\s*([\d.]+)\s*(mM|μM|uM|M)', re.I),
+        re.compile(rf'\bKm\s*[\(（]\s*({"|".join(_DK.get_enzyme_type_short_names())})\s*[-\s]?\s*like\s*[\)）]\s*(?:was|=|:|≈|~)\s*([\d.]+)\s*(mM|μM|uM|M)', re.I),
+        re.compile(rf'\bKm\s*(?:for|of)\s+(?:the\s+)?({"|".join(_DK.get_enzyme_type_short_names())})\s*[-\s]?\s*like\s+activity\s*(?:was|=|:|≈|~)\s*([\d.]+)\s*(mM|μM|uM|M)', re.I),
     ]
 
     _ENZYME_TYPE_VMAX_PATTERNS = [
-        re.compile(r'\bVmax\s*[\(（]\s*(peroxidase|oxidase|catalase|SOD|GPx|GOx|laccase|phosphatase|esterase|haloperoxidase|NTR|hydrolase|nuclease|tyrosinase|catalytic)\s*[-\s]?\s*like\s*[\)）]\s*(?:was|=|:|≈|~)\s*([\d.]+)\s*([^\s,;)]+)', re.I),
-        re.compile(r'\bVmax\s*(?:for|of)\s+(?:the\s+)?(peroxidase|oxidase|catalase|SOD|GPx|GOx|laccase|phosphatase|esterase|haloperoxidase|NTR|hydrolase|nuclease|tyrosinase|catalytic)\s*[-\s]?\s*like\s+activity\s*(?:was|=|:|≈|~)\s*([\d.]+)\s*([^\s,;)]+)', re.I),
+        re.compile(rf'\bVmax\s*[\(（]\s*({"|".join(_DK.get_enzyme_type_short_names())})\s*[-\s]?\s*like\s*[\)）]\s*(?:was|=|:|≈|~)\s*([\d.]+)\s*([^\s,;)]+)', re.I),
+        re.compile(rf'\bVmax\s*(?:for|of)\s+(?:the\s+)?({"|".join(_DK.get_enzyme_type_short_names())})\s*[-\s]?\s*like\s+activity\s*(?:was|=|:|≈|~)\s*([\d.]+)\s*([^\s,;)]+)', re.I),
     ]
 
     def _fill_kinetics_list(self, record, kinetics_texts):

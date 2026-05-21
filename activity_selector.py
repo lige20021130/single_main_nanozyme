@@ -2,17 +2,14 @@ import re
 import logging
 from typing import Dict, List, Optional, Any
 
+from domain_knowledge import get_domain_knowledge as _get_dk
 from nanozyme_models import EnzymeType
+
+_DK = _get_dk()
 
 logger = logging.getLogger(__name__)
 
-VALID_ENZYME_TYPES = {
-    "peroxidase_like", "oxidase_like", "catalase_like",
-    "superoxide_dismutase_like", "glucose_oxidase_like",
-    "laccase_like", "phosphatase_like", "esterase_like",
-    "nuclease_like", "nitroreductase_like", "hydrolase_like",
-    "haloperoxidase_like", "other", "unknown",
-}
+VALID_ENZYME_TYPES = {et["value"].replace("-", "_") for et in _DK.enzyme_types}
 
 
 def normalize_enzyme_type(raw: Optional[str]) -> str:

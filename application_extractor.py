@@ -2,186 +2,26 @@ import re
 import logging
 from typing import Dict, List, Optional, Any
 
-logger = logging.getLogger(__name__)
+from domain_knowledge import get_domain_knowledge as _get_dk
+from nanozyme_models import get_application_type_enum_string
 
-APPLICATION_TYPES = {
-    "biosensing", "colorimetric_sensing", "fluorescence_sensing",
-    "electrochemical_sensing", "SERS_sensing", "therapeutic",
-    "antibacterial", "antioxidant", "environmental_detection",
-    "food_safety", "diagnostic", "cytoprotection", "bioimaging",
-    "other",
-}
+_DK = _get_dk()
 
-APPLICATION_TYPE_PATTERNS = {
-    "colorimetric_sensing": [
-        r'(?i)colorimetric\s+(?:detection|sensing|assay|sensor)',
-        r'(?i)colorimetric\s+determination',
-        r'(?i)visual\s+(?:detection|sensing|determination)',
-        r'(?i)color\s+(?:change|imetric)\s+(?:detection|assay)',
-    ],
-    "fluorescence_sensing": [
-        r'(?i)fluorescen\w*\s+(?:detection|sensing|assay|sensor|probe)',
-        r'(?i)fluorometric\s+(?:detection|assay)',
-        r'(?i)fluorimetric\s+(?:detection|assay)',
-        r'(?i)turn.on\s+fluorescen',
-    ],
-    "electrochemical_sensing": [
-        r'(?i)electrochem\w*\s+(?:detection|sensing|sensor|assay)',
-        r'(?i)amperometric\s+(?:detection|sensor)',
-        r'(?i)voltammetric\s+(?:detection|sensor)',
-        r'(?i)impedimetric\s+(?:detection|sensor)',
-        r'(?i)potentiometric\s+(?:detection|sensor)',
-    ],
-    "SERS_sensing": [
-        r'(?i)SERS\s+(?:detection|sensing|sensor|assay|substrate)',
-        r'(?i)surface.enhanced\s+raman',
-    ],
-    "biosensing": [
-        r'(?i)biosens(?:or|ing)',
-        r'(?i)sensing\s+platform',
-        r'(?i)detect\w*\s+platform',
-        r'(?i)point.of.care\s+(?:test|detection|diagnostic)',
-    ],
-    "therapeutic": [
-        r'(?i)therap\w+',
-        r'(?i)tumou?r\s+therapy',
-        r'(?i)cancer\s+therapy',
-        r'(?i)wound\s+heal',
-        r'(?i)anti.?tumor',
-        r'(?i)photothermal\s+therap',
-        r'(?i)chemodynamic\s+therap',
-        r'(?i)sonodynamic\s+therap',
-        r'(?i)photodynamic\s+therap',
-        r'(?i)radiotherap\w*',
-        r'(?i)chemo\w*\s+therap',
-        r'(?i)immuno\w*\s+therap',
-        r'(?i)starvation\s+therap',
-        r'(?i)gas\s+therap',
-    ],
-    "antibacterial": [
-        r'(?i)antibacteri\w+',
-        r'(?i)bacteri\w*\s+kill',
-        r'(?i)disinfect',
-        r'(?i)anti.?microbial',
-        r'(?i)steriliz\w+',
-        r'(?i)bacteriostatic',
-        r'(?i)biocidal',
-    ],
-    "antioxidant": [
-        r'(?i)antioxidant',
-        r'(?i)ROS\s+scaveng',
-        r'(?i)cytoprotect',
-        r'(?i)anti.?inflammatory',
-        r'(?i)radical\s+scaveng',
-        r'(?i)free\s+radical\s+(?:scaveng|remov|elimin)',
-        r'(?i)oxidative\s+stress\s+(?:protect|reduc|reliev|mitig)',
-        r'(?i)radioprotect\w+',
-    ],
-    "environmental_detection": [
-        r'(?i)environment\w*\s+(?:detection|monitor)',
-        r'(?i)pollutant\s+(?:detection|degrad)',
-        r'(?i)water\s+(?:treatment|monitor|detection)',
-        r'(?i)degrad\w+\s+pollutant',
-        r'(?i)organic\s+pollutant\s+(?:remov|degrad|detect)',
-        r'(?i)waste\s+water',
-        r'(?i)heavy\s+metal\s+(?:detection|remov)',
-    ],
-    "food_safety": [
-        r'(?i)food\s+safety',
-        r'(?i)food\s+(?:detection|quality|monitor)',
-        r'(?i)milk\s+(?:detection|quality)',
-        r'(?i)beverage\s+(?:detection|quality)',
-    ],
-    "diagnostic": [
-        r'(?i)diagnos\w+',
-        r'(?i)clinical\s+(?:detection|assay|test)',
-        r'(?i)point.of.care',
-        r'(?i)bioassay',
-        r'(?i)immunoassay',
-    ],
-    "cytoprotection": [
-        r'(?i)cytoprotect\w+',
-        r'(?i)cell\s+protect',
-        r'(?i)neuroprotect\w+',
-        r'(?i)cardioprotect\w+',
-    ],
-    "bioimaging": [
-        r'(?i)bioimag\w+',
-        r'(?i)cell\s+imag\w+',
-        r'(?i)fluorescen\w*\s+imag\w+',
-        r'(?i)MR\s+imag\w+',
-        r'(?i)photoacoustic\s+imag\w+',
-    ],
-}
+APPLICATION_TYPES = {et["value"] for et in _DK.application_types}
 
-METHOD_PATTERNS = {
-    "colorimetric": r'(?i)colorimetric|colorimetry|absorbance|UV.vis',
-    "fluorescence": r'(?i)fluorescen\w*|fluorometric|fluorimetric',
-    "SERS": r'(?i)SERS|surface.enhanced\s+raman',
-    "electrochemical": r'(?i)electrochem\w*|amperometric|voltammetric|impedance',
-}
+APPLICATION_TYPE_PATTERNS = _DK.get_application_type_regex_patterns()
 
-SAMPLE_TYPE_PATTERNS = {
-    "serum": r'(?i)\bserum\b',
-    "water": r'(?i)\bwater\s+(?:sample|sample)?\b',
-    "food": r'(?i)\bfood\s+(?:sample|extract)?\b',
-    "cell": r'(?i)\bcell\b|\bcellular\b|\bin\s+vitro\b|\bin\s+vivo\b',
-    "urine": r'(?i)\burine\b',
-    "plasma": r'(?i)\bplasma\b',
-    "blood": r'(?i)\bblood\b',
-    "saliva": r'(?i)\bsaliva\b',
-    "environmental": r'(?i)\benvironmental\s+sample\b|\briver\b|\blake\b|\btap\s+water\b',
-}
+METHOD_PATTERNS = _DK.get_method_regex_patterns()
 
-_KNOWN_SUBSTRATES = {
-    "tmb", "abts", "opd", "h2o2", "h2o2", "dcfh-da", "dcfh",
-    "l-ascorbic acid", "ascorbic acid", "dopamine hydrochloride",
-    "amplex red", "taed", "guaiacol", "pyrogallol", "catechol",
-    "o-phenylenediamine", "3,3',5,5'-tetramethylbenzidine",
-    "2,2'-azino-bis", "nadh", "nadph",
-}
+SAMPLE_TYPE_PATTERNS = _DK.get_sample_type_regex_patterns()
 
-_KNOWN_ANALYTES = {
-    "glucose", "h2o2", "hydrogen peroxide", "cysteine", "cys",
-    "cu2+", "cu+", "fe2+", "fe3+", "hg2+", "pb2+", "cd2+",
-    "ascorbic acid", "aa", "dopamine", "ua", "uric acid",
-    "sulfite", "phenol", "bisphenol", "bpa",
-    "cancer cells", "tumor cells", "hepg2", "mcf-7", "4t1",
-    "glutathione", "gsh", "l-cysteine",
-    "cholesterol", "lactate", "xanthine", "hypoxanthine",
-    "malathion", "paraoxon", "carbaryl", "atrazine",
-    "escherichia coli", "e. coli", "s. aureus",
-    "cr(vi)", "cr6+", "mn2+", "zn2+", "ag+", "al3+",
-}
+_KNOWN_SUBSTRATES = set(_DK.get_all_substrates())
 
-_PROBE_MOLECULES = {
-    "crystal violet", "cv+", "cv",
-    "methylene blue", "mb",
-    "rhodamine b", "rhb",
-    "rhodamine 6g", "r6g",
-    "4-nitrophenol", "4-np",
-    "congo red",
-    "methyl orange",
-    "methyl red",
-    "eosin y",
-    "fluorescein",
-    "janus green b",
-    "nile blue",
-    "nile red",
-    "acridine orange",
-    "proflavine",
-    "safranin",
-    "neutral red",
-}
+_KNOWN_ANALYTES = _DK.get_known_analytes()
 
-_INVALID_ANALYTE_PHRASES = {
-    "catalytic reactions",
-    "catalytic reaction",
-    "enzyme activity",
-    "nanozyme activity",
-    "oxidase activity",
-    "peroxidase activity",
-}
+_PROBE_MOLECULES = _DK.get_probe_molecules()
+
+_INVALID_ANALYTE_PHRASES = _DK.get_invalid_analyte_phrases()
 
 def is_valid_analyte(analyte: str) -> bool:
     if not analyte or not isinstance(analyte, str):
@@ -234,21 +74,21 @@ def classify_application_type(desc: str, app_type_raw: str = "") -> str:
     combined = (desc + " " + app_type_raw).lower()
     for app_type, patterns in APPLICATION_TYPE_PATTERNS.items():
         for pat in patterns:
-            if re.search(pat, combined):
+            if pat.search(combined):
                 return app_type
     return "other"
 
 
 def extract_method(desc: str) -> Optional[str]:
     for method, pat in METHOD_PATTERNS.items():
-        if re.search(pat, desc):
+        if pat.search(desc):
             return method
     return None
 
 
 def extract_sample_type(desc: str) -> Optional[str]:
     for stype, pat in SAMPLE_TYPE_PATTERNS.items():
-        if re.search(pat, desc):
+        if pat.search(desc):
             return stype
     return None
 

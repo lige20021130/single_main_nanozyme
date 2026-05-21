@@ -102,6 +102,14 @@ class DomainKnowledge:
                     result.append(sub)
         return result
 
+    def get_probe_molecules(self) -> set:
+        probes: set = set()
+        for entry in self._data.get("probe_molecules", {}).get("examples", []):
+            probes.add(entry["name"].lower())
+            for alias in entry.get("aliases", []):
+                probes.add(alias.lower())
+        return probes
+
     def get_enzyme_registry(self) -> Dict[str, Dict[str, Any]]:
         registry: Dict[str, Dict[str, Any]] = {}
         for et in self.enzyme_types:
@@ -165,6 +173,70 @@ class DomainKnowledge:
             if substrates:
                 lines.append(f"Common substrates for {et['value']}: {', '.join(substrates)}")
         return "\n".join(lines)
+
+    def get_application_type_regex_patterns(self) -> Dict[str, List[re.Pattern]]:
+        if hasattr(self, '_app_type_patterns_cache') and self._app_type_patterns_cache is not None:
+            return self._app_type_patterns_cache
+        result: Dict[str, List[re.Pattern]] = {}
+        for app_type, pat_list in self._data.get("application_type_regex_patterns", {}).items():
+            result[app_type] = [re.compile(p, re.I) for p in pat_list]
+        self._app_type_patterns_cache = result
+        return result
+
+    def get_method_regex_patterns(self) -> Dict[str, re.Pattern]:
+        if hasattr(self, '_method_patterns_cache') and self._method_patterns_cache is not None:
+            return self._method_patterns_cache
+        result: Dict[str, re.Pattern] = {}
+        for method, pat_str in self._data.get("method_regex_patterns", {}).items():
+            result[method] = re.compile(pat_str, re.I)
+        self._method_patterns_cache = result
+        return result
+
+    def get_sample_type_regex_patterns(self) -> Dict[str, re.Pattern]:
+        if hasattr(self, '_sample_type_patterns_cache') and self._sample_type_patterns_cache is not None:
+            return self._sample_type_patterns_cache
+        result: Dict[str, re.Pattern] = {}
+        for stype, pat_str in self._data.get("sample_type_regex_patterns", {}).items():
+            result[stype] = re.compile(pat_str, re.I)
+        self._sample_type_patterns_cache = result
+        return result
+
+    def get_known_analytes(self) -> set:
+        return {a.lower() for a in self._data.get("known_analytes", [])}
+
+    def get_invalid_analyte_phrases(self) -> set:
+        return {p.lower() for p in self._data.get("invalid_analyte_phrases", [])}
+
+    def get_figure_caption_patterns(self) -> Dict[str, List[re.Pattern]]:
+        if hasattr(self, '_caption_patterns_cache') and self._caption_patterns_cache is not None:
+            return self._caption_patterns_cache
+        result: Dict[str, List[re.Pattern]] = {}
+        for category, pat_list in self._data.get("figure_caption_patterns", {}).items():
+            result[category] = [re.compile(p, re.I) for p in pat_list]
+        self._caption_patterns_cache = result
+        return result
+
+    def get_mechanism_regex_patterns(self) -> List[re.Pattern]:
+        if hasattr(self, '_mechanism_patterns_cache') and self._mechanism_patterns_cache is not None:
+            return self._mechanism_patterns_cache
+        patterns: List[re.Pattern] = []
+        for pat_str in self._data.get("mechanism_regex_patterns", []):
+            patterns.append(re.compile(pat_str, re.I))
+        self._mechanism_patterns_cache = patterns
+        return patterns
+
+    def get_enzyme_type_short_names(self) -> List[str]:
+        names: List[str] = []
+        for et in self.enzyme_types:
+            val = et["value"]
+            if val in ("other", "unknown"):
+                continue
+            short = val.replace("-like", "")
+            names.append(short)
+            for alias in et.get("aliases", []):
+                if len(alias) <= 6 and alias not in names:
+                    names.append(alias)
+        return names
 
 
 def get_domain_knowledge() -> DomainKnowledge:
