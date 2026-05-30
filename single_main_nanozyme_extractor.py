@@ -5502,8 +5502,25 @@ class SingleMainNanozymePipeline:
                     if u and isinstance(u, str) and _normalize_unit_fn:
                         entry[ukey] = _normalize_unit_fn(u)
             if has_kinetics_data:
-                primary = {k: kin.get(k) for k in _kin_keys}
-                if primary not in kin_list:
+                primary_sub = (kin.get("substrate") or "").strip().lower()
+                primary_mv = (kin.get("material_variant") or "").strip().lower()
+                primary_dm = (kin.get("detection_method") or "").strip().lower()
+                primary_key = (primary_sub, primary_mv, primary_dm)
+                found_primary = False
+                for entry in kin_list:
+                    if not isinstance(entry, dict):
+                        continue
+                    e_sub = (entry.get("substrate") or "").strip().lower()
+                    e_mv = (entry.get("material_variant") or "").strip().lower()
+                    e_dm = (entry.get("detection_method") or "").strip().lower()
+                    if (e_sub, e_mv, e_dm) == primary_key:
+                        found_primary = True
+                        for k in _kin_keys:
+                            if kin.get(k) is not None and entry.get(k) is None:
+                                entry[k] = kin[k]
+                        break
+                if not found_primary:
+                    primary = {k: kin.get(k) for k in _kin_keys}
                     kin_list.insert(0, primary)
             else:
                 first = kin_list[0] if kin_list else {}
@@ -5528,15 +5545,23 @@ class SingleMainNanozymePipeline:
         for entry in kin_list:
             if not isinstance(entry, dict):
                 continue
-            key = (
-                entry.get("Km"), entry.get("Km_unit"),
-                entry.get("Vmax"), entry.get("Vmax_unit"),
-                entry.get("substrate"), entry.get("detection_method"),
-                entry.get("material_variant"),
-            )
+            sub = (entry.get("substrate") or "").strip().lower()
+            mv = (entry.get("material_variant") or "").strip().lower()
+            dm = (entry.get("detection_method") or "").strip().lower()
+            key = (sub, mv, dm)
             if key not in seen:
                 seen.add(key)
                 deduped.append(entry)
+            else:
+                for i, existing in enumerate(deduped):
+                    e_sub = (existing.get("substrate") or "").strip().lower()
+                    e_mv = (existing.get("material_variant") or "").strip().lower()
+                    e_dm = (existing.get("detection_method") or "").strip().lower()
+                    if (e_sub, e_mv, e_dm) == key:
+                        for k, v in entry.items():
+                            if v is not None and existing.get(k) is None:
+                                deduped[i][k] = v
+                        break
         if len(deduped) < len(kin_list):
             logger.info(f"[SMN] Deduplicated kinetics_list: {len(kin_list)} -> {len(deduped)}")
         record["main_activity"]["kinetics_list"] = deduped
@@ -7036,6 +7061,9 @@ class SingleMainNanozymePipeline:
 
     def _backfill_kinetics_from_important_values(self, record: Dict[str, Any]) -> None:
         kin = record.get("main_activity", {}).get("kinetics", {})
+        kin_list = record.get("main_activity", {}).get("kinetics_list", [])
+        if not isinstance(kin_list, list):
+            kin_list = []
         ivs = record.get("important_values", [])
         if not ivs:
             return
@@ -7056,6 +7084,8 @@ class SingleMainNanozymePipeline:
             unit = iv.get("unit", "")
             source = iv.get("source", "")
             context = iv.get("context", "")
+            iv_substrate = iv.get("substrate")
+            iv_material = iv.get("material_variant")
 
             if not val_str:
                 continue
@@ -7076,7 +7106,33 @@ class SingleMainNanozymePipeline:
                 else:
                     continue
 
-            if name in ("Km", "VLM_Km", "LLM_Km", "LLM_Km_alternative") and kin.get("Km") is None:
+            is_km = name in ("Km", "VLM_Km", "LLM_Km", "LLM_Km_alternative")
+            is_vmax = name in ("Vmax", "VLM_Vmax", "LLM_Vmax", "LLM_Vmax_alternative")
+            is_kcat = name in ("kcat", "VLM_kcat", "LLM_kcat", "LLM_kcat_alternative")
+            is_kcat_km = name in ("kcat_Km", "VLM_kcat_Km", "LLM_kcat_Km", "LLM_kcat_Km_alternative")
+
+            if not (is_km or is_vmax or is_kcat or is_kcat_km):
+                continue
+
+            target_substrate = (iv_substrate or "").strip().lower() if iv_substrate else ""
+            target_material = (iv_material or "").strip().lower() if iv_material else ""
+            target_dm = (inferred_dm or "").strip().lower() if inferred_dm else ""
+
+            matched_entry = None
+            for entry in kin_list:
+                if not isinstance(entry, dict):
+                    continue
+                e_sub = (entry.get("substrate") or "").strip().lower()
+                e_mv = (entry.get("material_variant") or "").strip().lower()
+                e_dm = (entry.get("detection_method") or "").strip().lower()
+                sub_match = (target_substrate == e_sub) or (not target_substrate and e_sub) or (target_substrate and not e_sub)
+                mv_match = (target_material == e_mv) or (not target_material and e_mv) or (target_material and not e_mv)
+                dm_match = (target_dm == e_dm) or (not target_dm and e_dm) or (target_dm and not e_dm)
+                if sub_match and mv_match and dm_match:
+                    matched_entry = entry
+                    break
+
+            if is_km and kin.get("Km") is None:
                 record["main_activity"]["kinetics"]["Km"] = val
                 if unit and not kin.get("Km_unit"):
                     if _is_concentration_unit_fn and _is_concentration_unit_fn(unit):
@@ -7090,7 +7146,7 @@ class SingleMainNanozymePipeline:
                 if inferred_dm and not kin.get("detection_method"):
                     record["main_activity"]["kinetics"]["detection_method"] = inferred_dm
                 backfilled.append(f"Km={val}")
-            elif name in ("Vmax", "VLM_Vmax", "LLM_Vmax", "LLM_Vmax_alternative") and kin.get("Vmax") is None:
+            elif is_vmax and kin.get("Vmax") is None:
                 record["main_activity"]["kinetics"]["Vmax"] = val
                 if unit and not kin.get("Vmax_unit"):
                     if _is_rate_unit_fn and _is_rate_unit_fn(unit):
@@ -7104,19 +7160,62 @@ class SingleMainNanozymePipeline:
                 if inferred_dm and not kin.get("detection_method"):
                     record["main_activity"]["kinetics"]["detection_method"] = inferred_dm
                 backfilled.append(f"Vmax={val}")
-            elif name in ("kcat", "VLM_kcat", "LLM_kcat", "LLM_kcat_alternative") and kin.get("kcat") is None:
+            elif is_kcat and kin.get("kcat") is None:
                 record["main_activity"]["kinetics"]["kcat"] = val
                 if unit and not kin.get("kcat_unit"):
                     if _normalize_unit_fn:
                         record["main_activity"]["kinetics"]["kcat_unit"] = _normalize_unit_fn(unit)
                 backfilled.append(f"kcat={val}")
-            elif name in ("kcat_Km", "VLM_kcat_Km", "LLM_kcat_Km", "LLM_kcat_Km_alternative") and kin.get("kcat_Km") is None:
+            elif is_kcat_km and kin.get("kcat_Km") is None:
                 record["main_activity"]["kinetics"]["kcat_Km"] = val
                 if unit and not kin.get("kcat_Km_unit"):
                     if _normalize_unit_fn:
                         record["main_activity"]["kinetics"]["kcat_Km_unit"] = _normalize_unit_fn(unit)
                 backfilled.append(f"kcat_Km={val}")
 
+            if matched_entry is not None:
+                if is_km and matched_entry.get("Km") is None:
+                    matched_entry["Km"] = val
+                    if unit:
+                        matched_entry["Km_unit"] = _normalize_unit_fn(unit) if _normalize_unit_fn else unit
+                    if inferred_dm and not matched_entry.get("detection_method"):
+                        matched_entry["detection_method"] = inferred_dm
+                elif is_vmax and matched_entry.get("Vmax") is None:
+                    matched_entry["Vmax"] = val
+                    if unit:
+                        matched_entry["Vmax_unit"] = _normalize_unit_fn(unit) if _normalize_unit_fn else unit
+                elif is_kcat and matched_entry.get("kcat") is None:
+                    matched_entry["kcat"] = val
+                    if unit:
+                        matched_entry["kcat_unit"] = _normalize_unit_fn(unit) if _normalize_unit_fn else unit
+                elif is_kcat_km and matched_entry.get("kcat_Km") is None:
+                    matched_entry["kcat_Km"] = val
+                    if unit:
+                        matched_entry["kcat_Km_unit"] = _normalize_unit_fn(unit) if _normalize_unit_fn else unit
+            elif iv_substrate or iv_material or inferred_dm:
+                new_entry = {
+                    "substrate": iv_substrate or None,
+                    "material_variant": iv_material or None,
+                    "detection_method": inferred_dm or None,
+                    "source": source or "important_values",
+                    "needs_review": True,
+                }
+                if is_km:
+                    new_entry["Km"] = val
+                    new_entry["Km_unit"] = _normalize_unit_fn(unit) if _normalize_unit_fn and unit else (unit or None)
+                elif is_vmax:
+                    new_entry["Vmax"] = val
+                    new_entry["Vmax_unit"] = _normalize_unit_fn(unit) if _normalize_unit_fn and unit else (unit or None)
+                elif is_kcat:
+                    new_entry["kcat"] = val
+                    new_entry["kcat_unit"] = _normalize_unit_fn(unit) if _normalize_unit_fn and unit else (unit or None)
+                elif is_kcat_km:
+                    new_entry["kcat_Km"] = val
+                    new_entry["kcat_Km_unit"] = _normalize_unit_fn(unit) if _normalize_unit_fn and unit else (unit or None)
+                kin_list.append(new_entry)
+                backfilled.append(f"{name}={val} (new kinetics_list entry)")
+
+        record["main_activity"]["kinetics_list"] = kin_list
         if backfilled:
             logger.info(f"[SMN] Backfilled kinetics from important_values: {', '.join(backfilled)}")
 
@@ -7171,6 +7270,23 @@ class SingleMainNanozymePipeline:
             kin["Vmax_unit"] = "μM/s"
             logger.info(f"[SMN] Final validation: Vmax auto-converted {vmax_val} mM/s -> {new_val} μM/s")
 
+        kcat_val = kin.get("kcat")
+        kcat_u = kin.get("kcat_unit", "")
+        if isinstance(kcat_val, (int, float)) and kcat_u in ("M/s", "M s^-1", "M s-1") and abs(kcat_val) < 1.0:
+            new_val = kcat_val * 1e6
+            kin["kcat"] = new_val
+            kin["kcat_unit"] = "μM/s"
+            logger.info(f"[SMN] Final validation: kcat auto-converted {kcat_val} M/s -> {new_val} μM/s")
+
+        kcat_km_val = kin.get("kcat_Km")
+        kcat_km_u = kin.get("kcat_Km_unit", "")
+        if isinstance(kcat_km_val, (int, float)) and kcat_km_u in ("M^-1 s^-1", "M-1 s-1", "/M/s"):
+            if abs(kcat_km_val) < 1e3:
+                logger.warning(f"[SMN] Final validation: kcat/Km={kcat_km_val} {kcat_km_u} is unrealistically low, clearing.")
+                kin["kcat_Km"] = None
+                kin["kcat_Km_unit"] = None
+                kin["needs_review"] = True
+
         for kl in record.get("main_activity", {}).get("kinetics_list", []):
             if not isinstance(kl, dict):
                 continue
@@ -7179,11 +7295,46 @@ class SingleMainNanozymePipeline:
             if isinstance(kl_km, (int, float)) and kl_kmu in ("M",) and kl_km > 1.0:
                 kl["Km"] = None
                 kl["Km_unit"] = None
+                kl["needs_review"] = True
+            elif isinstance(kl_km, (int, float)) and kl_kmu in ("mM",) and kl_km > 1000:
+                kl["Km"] = None
+                kl["Km_unit"] = None
+                kl["needs_review"] = True
             kl_vmax = kl.get("Vmax")
             kl_vmaxu = kl.get("Vmax_unit", "")
+            if isinstance(kl_vmax, (int, float)) and isinstance(kl_vmaxu, str):
+                sc_match = re.match(r'[×x]\s*10[_\s^-]*(\d+)\s+(.*)', kl_vmaxu)
+                if sc_match:
+                    exponent = int(sc_match.group(1))
+                    base_unit = sc_match.group(2).strip()
+                    converted = kl_vmax * (10 ** (-exponent))
+                    kl["Vmax"] = converted
+                    kl["Vmax_unit"] = base_unit
+                    logger.info(f"[SMN] Final validation: kinetics_list Vmax {kl_vmax} ×10^{exponent} {base_unit} -> {converted} {base_unit}")
+                    kl_vmax = converted
+                    kl_vmaxu = base_unit
             if isinstance(kl_vmax, (int, float)) and kl_vmaxu in ("M/s", "M s^-1", "M s-1") and abs(kl_vmax) < 1.0:
                 kl["Vmax"] = kl_vmax * 1e6
                 kl["Vmax_unit"] = "μM/s"
+            elif isinstance(kl_vmax, (int, float)) and kl_vmaxu in ("M/s", "M s^-1", "M s-1") and abs(kl_vmax) > 1e-3:
+                kl["Vmax"] = None
+                kl["Vmax_unit"] = None
+                kl["needs_review"] = True
+            elif isinstance(kl_vmax, (int, float)) and kl_vmaxu in ("mM/s", "mM s^-1", "mM s-1") and abs(kl_vmax) < 1.0:
+                kl["Vmax"] = kl_vmax * 1e3
+                kl["Vmax_unit"] = "μM/s"
+            kl_kcat = kl.get("kcat")
+            kl_kcatu = kl.get("kcat_unit", "")
+            if isinstance(kl_kcat, (int, float)) and kl_kcatu in ("M/s", "M s^-1", "M s-1") and abs(kl_kcat) < 1.0:
+                kl["kcat"] = kl_kcat * 1e6
+                kl["kcat_unit"] = "μM/s"
+            kl_kcat_km = kl.get("kcat_Km")
+            kl_kcat_kmu = kl.get("kcat_Km_unit", "")
+            if isinstance(kl_kcat_km, (int, float)) and kl_kcat_kmu in ("M^-1 s^-1", "M-1 s-1", "/M/s"):
+                if abs(kl_kcat_km) < 1e3:
+                    kl["kcat_Km"] = None
+                    kl["kcat_Km_unit"] = None
+                    kl["needs_review"] = True
 
     def _infer_profiles(self, record: Dict[str, Any], buckets: Dict[str, List[str]]) -> None:
         act = record.get("main_activity", {})
@@ -7269,7 +7420,7 @@ class SingleMainNanozymePipeline:
             for new_entry in llm_kin_list:
                 if not isinstance(new_entry, dict):
                     continue
-                is_dup = False
+                matched_existing = None
                 for ex in existing:
                     if not isinstance(ex, dict):
                         continue
@@ -7277,9 +7428,13 @@ class SingleMainNanozymePipeline:
                     same_dm = (new_entry.get("detection_method") == ex.get("detection_method"))
                     same_mv = (new_entry.get("material_variant") == ex.get("material_variant"))
                     if same_sub and same_dm and same_mv:
-                        is_dup = True
+                        matched_existing = ex
                         break
-                if not is_dup:
+                if matched_existing is not None:
+                    for k, v in new_entry.items():
+                        if v is not None and matched_existing.get(k) is None:
+                            matched_existing[k] = v
+                else:
                     existing.append(new_entry)
 
         sel = record.get("selected_nanozyme", {})
